@@ -177,6 +177,14 @@ msgstr ""
 msgid "Acknowledge"
 msgstr ""
 
+#: src/components/routes/ack.tsx
+msgid "Acknowledge for {days} days"
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "Acknowledge this alert?"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "acknowledged"
 msgstr ""
@@ -285,6 +293,10 @@ msgstr ""
 msgid "Agent"
 msgstr "Агент"
 
+#: src/components/routes/ack.tsx
+msgid "Alert acknowledgement"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/layout.tsx
@@ -322,6 +334,10 @@ msgstr ""
 #: src/components/systems-table/systems-table.tsx
 msgid "All Systems"
 msgstr "Сви системи"
+
+#: src/components/routes/ack.tsx
+msgid "Applied"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -623,6 +639,10 @@ msgstr "Проверите ваш сервис за обавештавања"
 msgid "Checked {0}"
 msgstr "Проверено {0}"
 
+#: src/components/routes/ack.tsx
+msgid "Checking this link…"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "checks"
 msgstr ""
@@ -878,6 +898,7 @@ msgstr "Креирано"
 msgid "crit — not acknowledgeable"
 msgstr ""
 
+#: src/components/routes/ack.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
 msgstr ""
@@ -938,6 +959,10 @@ msgstr ""
 
 #: src/components/routes/report.tsx
 msgid "Daily report"
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "days"
 msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
@@ -1522,6 +1547,10 @@ msgstr "Interval (sekunde)"
 msgid "Invalid email address."
 msgstr "Неважећа имејл адреса."
 
+#: src/components/routes/ack.tsx
+msgid "It may have expired or already been used. Open the dashboard to acknowledge from there."
+msgstr ""
+
 #: src/components/routes/alerts.tsx
 #: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
@@ -1960,6 +1989,10 @@ msgstr "Циљеви нису пронађени."
 msgid "None"
 msgstr "Нема"
 
+#: src/components/routes/ack.tsx
+msgid "Not applied"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "not run yet"
 msgstr ""
@@ -2043,6 +2076,10 @@ msgstr ""
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Open menu"
 msgstr "Отвори мени"
+
+#: src/components/routes/ack.tsx
+msgid "Open the dashboard"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Optional. Defaults to the agent's system resolver."
@@ -2697,6 +2734,10 @@ msgstr "Пријави се"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Јачина сигнала повезаних Wi-Fi интерфејса"
 
+#: src/components/routes/ack.tsx
+msgid "Silence for"
+msgstr ""
+
 #: src/components/routes/system/charts/network-totals.tsx
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "Since data (up to 30 days)"
@@ -2932,8 +2973,20 @@ msgstr "Затим се пријавите на backend и ресетујте л
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "Ова акција се не може опозвати. Ово ће трајно избрисати све тренутне записе за {name} из базе података."
 
+#: src/components/routes/ack.tsx
+msgid "This exact alert is silenced for {days} days. The runner is applying it now, about a minute."
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "This link is not valid"
+msgstr ""
+
 #: src/components/routes/report.tsx
 msgid "This report could not be loaded."
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "This silences this exact alert. It stays listed as acknowledged, and a worse severity still alerts."
 msgstr ""
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
@@ -3101,6 +3154,10 @@ msgstr ""
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"
 msgstr "Окида се када употреба било ког диска премаши праг"
+
+#: src/components/routes/ack.tsx
+msgid "Try again, or acknowledge from the dashboard."
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -3283,6 +3340,10 @@ msgstr "Желите да помогнете у побољшању наших п
 msgid "Wants"
 msgstr "Жели"
 
+#: src/components/routes/ack.tsx
+msgid "Warning"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Warning (%)"
 msgstr "Упозорење (%)"
@@ -3354,6 +3415,10 @@ msgstr "Wi-Fi сигнал"
 msgctxt "Button to copy install command"
 msgid "Windows command"
 msgstr "Windows команда"
+
+#: src/components/routes/ack.tsx
+msgid "Working…"
+msgstr ""
 
 #. Disk write
 #. Disk write

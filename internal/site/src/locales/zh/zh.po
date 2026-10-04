@@ -177,6 +177,14 @@ msgstr ""
 msgid "Acknowledge"
 msgstr ""
 
+#: src/components/routes/ack.tsx
+msgid "Acknowledge for {days} days"
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "Acknowledge this alert?"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "acknowledged"
 msgstr ""
@@ -285,6 +293,10 @@ msgstr ""
 msgid "Agent"
 msgstr "代理程式"
 
+#: src/components/routes/ack.tsx
+msgid "Alert acknowledgement"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/layout.tsx
@@ -322,6 +334,10 @@ msgstr ""
 #: src/components/systems-table/systems-table.tsx
 msgid "All Systems"
 msgstr "所有系統"
+
+#: src/components/routes/ack.tsx
+msgid "Applied"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -623,6 +639,10 @@ msgstr "檢查您的通知服務"
 msgid "Checked {0}"
 msgstr "已於 {0} 檢查"
 
+#: src/components/routes/ack.tsx
+msgid "Checking this link…"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "checks"
 msgstr ""
@@ -878,6 +898,7 @@ msgstr "已建立"
 msgid "crit — not acknowledgeable"
 msgstr ""
 
+#: src/components/routes/ack.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
 msgstr ""
@@ -938,6 +959,10 @@ msgstr ""
 
 #: src/components/routes/report.tsx
 msgid "Daily report"
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "days"
 msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
@@ -1522,6 +1547,10 @@ msgstr "間隔 (秒)"
 msgid "Invalid email address."
 msgstr "無效的電子郵件地址。"
 
+#: src/components/routes/ack.tsx
+msgid "It may have expired or already been used. Open the dashboard to acknowledge from there."
+msgstr ""
+
 #: src/components/routes/alerts.tsx
 #: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
@@ -1960,6 +1989,10 @@ msgstr "找不到目標。"
 msgid "None"
 msgstr "無"
 
+#: src/components/routes/ack.tsx
+msgid "Not applied"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "not run yet"
 msgstr ""
@@ -2043,6 +2076,10 @@ msgstr ""
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Open menu"
 msgstr "開啟選單"
+
+#: src/components/routes/ack.tsx
+msgid "Open the dashboard"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Optional. Defaults to the agent's system resolver."
@@ -2697,6 +2734,10 @@ msgstr "登入"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "已連線 Wi-Fi 介面的訊號強度"
 
+#: src/components/routes/ack.tsx
+msgid "Silence for"
+msgstr ""
+
 #: src/components/routes/system/charts/network-totals.tsx
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "Since data (up to 30 days)"
@@ -2932,8 +2973,20 @@ msgstr "然後登入後台並在使用者列表中重設您的帳號密碼。"
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "此操作無法復原。這將永久刪除資料庫中{name}的所有當前記錄。"
 
+#: src/components/routes/ack.tsx
+msgid "This exact alert is silenced for {days} days. The runner is applying it now, about a minute."
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "This link is not valid"
+msgstr ""
+
 #: src/components/routes/report.tsx
 msgid "This report could not be loaded."
+msgstr ""
+
+#: src/components/routes/ack.tsx
+msgid "This silences this exact alert. It stays listed as acknowledged, and a worse severity still alerts."
 msgstr ""
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
@@ -3101,6 +3154,10 @@ msgstr ""
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"
 msgstr "當任何磁碟使用率超過閾值時觸發"
+
+#: src/components/routes/ack.tsx
+msgid "Try again, or acknowledge from the dashboard."
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -3283,6 +3340,10 @@ msgstr "想幫助我們改善翻譯嗎？查看<0>Crowdin</0>以取得更多詳�
 msgid "Wants"
 msgstr "可選依賴"
 
+#: src/components/routes/ack.tsx
+msgid "Warning"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Warning (%)"
 msgstr "警告 (%)"
@@ -3354,6 +3415,10 @@ msgstr "Wi-Fi 訊號"
 msgctxt "Button to copy install command"
 msgid "Windows command"
 msgstr "Windows 指令"
+
+#: src/components/routes/ack.tsx
+msgid "Working…"
+msgstr ""
 
 #. Disk write
 #. Disk write

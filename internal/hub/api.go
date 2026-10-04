@@ -218,6 +218,11 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	// Ohmz fork: forward an acknowledge / un-acknowledge request to the agent, which writes a
 	// signed request into the maintenance engine's inbox.
 	apiAuth.POST("/maintenance/ack", h.maintenanceAck).BindFunc(excludeReadOnlyRole)
+	// Ohmz fork: ack tokens for e-mail links are minted and applied by the hub (the new site). Mint is
+	// authenticated with the engine's ack/web.key (HMAC over the body); peek/commit need a valid token.
+	apiNoAuth.POST("/maintenance/ack/mint", h.maintenanceAckMint)
+	apiNoAuth.GET("/maintenance/ack/peek", h.maintenanceAckPeek)
+	apiNoAuth.POST("/maintenance/ack/commit", h.maintenanceAckCommit)
 	// /containers routes
 	if enabled, _ := utils.GetEnv("CONTAINER_DETAILS"); enabled != "false" {
 		// get container logs

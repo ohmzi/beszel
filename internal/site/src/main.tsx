@@ -28,6 +28,7 @@ import * as systemsManager from "@/lib/systemsManager.ts"
 import type { BeszelInfo, UpdateInfo } from "./types"
 
 const LoginPage = lazy(() => import("@/components/login/login.tsx"))
+const Ack = lazy(() => import("@/components/routes/ack.tsx"))
 const Home = lazy(() => import("@/components/routes/home.tsx"))
 const Alerts = lazy(() => import("@/components/routes/alerts.tsx"))
 const Incidents = lazy(() => import("@/components/routes/incidents.tsx"))
@@ -133,6 +134,7 @@ const App = memo(() => {
 
 const Layout = () => {
 	const authenticated = useStore($authenticated)
+	const page = useStore($router)
 	const copyContent = useStore($copyContent)
 	const direction = useStore($direction)
 	const { layoutWidth } = useStore($userSettings, { keys: ["layoutWidth"] })
@@ -143,7 +145,11 @@ const Layout = () => {
 
 	return (
 		<DirectionProvider dir={direction}>
-			{!authenticated ? (
+			{page?.route === "ack" ? (
+				<Suspense>
+					<Ack />
+				</Suspense>
+			) : !authenticated ? (
 				<Suspense>
 					<LoginPage />
 				</Suspense>

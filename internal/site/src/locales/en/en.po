@@ -172,6 +172,14 @@ msgstr "About this report"
 msgid "Acknowledge"
 msgstr "Acknowledge"
 
+#: src/components/routes/ack.tsx
+msgid "Acknowledge for {days} days"
+msgstr "Acknowledge for {days} days"
+
+#: src/components/routes/ack.tsx
+msgid "Acknowledge this alert?"
+msgstr "Acknowledge this alert?"
+
 #: src/components/routes/checks.tsx
 msgid "acknowledged"
 msgstr "acknowledged"
@@ -280,6 +288,10 @@ msgstr "Age"
 msgid "Agent"
 msgstr "Agent"
 
+#: src/components/routes/ack.tsx
+msgid "Alert acknowledgement"
+msgstr "Alert acknowledgement"
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/layout.tsx
@@ -317,6 +329,10 @@ msgstr "All rules"
 #: src/components/systems-table/systems-table.tsx
 msgid "All Systems"
 msgstr "All Systems"
+
+#: src/components/routes/ack.tsx
+msgid "Applied"
+msgstr "Applied"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -618,6 +634,10 @@ msgstr "Check your notification service"
 msgid "Checked {0}"
 msgstr "Checked {0}"
 
+#: src/components/routes/ack.tsx
+msgid "Checking this link…"
+msgstr "Checking this link…"
+
 #: src/components/routes/checks.tsx
 msgid "checks"
 msgstr "checks"
@@ -873,6 +893,7 @@ msgstr "Created"
 msgid "crit — not acknowledgeable"
 msgstr "crit — not acknowledgeable"
 
+#: src/components/routes/ack.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
 msgstr "Critical"
@@ -934,6 +955,10 @@ msgstr "Daily and weekly maintenance reports, newest first."
 #: src/components/routes/report.tsx
 msgid "Daily report"
 msgstr "Daily report"
+
+#: src/components/routes/ack.tsx
+msgid "days"
+msgstr "days"
 
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
@@ -1517,6 +1542,10 @@ msgstr "Interval (seconds)"
 msgid "Invalid email address."
 msgstr "Invalid email address."
 
+#: src/components/routes/ack.tsx
+msgid "It may have expired or already been used. Open the dashboard to acknowledge from there."
+msgstr "It may have expired or already been used. Open the dashboard to acknowledge from there."
+
 #: src/components/routes/alerts.tsx
 #: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
@@ -1955,6 +1984,10 @@ msgstr "No targets found."
 msgid "None"
 msgstr "None"
 
+#: src/components/routes/ack.tsx
+msgid "Not applied"
+msgstr "Not applied"
+
 #: src/components/routes/checks.tsx
 msgid "not run yet"
 msgstr "not run yet"
@@ -2038,6 +2071,10 @@ msgstr "Open incidents from the maintenance engine's ledger, worst first."
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Open menu"
 msgstr "Open menu"
+
+#: src/components/routes/ack.tsx
+msgid "Open the dashboard"
+msgstr "Open the dashboard"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Optional. Defaults to the agent's system resolver."
@@ -2692,6 +2729,10 @@ msgstr "Sign in"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Signal strength of connected Wi-Fi interfaces"
 
+#: src/components/routes/ack.tsx
+msgid "Silence for"
+msgstr "Silence for"
+
 #: src/components/routes/system/charts/network-totals.tsx
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "Since data (up to 30 days)"
@@ -2927,9 +2968,21 @@ msgstr "Then log into the backend and reset your user account password in the us
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 
+#: src/components/routes/ack.tsx
+msgid "This exact alert is silenced for {days} days. The runner is applying it now, about a minute."
+msgstr "This exact alert is silenced for {days} days. The runner is applying it now, about a minute."
+
+#: src/components/routes/ack.tsx
+msgid "This link is not valid"
+msgstr "This link is not valid"
+
 #: src/components/routes/report.tsx
 msgid "This report could not be loaded."
 msgstr "This report could not be loaded."
+
+#: src/components/routes/ack.tsx
+msgid "This silences this exact alert. It stays listed as acknowledged, and a worse severity still alerts."
+msgstr "This silences this exact alert. It stays listed as acknowledged, and a worse severity still alerts."
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -3096,6 +3149,10 @@ msgstr "Triggers when the homelab-maint verdict exceeds a threshold (0 healthy, 
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"
 msgstr "Triggers when usage of any disk exceeds a threshold"
+
+#: src/components/routes/ack.tsx
+msgid "Try again, or acknowledge from the dashboard."
+msgstr "Try again, or acknowledge from the dashboard."
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -3278,6 +3335,10 @@ msgstr "Want to help improve our translations? Check <0>Crowdin</0> for details.
 msgid "Wants"
 msgstr "Wants"
 
+#: src/components/routes/ack.tsx
+msgid "Warning"
+msgstr "Warning"
+
 #: src/components/routes/settings/general.tsx
 msgid "Warning (%)"
 msgstr "Warning (%)"
@@ -3349,6 +3410,10 @@ msgstr "Wi-Fi signal"
 msgctxt "Button to copy install command"
 msgid "Windows command"
 msgstr "Windows command"
+
+#: src/components/routes/ack.tsx
+msgid "Working…"
+msgstr "Working…"
 
 #. Disk write
 #. Disk write

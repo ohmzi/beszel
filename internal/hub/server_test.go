@@ -34,6 +34,7 @@ func TestIsAppRoute(t *testing.T) {
 		{"/spikes", "/", true},
 		{"/migration", "/", true},
 		{"/health", "/", true},
+		{"/ack", "/", true},
 		{"/forgot-password", "/", true},
 		{"/request-otp", "/", true},
 		{"/system/abc123", "/", true},

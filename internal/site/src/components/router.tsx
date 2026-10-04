@@ -19,6 +19,7 @@ const routes = {
 	spikes: "/spikes",
 	migration: "/migration",
 	health: "/health",
+	ack: "/ack",
 	system: `/system/:id`,
 	settings: `/settings/:name?`,
 	forgot_password: `/forgot-password`,
