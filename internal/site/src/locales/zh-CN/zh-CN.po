@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "5 分钟"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "创建账户"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "创建时间"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "请求一次性密码"
 msgid "Request OTP"
 msgstr "请求 OTP"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "被需要"
@@ -2057,6 +2070,11 @@ msgstr "定期向外部监控服务发送外发探测请求，这样您便可以
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "发送测试 心跳"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2426,6 +2444,10 @@ msgstr "当任何磁盘的使用率超过阈值时触发"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "类型"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"

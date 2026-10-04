@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "5 perc"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "Fiók létrehozása"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "Létrehozva"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "Egyszeri jelszó kérése"
 msgid "Request OTP"
 msgstr "OTP kérése"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "Szükséges"
@@ -2057,6 +2070,11 @@ msgstr "Küldjön időszakos kimenő pingeket egy külső megfigyelő szolgálta
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "Teszt heartbeat küldése"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2426,6 +2444,10 @@ msgstr "Riaszt, ha a lemezhasználat túllép egy küszöbértéket"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "Típus"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"

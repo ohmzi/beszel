@@ -138,6 +138,11 @@ msgid "5 min"
 msgstr "5 min"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr "Acknowledge"
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr "Acknowledged"
 
@@ -718,6 +723,10 @@ msgstr "Create account"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "Created"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr "crit — not acknowledgeable"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1874,6 +1883,10 @@ msgstr "Request a one-time password"
 msgid "Request OTP"
 msgstr "Request OTP"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr "Requested. The runner applies it within a minute."
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "Required by"
@@ -2052,6 +2065,11 @@ msgstr "Send periodic outbound pings to an external monitoring service so you ca
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "Send test heartbeat"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr "Sending…"
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2421,6 +2439,10 @@ msgstr "Triggers when usage of any disk exceeds a threshold"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "Type"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr "Un-acknowledge"
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"

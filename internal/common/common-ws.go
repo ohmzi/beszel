@@ -30,6 +30,8 @@ const (
 	GetPackageUpdates
 	// Request recent logs for a systemd service from the agent.
 	GetSystemdLogs
+	// Enqueue an acknowledge / un-acknowledge request into the maintenance engine's inbox (Ohmz fork).
+	MaintenanceAck
 	// Add new actions here...
 )
 
@@ -90,4 +92,21 @@ type SystemdInfoRequest struct {
 
 type SystemdLogsRequest struct {
 	ServiceName string `cbor:"0,keyasint"`
+}
+
+// MaintenanceAckRequest asks the agent to write a signed ack/unack request into the maintenance
+// engine's inbox (Ohmz fork). The agent builds and signs the request itself; the hub never supplies
+// raw bytes.
+type MaintenanceAckRequest struct {
+	Kind     string `cbor:"0,keyasint"` // ack | unack
+	Fp       string `cbor:"1,keyasint"`
+	Severity string `cbor:"2,keyasint,omitempty"` // warn | crit (ack only)
+	Note     string `cbor:"3,keyasint,omitempty"` // ack only
+	Days     int    `cbor:"4,keyasint,omitempty"` // ack only
+}
+
+// MaintenanceAckResult is the agent's answer: whether the request was queued.
+type MaintenanceAckResult struct {
+	OK    bool   `cbor:"0,keyasint"`
+	Error string `cbor:"1,keyasint,omitempty"`
 }

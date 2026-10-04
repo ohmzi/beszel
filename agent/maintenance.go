@@ -317,6 +317,7 @@ func recentIncidents(v any, n int) []system.MaintenanceIncident {
 			Status:   clampStr(str(r["status"]), 16),
 			Since:    uint64(max(int64(num(r["since"])), 0)),
 			Summary:  clampStr(str(r["summary"]), 200),
+			Fp:       clampStr(str(r["fp"]), 16),
 		})
 	}
 	return out

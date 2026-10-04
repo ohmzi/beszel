@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "5 хв"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "Створити обліковий запис"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "Створено"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "Запит одноразового пароля"
 msgid "Request OTP"
 msgstr "Запит OTP"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "Потрібно для"
@@ -2057,6 +2070,11 @@ msgstr "Надсилайте періодичні вихідні пінги на
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "Надіслати тестовий heartbeat"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2426,6 +2444,10 @@ msgstr "Спрацьовує, коли використання будь-яко�
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "Тип"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"

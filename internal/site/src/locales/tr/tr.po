@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "5 dk"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "Hesap oluştur"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "Oluşturuldu"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "Tek kullanımlık şifre iste"
 msgid "Request OTP"
 msgstr "OTP iste"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "Gerektiren"
@@ -2057,6 +2070,11 @@ msgstr "Beszel'i internete maruz bırakmadan izleyebilmeniz için harici bir izl
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "Test heartbeat gönder"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2426,6 +2444,10 @@ msgstr "Herhangi bir diskin kullanımı bir eşiği aştığında tetiklenir"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "Tür"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"

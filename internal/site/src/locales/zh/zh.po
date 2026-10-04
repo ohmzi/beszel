@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "5 分鐘"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "建立帳號"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "已建立"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "請求一次性密碼"
 msgid "Request OTP"
 msgstr "請求 OTP"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "被依賴"
@@ -2057,6 +2070,11 @@ msgstr "定期發送 Outbound Ping 至外部監控服務，讓您無需將 Besze
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "發送測試 Heartbeat"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2426,6 +2444,10 @@ msgstr "當任何磁碟使用率超過閾值時觸發"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "類型"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"

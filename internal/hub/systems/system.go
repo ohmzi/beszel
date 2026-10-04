@@ -873,6 +873,16 @@ func (sys *System) FetchPackageUpdatesFromAgent() (system.PackageUpdates, error)
 	return result, err
 }
 
+// MaintenanceAckFromAgent asks the agent to enqueue a signed ack/unack request into the
+// maintenance engine's inbox (Ohmz fork).
+func (sys *System) MaintenanceAckFromAgent(req common.MaintenanceAckRequest) (common.MaintenanceAckResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var result common.MaintenanceAckResult
+	err := sys.request(ctx, common.MaintenanceAck, req, &result)
+	return result, err
+}
+
 // FetchZfsDataFromAgent fetches ZFS detail data from the agent.
 func (sys *System) FetchZfsDataFromAgent(force bool) (*zfs.ZfsData, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

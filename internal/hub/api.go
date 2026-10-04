@@ -15,6 +15,7 @@ import (
 	"github.com/blang/semver"
 	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/internal/alerts"
+	"github.com/henrygd/beszel/internal/common"
 	systementity "github.com/henrygd/beszel/internal/entities/system"
 	"github.com/henrygd/beszel/internal/ghupdate"
 	"github.com/henrygd/beszel/internal/hub/config"
@@ -207,6 +208,9 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	apiAuth.GET("/systemd/logs", h.getSystemdLogs)
 	// get pending package updates
 	apiAuth.GET("/package-updates", h.getPackageUpdates)
+	// Ohmz fork: forward an acknowledge / un-acknowledge request to the agent, which writes a
+	// signed request into the maintenance engine's inbox.
+	apiAuth.POST("/maintenance/ack", h.maintenanceAck).BindFunc(excludeReadOnlyRole)
 	// /containers routes
 	if enabled, _ := utils.GetEnv("CONTAINER_DETAILS"); enabled != "false" {
 		// get container logs
@@ -544,4 +548,42 @@ func (h *Hub) refreshZfsData(e *core.RequestEvent) error {
 	}
 
 	return e.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// maintenanceAck handles POST /api/beszel/maintenance/ack (Ohmz fork).
+// It forwards an acknowledge / un-acknowledge request to the agent, which writes a signed
+// request into the maintenance engine's inbox. The runner validates and applies it.
+func (h *Hub) maintenanceAck(e *core.RequestEvent) error {
+	systemID := e.Request.URL.Query().Get("system")
+	if systemID == "" {
+		return e.BadRequestError("Invalid system parameter", nil)
+	}
+	system, err := h.sm.GetSystem(systemID)
+	if err != nil || !system.HasUser(e.App, e.Auth) {
+		return e.NotFoundError("", nil)
+	}
+	var body struct {
+		Kind     string `json:"kind"`
+		Fp       string `json:"fp"`
+		Severity string `json:"severity"`
+		Note     string `json:"note"`
+		Days     int    `json:"days"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return e.BadRequestError("Invalid request body", nil)
+	}
+	result, err := system.MaintenanceAckFromAgent(common.MaintenanceAckRequest{
+		Kind:     body.Kind,
+		Fp:       body.Fp,
+		Severity: body.Severity,
+		Note:     body.Note,
+		Days:     body.Days,
+	})
+	if err != nil {
+		return e.InternalServerError("", err)
+	}
+	if !result.OK {
+		return e.BadRequestError(result.Error, nil)
+	}
+	return e.JSON(http.StatusOK, map[string]any{"ok": true})
 }

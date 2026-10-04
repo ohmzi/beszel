@@ -60,6 +60,7 @@ func NewHandlerRegistry() *HandlerRegistry {
 	registry.Register(common.SyncNetworkMonitors, &SyncNetworkMonitorsHandler{})
 	registry.Register(common.GetZfsData, &GetZfsDataHandler{})
 	registry.Register(common.GetPackageUpdates, &GetPackageUpdatesHandler{})
+	registry.Register(common.MaintenanceAck, &MaintenanceAckHandler{})
 
 	return registry
 }
@@ -220,6 +221,24 @@ func (h *GetPackageUpdatesHandler) Handle(hctx *HandlerContext) error {
 		return hctx.SendResponse(system.PackageUpdates{}, hctx.RequestID)
 	}
 	return hctx.SendResponse(hctx.Agent.packageUpdates.list(), hctx.RequestID)
+}
+
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+
+// MaintenanceAckHandler writes a signed ack/unack request into the maintenance
+// engine's inbox (Ohmz fork). It builds and signs the request itself.
+type MaintenanceAckHandler struct{}
+
+func (h *MaintenanceAckHandler) Handle(hctx *HandlerContext) error {
+	var req common.MaintenanceAckRequest
+	if err := cbor.Unmarshal(hctx.Request.Data, &req); err != nil {
+		return err
+	}
+	if err := enqueueAckRequest(req.Kind, req.Fp, req.Severity, req.Note, req.Days); err != nil {
+		return hctx.SendResponse(common.MaintenanceAckResult{OK: false, Error: err.Error()}, hctx.RequestID)
+	}
+	return hctx.SendResponse(common.MaintenanceAckResult{OK: true}, hctx.RequestID)
 }
 
 ////////////////////////////////////////////////////////////////////////////

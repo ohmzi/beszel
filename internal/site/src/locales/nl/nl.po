@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "5 minuten"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "Account aanmaken"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "Aangemaakt"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "Eenmalig wachtwoord aanvragen"
 msgid "Request OTP"
 msgstr "OTP aanvragen"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "Vereist door"
@@ -2057,6 +2070,11 @@ msgstr "Stuur periodieke uitgaande pings naar een externe monitoringservice, zod
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "Stuur test-heartbeat"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2425,6 +2443,10 @@ msgstr "Triggert wanneer het gebruik van een schijf een drempelwaarde overschrij
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
 msgstr ""
 
 #: src/lib/alerts.ts

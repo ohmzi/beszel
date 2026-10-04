@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "5분"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "계정 생성"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "생성됨"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "OTP 요청"
 msgid "Request OTP"
 msgstr "OTP 요청"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "필요한 대상"
@@ -2057,6 +2070,11 @@ msgstr "외부 모니터링 서비스에 주기적으로 아웃바운드 핑을 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "테스트 하트비트 전송"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2426,6 +2444,10 @@ msgstr "디스크 사용량이 임계값을 초과할 때 트리거됩니다."
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "유형"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"

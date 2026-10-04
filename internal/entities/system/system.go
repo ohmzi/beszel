@@ -201,6 +201,7 @@ type MaintenanceIncident struct {
 	Status   string `json:"y,omitempty" cbor:"4,keyasint,omitempty"` // open | acknowledged
 	Since    uint64 `json:"t,omitempty" cbor:"5,keyasint,omitempty"`
 	Summary  string `json:"d,omitempty" cbor:"6,keyasint,omitempty"`
+	Fp       string `json:"p,omitempty" cbor:"7,keyasint,omitempty"` // issue fingerprint, when the incident has one (ack target)
 }
 
 // Core system data that is needed in All Systems table

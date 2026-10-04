@@ -1,13 +1,16 @@
 // Open incidents (Ohmz fork, see docs/OHMZ-REDESIGN.md).
 // The maintenance engine keeps an incident ledger; its open entries are carried through each
 // system's `info.mt.o`. Acknowledged ones are listed too (the owner knows), marked as such.
+// Acknowledge / Un-acknowledge here forwards a request to the agent, which writes a signed request
+// into the engine's inbox; the runner applies it within a minute.
 import { Trans, useLingui } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
 import { useStore } from "@nanostores/react"
-import { memo, useEffect, useMemo } from "react"
+import { memo, useEffect, useMemo, useState } from "react"
 import { FooterRepoLink } from "@/components/footer-repo-link"
 import { $router, Link } from "@/components/router"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { pb } from "@/lib/api"
 import { $systems } from "@/lib/stores"
 import type { MaintenanceIncident } from "@/types"
 
@@ -27,6 +30,8 @@ function since(ts?: number): string {
 export default memo(() => {
 	const { t } = useLingui()
 	const systems = useStore($systems)
+	const [busy, setBusy] = useState<Record<string, string>>({})
+	const [note, setNote] = useState<{ fp: string; text: string; ok: boolean } | null>(null)
 
 	useEffect(() => {
 		document.title = `${t`Incidents`} / Beszel`
@@ -42,6 +47,27 @@ export default memo(() => {
 		out.sort((a, b) => (SEV_RANK[b.inc.s ?? ""] ?? 0) - (SEV_RANK[a.inc.s ?? ""] ?? 0) || (b.inc.t ?? 0) - (a.inc.t ?? 0))
 		return out
 	}, [systems])
+
+	async function send(sysId: string, kind: "ack" | "unack", fp: string) {
+		setBusy((b) => ({ ...b, [fp]: kind }))
+		setNote(null)
+		try {
+			await pb.send("/api/beszel/maintenance/ack", {
+				method: "POST",
+				query: { system: sysId },
+				body: kind === "ack" ? { kind, fp, severity: "warn", days: 90 } : { kind, fp },
+			})
+			setNote({ fp, text: t`Requested. The runner applies it within a minute.`, ok: true })
+		} catch (err) {
+			setNote({ fp, text: String((err as Error)?.message || err), ok: false })
+		} finally {
+			setBusy((b) => {
+				const n = { ...b }
+				delete n[fp]
+				return n
+			})
+		}
+	}
 
 	return (
 		<>
@@ -67,53 +93,88 @@ export default memo(() => {
 							<TableHead>
 								<Trans>Title</Trans>
 							</TableHead>
-							<TableHead className="w-40">
+							<TableHead className="w-36">
 								<Trans>Task</Trans>
 							</TableHead>
 							<TableHead className="w-32">
 								<Trans>Status</Trans>
 							</TableHead>
-							<TableHead className="w-28">
+							<TableHead className="w-24">
 								<Trans>Open for</Trans>
 							</TableHead>
-							<TableHead className="w-40">
+							<TableHead className="w-32">
 								<Trans>System</Trans>
+							</TableHead>
+							<TableHead className="w-40 text-right">
+								<Trans>Acknowledge</Trans>
 							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{rows.map(({ sysId, sys, inc }, i) => (
-							<TableRow key={`${sysId}-${inc.i}-${i}`}>
-								<TableCell>
-									<span className="flex items-center gap-1.5">
-										<span className={`block size-2 rounded-full ${SEV_DOT[inc.s ?? ""] ?? "bg-foreground/40"}`} />
-										<span className="text-muted-foreground">{SEV_WORD[inc.s ?? ""] ?? inc.s ?? ""}</span>
-									</span>
-								</TableCell>
-								<TableCell className="font-medium">
-									{inc.n || inc.k || ""}
-									{inc.d ? <span className="block text-xs text-muted-foreground truncate max-w-lg">{inc.d}</span> : null}
-								</TableCell>
-								<TableCell className="text-muted-foreground">{inc.k ?? ""}</TableCell>
-								<TableCell>
-									{inc.y === "acknowledged" ? (
-										<span className="text-muted-foreground">
-											<Trans>Acknowledged</Trans>
+						{rows.map(({ sysId, sys, inc }, i) => {
+							const fp = inc.p ?? ""
+							const b = fp ? busy[fp] : undefined
+							const canAck = !!fp && inc.s === "sev3" && inc.y !== "acknowledged"
+							const canUnack = !!fp && inc.y === "acknowledged"
+							return (
+								<TableRow key={`${sysId}-${inc.i}-${i}`}>
+									<TableCell>
+										<span className="flex items-center gap-1.5">
+											<span className={`block size-2 rounded-full ${SEV_DOT[inc.s ?? ""] ?? "bg-foreground/40"}`} />
+											<span className="text-muted-foreground">{SEV_WORD[inc.s ?? ""] ?? inc.s ?? ""}</span>
 										</span>
-									) : (
-										<span className="text-red-500">
-											<Trans>Open</Trans>
-										</span>
-									)}
-								</TableCell>
-								<TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">{since(inc.t)}</TableCell>
-								<TableCell>
-									<Link href={getPagePath($router, "system", { id: sysId })} className="hover:underline">
-										{sys}
-									</Link>
-								</TableCell>
-							</TableRow>
-						))}
+									</TableCell>
+									<TableCell className="font-medium">
+										{inc.n || inc.k || ""}
+										{inc.d ? <span className="block text-xs text-muted-foreground truncate max-w-lg">{inc.d}</span> : null}
+										{note && note.fp === fp ? (
+											<span className={`block text-xs ${note.ok ? "text-green-500" : "text-red-500"}`}>{note.text}</span>
+										) : null}
+									</TableCell>
+									<TableCell className="text-muted-foreground">{inc.k ?? ""}</TableCell>
+									<TableCell>
+										{inc.y === "acknowledged" ? (
+											<span className="text-muted-foreground">
+												<Trans>Acknowledged</Trans>
+											</span>
+										) : (
+											<span className="text-red-500">
+												<Trans>Open</Trans>
+											</span>
+										)}
+									</TableCell>
+									<TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">{since(inc.t)}</TableCell>
+									<TableCell>
+										<Link href={getPagePath($router, "system", { id: sysId })} className="hover:underline">
+											{sys}
+										</Link>
+									</TableCell>
+									<TableCell className="text-right">
+										{canAck ? (
+											<button
+												type="button"
+												className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-accent disabled:opacity-60"
+												disabled={!!b}
+												onClick={() => send(sysId, "ack", fp)}
+											>
+												{b === "ack" ? t`Sending…` : t`Acknowledge`}
+											</button>
+										) : canUnack ? (
+											<button
+												type="button"
+												className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-accent disabled:opacity-60"
+												disabled={!!b}
+												onClick={() => send(sysId, "unack", fp)}
+											>
+												{b === "unack" ? t`Sending…` : t`Un-acknowledge`}
+											</button>
+										) : (
+											<span className="text-xs text-muted-foreground">{inc.s === "sev3" ? "" : t`crit — not acknowledgeable`}</span>
+										)}
+									</TableCell>
+								</TableRow>
+							)
+						})}
 					</TableBody>
 				</Table>
 			)}

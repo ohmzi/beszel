@@ -89,6 +89,8 @@ export interface MaintenanceIncident {
 	t?: number
 	/** summary */
 	d?: string
+	/** issue fingerprint (ack target), when the incident has one */
+	p?: string
 }
 
 export interface SystemInfo {

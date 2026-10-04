@@ -143,6 +143,11 @@ msgid "5 min"
 msgstr "۵ دقیقه"
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
@@ -723,6 +728,10 @@ msgstr "ایجاد حساب کاربری"
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "ایجاد شده"
+
+#: src/components/routes/incidents.tsx
+msgid "crit — not acknowledgeable"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Critical"
@@ -1879,6 +1888,10 @@ msgstr "درخواست رمز عبور یک‌بار مصرف"
 msgid "Request OTP"
 msgstr "درخواست OTP"
 
+#: src/components/routes/incidents.tsx
+msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
 msgstr "مورد نیاز توسط"
@@ -2057,6 +2070,11 @@ msgstr "پینگ‌های خروجی دوره‌ای را به یک سرویس �
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "ارسال ضربان قلب آزمایشی"
+
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Sending…"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -2426,6 +2444,10 @@ msgstr "هنگامی که استفاده از هر دیسکی از یک آستا
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Type"
 msgstr "نوع"
+
+#: src/components/routes/incidents.tsx
+msgid "Un-acknowledge"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unhealthy"
