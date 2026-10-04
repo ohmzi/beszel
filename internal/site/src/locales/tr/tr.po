@@ -137,6 +137,11 @@ msgstr "24 saat"
 msgid "24h (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "24h ↓ / ↑"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 gün"
@@ -148,6 +153,11 @@ msgstr "5 dk"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "7d (↓ / ↑)"
+msgstr ""
+
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "7d ↓ / ↑"
 msgstr ""
 
 #: src/components/routes/incidents.tsx
@@ -1629,6 +1639,11 @@ msgstr "Bildirimler, son konteyner günlüklerinden alıntılar içerebilir."
 msgid "Now (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "Now ↓ / ↑"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "OAuth 2 / OIDC desteği"
@@ -2159,7 +2174,9 @@ msgstr "Seri Numarası"
 msgid "Service Details"
 msgstr "Hizmet Ayrıntıları"
 
-#: src/components/routes/system.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/services.tsx
+#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "Hizmetler"
@@ -2286,6 +2303,10 @@ msgstr "Zaman içindeki sistem yükü ortalamaları"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
 msgstr "Systemd Hizmetleri"
+
+#: src/components/routes/services.tsx
+msgid "Systemd services, pending package updates and storage pools for this host."
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2587,7 +2608,6 @@ msgstr "Güncellendi"
 msgid "Updated every 10 minutes."
 msgstr "Her 10 dakikada bir güncellenir."
 
-#: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr "Güncellemeler"

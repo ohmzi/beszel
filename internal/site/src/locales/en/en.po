@@ -132,6 +132,11 @@ msgstr "24 hours"
 msgid "24h (↓ / ↑)"
 msgstr "24h (↓ / ↑)"
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "24h ↓ / ↑"
+msgstr "24h ↓ / ↑"
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 days"
@@ -144,6 +149,11 @@ msgstr "5 min"
 #: src/components/routes/system/charts/container-network.tsx
 msgid "7d (↓ / ↑)"
 msgstr "7d (↓ / ↑)"
+
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "7d ↓ / ↑"
+msgstr "7d ↓ / ↑"
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
@@ -1624,6 +1634,11 @@ msgstr "Notifications may include recent container log excerpts."
 msgid "Now (↓ / ↑)"
 msgstr "Now (↓ / ↑)"
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "Now ↓ / ↑"
+msgstr "Now ↓ / ↑"
+
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "OAuth 2 / OIDC support"
@@ -2154,7 +2169,9 @@ msgstr "Serial Number"
 msgid "Service Details"
 msgstr "Service Details"
 
-#: src/components/routes/system.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/services.tsx
+#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "Services"
@@ -2281,6 +2298,10 @@ msgstr "System load averages over time"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
 msgstr "Systemd Services"
+
+#: src/components/routes/services.tsx
+msgid "Systemd services, pending package updates and storage pools for this host."
+msgstr "Systemd services, pending package updates and storage pools for this host."
 
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2582,7 +2603,6 @@ msgstr "Updated"
 msgid "Updated every 10 minutes."
 msgstr "Updated every 10 minutes."
 
-#: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr "Updates"

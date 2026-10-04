@@ -1,7 +1,8 @@
 import type { CellContext, Column, ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
-import { cn, copyToClipboard, decimalString, formatMicroseconds, hourWithSeconds } from "@/lib/utils"
+import { cn, copyToClipboard, decimalString, formatBytes, formatMicroseconds, hourWithSeconds } from "@/lib/utils"
 import {
+	ArrowDownUpIcon,
 	GlobeIcon,
 	TimerIcon,
 	WifiOffIcon,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Plural, Trans } from "@lingui/react/macro"
 import { $allSystemsById } from "@/lib/stores"
+import { $containerNet } from "@/lib/container-net"
 import type { ReadableAtom } from "nanostores"
 import { useStore } from "@nanostores/react"
 import { SystemStatus } from "@/lib/enums"
@@ -64,6 +66,28 @@ const SYSTEM_STATUS_COLORS = {
  */
 const isMuted = (record: NetworkMonitorRecord, systemRecord: SystemRecord | undefined) =>
 	!record.enabled || systemRecord?.status !== SystemStatus.Up
+
+// Ohmz fork: per-monitor bandwidth (matched to the container of the same name).
+function fmtBytes(x: number): string {
+	const { value, unit } = formatBytes(x)
+	return `${value >= 100 ? Math.round(value).toLocaleString() : value.toFixed(1)} ${unit}`
+}
+
+function NetCell({ record, which }: { record: NetworkMonitorRecord; which: "now" | "d24" | "d7" }) {
+	const net = useStore($containerNet)[`${record.system}:${record.name ?? ""}`]
+	if (!net) return <span className="ms-1.5 text-muted-foreground">-</span>
+	const down = which === "now" ? net.nowDown : which === "d24" ? net.d24Down : net.d7Down
+	const up = which === "now" ? net.nowUp : which === "d24" ? net.d24Up : net.d7Up
+	if (!down && !up) return <span className="ms-1.5 text-muted-foreground">-</span>
+	const suf = which === "now" ? "/s" : ""
+	return (
+		<span className="ms-1.5 tabular-nums whitespace-nowrap text-xs">
+			<span className="text-green-500">↓</span> {fmtBytes(down)}
+			{suf} <span className="text-blue-500">↑</span> {fmtBytes(up)}
+			{suf}
+		</span>
+	)
+}
 
 export function getMonitorColumns(
 	_longestTarget = "",
@@ -248,6 +272,27 @@ export function getMonitorColumns(
 					</span>
 				)
 			},
+		},
+		{
+			id: "netNow",
+			meta: { label: t`Now ↓ / ↑` },
+			enableSorting: false,
+			header: ({ column }) => <HeaderButton column={column} name={t`Now ↓ / ↑`} Icon={ArrowDownUpIcon} />,
+			cell: ({ row }) => <NetCell record={row.original} which="now" />,
+		},
+		{
+			id: "net24",
+			meta: { label: t`24h ↓ / ↑` },
+			enableSorting: false,
+			header: ({ column }) => <HeaderButton column={column} name={t`24h ↓ / ↑`} Icon={ArrowDownUpIcon} />,
+			cell: ({ row }) => <NetCell record={row.original} which="d24" />,
+		},
+		{
+			id: "net7",
+			meta: { label: t`7d ↓ / ↑` },
+			enableSorting: false,
+			header: ({ column }) => <HeaderButton column={column} name={t`7d ↓ / ↑`} Icon={ArrowDownUpIcon} />,
+			cell: ({ row }) => <NetCell record={row.original} which="d7" />,
 		},
 		{
 			id: "cert",

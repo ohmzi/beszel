@@ -137,6 +137,11 @@ msgstr "24 giờ"
 msgid "24h (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "24h ↓ / ↑"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 ngày"
@@ -148,6 +153,11 @@ msgstr "5 phút"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "7d (↓ / ↑)"
+msgstr ""
+
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "7d ↓ / ↑"
 msgstr ""
 
 #: src/components/routes/incidents.tsx
@@ -1629,6 +1639,11 @@ msgstr "Thông báo có thể bao gồm các đoạn trích gần đây từ nh�
 msgid "Now (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "Now ↓ / ↑"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "Hỗ trợ OAuth 2 / OIDC"
@@ -2159,7 +2174,9 @@ msgstr "Số seri"
 msgid "Service Details"
 msgstr "Chi tiết dịch vụ"
 
-#: src/components/routes/system.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/services.tsx
+#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "Dịch vụ"
@@ -2286,6 +2303,10 @@ msgstr "Tải trung bình của hệ thống theo thời gian"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
 msgstr "Dịch vụ Systemd"
+
+#: src/components/routes/services.tsx
+msgid "Systemd services, pending package updates and storage pools for this host."
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2587,7 +2608,6 @@ msgstr "Đã cập nhật"
 msgid "Updated every 10 minutes."
 msgstr "Cập nhật mỗi 10 phút."
 
-#: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr "Cập nhật"

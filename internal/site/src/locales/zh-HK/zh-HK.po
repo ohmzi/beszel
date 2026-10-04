@@ -137,6 +137,11 @@ msgstr "24小時"
 msgid "24h (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "24h ↓ / ↑"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30天"
@@ -148,6 +153,11 @@ msgstr "5 分鐘"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "7d (↓ / ↑)"
+msgstr ""
+
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "7d ↓ / ↑"
 msgstr ""
 
 #: src/components/routes/incidents.tsx
@@ -1629,6 +1639,11 @@ msgstr "通知可能包含最近的容器日誌片段。"
 msgid "Now (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "Now ↓ / ↑"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "支援 OAuth 2 / OIDC"
@@ -2159,7 +2174,9 @@ msgstr "序列號"
 msgid "Service Details"
 msgstr "服務詳情"
 
-#: src/components/routes/system.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/services.tsx
+#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "服務"
@@ -2286,6 +2303,10 @@ msgstr "系統平均負載隨時間變化"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
 msgstr "Systemd 服務"
+
+#: src/components/routes/services.tsx
+msgid "Systemd services, pending package updates and storage pools for this host."
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2587,7 +2608,6 @@ msgstr "已更新"
 msgid "Updated every 10 minutes."
 msgstr "每 10 分鐘更新一次。"
 
-#: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr "更新"

@@ -137,6 +137,11 @@ msgstr "24 ساعة"
 msgid "24h (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "24h ↓ / ↑"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 يومًا"
@@ -148,6 +153,11 @@ msgstr "5 دقائق"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "7d (↓ / ↑)"
+msgstr ""
+
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "7d ↓ / ↑"
 msgstr ""
 
 #: src/components/routes/incidents.tsx
@@ -1629,6 +1639,11 @@ msgstr "قد تتضمن الإشعارات مقتطفات حديثة من سجل
 msgid "Now (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "Now ↓ / ↑"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "دعم OAuth 2 / OIDC"
@@ -2159,7 +2174,9 @@ msgstr "الرقم التسلسلي"
 msgid "Service Details"
 msgstr "تفاصيل الخدمة"
 
-#: src/components/routes/system.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/services.tsx
+#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "الخدمات"
@@ -2286,6 +2303,10 @@ msgstr "متوسط تحميل النظام مع مرور الوقت"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
 msgstr "خدمات systemd"
+
+#: src/components/routes/services.tsx
+msgid "Systemd services, pending package updates and storage pools for this host."
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2587,7 +2608,6 @@ msgstr "تم التحديث"
 msgid "Updated every 10 minutes."
 msgstr "يتم التحديث كل 10 دقائق."
 
-#: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr "التحديثات"

@@ -137,6 +137,11 @@ msgstr "24時間"
 msgid "24h (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "24h ↓ / ↑"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30日間"
@@ -148,6 +153,11 @@ msgstr "5分"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "7d (↓ / ↑)"
+msgstr ""
+
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "7d ↓ / ↑"
 msgstr ""
 
 #: src/components/routes/incidents.tsx
@@ -1629,6 +1639,11 @@ msgstr "通知には、最近のコンテナログの抜粋が含まれる場合
 msgid "Now (↓ / ↑)"
 msgstr ""
 
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/network-monitors-table/network-monitors-columns.tsx
+msgid "Now ↓ / ↑"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "OAuth 2 / OIDCサポート"
@@ -2159,7 +2174,9 @@ msgstr "シリアル番号"
 msgid "Service Details"
 msgstr "サービス詳細"
 
-#: src/components/routes/system.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/services.tsx
+#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "サービス"
@@ -2286,6 +2303,10 @@ msgstr "システムの負荷平均の推移"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
 msgstr "Systemdサービス"
+
+#: src/components/routes/services.tsx
+msgid "Systemd services, pending package updates and storage pools for this host."
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2587,7 +2608,6 @@ msgstr "更新済み"
 msgid "Updated every 10 minutes."
 msgstr "10分ごとに更新されます。"
 
-#: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr "更新"

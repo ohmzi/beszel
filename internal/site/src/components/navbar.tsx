@@ -15,6 +15,7 @@ import {
 	SearchIcon,
 	ServerIcon,
 	SettingsIcon,
+	TerminalSquareIcon,
 	UserIcon,
 	UsersIcon,
 } from "lucide-react"
@@ -204,6 +205,21 @@ export default function Navbar() {
 					</TooltipTrigger>
 					<TooltipContent>
 						<Trans>Reports</Trans>
+					</TooltipContent>
+				</Tooltip>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Link
+							href={getPagePath($router, "services")}
+							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+							aria-label="Services"
+							onMouseEnter={() => import("@/components/routes/services")}
+						>
+							<TerminalSquareIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+						</Link>
+					</TooltipTrigger>
+					<TooltipContent>
+						<Trans>Services</Trans>
 					</TooltipContent>
 				</Tooltip>
 				<Tooltip>

@@ -15,22 +15,16 @@ import { TemperatureChart, FanChart, BatteryChart } from "./system/charts/sensor
 import { WiFiChart } from "./system/charts/wifi-chart"
 import { GpuPowerChart, GpuCharts } from "./system/charts/gpu-charts"
 import {
-	LazyContainersTable,
 	LazyNetworkMonitorsTable,
-	LazyPackageUpdatesTable,
 	LazySmartTable,
-	LazySystemdTable,
 	LazyZfsTable,
 } from "./system/lazy-tables"
 import { LoadAverageChart } from "./system/charts/load-average-chart"
 import { MaintenanceChart } from "./system/charts/maintenance-chart"
 
-import { ContainerIcon, CpuIcon, HardDriveIcon, NetworkIcon, PackageIcon, TerminalSquareIcon } from "lucide-react"
+import { ContainerIcon, CpuIcon, HardDriveIcon, NetworkIcon } from "lucide-react"
 import { GpuIcon } from "../ui/icons"
-import SystemdTable from "../systemd-table/systemd-table"
-import ContainersTable from "../containers-table/containers-table"
 
-const SEMVER_0_14_0 = parseSemVer("0.14.0")
 const SEMVER_0_15_0 = parseSemVer("0.15.0")
 
 export default memo(function SystemDetail({ id }: { id: string }) {
@@ -72,7 +66,6 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 
 	const hasContainers = containerData.length > 0
 	const maybeHasSmartData = compareSemVer(chartData.agentVersion, SEMVER_0_15_0) >= 0
-	const hasContainersTable = hasContainers && compareSemVer(chartData.agentVersion, SEMVER_0_14_0) >= 0
 	const hasSystemd = system.info.sv
 	const hasGpu = hasGpuData || hasGpuPowerData
 	const hasZfs = Object.keys(systemStats.at(-1)?.stats?.z ?? {}).length > 0
@@ -163,18 +156,6 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 				<ExtraFsCharts systemData={systemData} />
 
 				{hasZfs && <ZfsCharts systemData={systemData} />}
-
-				{hasZfs && <LazyZfsTable systemId={system.id} />}
-
-				{maybeHasSmartData && <LazySmartTable systemId={system.id} />}
-
-				{hasContainersTable && <LazyContainersTable systemId={system.id} />}
-
-				{hasSystemd && <LazySystemdTable systemId={system.id} />}
-
-				{packageUpdates && <LazyPackageUpdatesTable systemId={system.id} counts={packageUpdates} />}
-
-				{hasNetworkMonitors && <LazyNetworkMonitorsTable systemId={system.id} />}
 			</>
 		)
 	}
@@ -205,18 +186,6 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 						<TabsTrigger value="containers" className="w-full flex items-center gap-2">
 							<ContainerIcon className="size-3.5" />
 							<Trans>Containers</Trans>
-						</TabsTrigger>
-					)}
-					{hasSystemd && (
-						<TabsTrigger value="services" className="w-full flex items-center gap-2">
-							<TerminalSquareIcon className="size-3.5" />
-							<Trans>Services</Trans>
-						</TabsTrigger>
-					)}
-					{packageUpdates && (
-						<TabsTrigger value="updates" className="w-full flex items-center gap-2">
-							<PackageIcon className="size-3.5" />
-							<Trans>Updates</Trans>
 						</TabsTrigger>
 					)}
 				</TabsList>
@@ -303,23 +272,12 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 										networkConfig={containerChartConfigs.network}
 									/>
 								</div>
-								{hasContainersTable && <ContainersTable systemId={system.id} />}
 							</>
 						)}
 					</TabsContent>
 				)}
 
-				{hasSystemd && (
-					<TabsContent value="services" forceMount className={activeTab === "services" ? "contents" : "hidden"}>
-						{mountedTabs.has("services") && <SystemdTable systemId={system.id} />}
-					</TabsContent>
-				)}
 
-				{packageUpdates && (
-					<TabsContent value="updates" forceMount className={activeTab === "updates" ? "contents" : "hidden"}>
-						{mountedTabs.has("updates") && <LazyPackageUpdatesTable systemId={system.id} counts={packageUpdates} />}
-					</TabsContent>
-				)}
 			</Tabs>
 		)
 	}

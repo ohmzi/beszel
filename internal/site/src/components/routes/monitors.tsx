@@ -3,7 +3,6 @@ import { memo, useEffect } from "react"
 import NetworkMonitorsTableNew from "@/components/network-monitors-table/network-monitors-table"
 import { FooterRepoLink } from "@/components/footer-repo-link"
 import { NetworkTotals } from "@/components/routes/system/charts/network-totals"
-import { ContainerNetwork } from "@/components/routes/system/charts/container-network"
 import { useNetworkMonitors } from "@/lib/use-network-monitors"
 import { $allSystemsById } from "@/lib/stores"
 import { supportsNetworkMonitors } from "@/lib/utils"
@@ -27,13 +26,12 @@ export default memo(() => {
 
 	return (
 		<>
-			<NetworkMonitorsTableNew monitors={visibleMonitors} isLoading={isLoading} />
 			{sysId ? (
-				<div className="grid xl:grid-cols-2 gap-4 mt-6">
+				<div className="mb-6">
 					<NetworkTotals systemId={sysId} />
-					<ContainerNetwork systemId={sysId} />
 				</div>
 			) : null}
+			<NetworkMonitorsTableNew monitors={visibleMonitors} isLoading={isLoading} />
 			<FooterRepoLink />
 		</>
 	)

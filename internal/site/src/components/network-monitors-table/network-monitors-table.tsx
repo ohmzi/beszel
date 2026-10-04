@@ -37,6 +37,7 @@ import { isReadOnlyUser, queueUserSettings } from "@/lib/api"
 import { pb } from "@/lib/api"
 import { SystemStatus } from "@/lib/enums"
 import { $allSystemsById, $direction, $textMeasureVersion, $userSettings, getUserChartTime } from "@/lib/stores"
+import { loadContainerNet } from "@/lib/container-net"
 import { cn, formatShortDate, isVisuallyLonger, matchesFilterGroups, parseFilterGroups, parseSemVer } from "@/lib/utils"
 import type { ChartOptions, MonitorCertInfo, NetworkMonitorRecord } from "@/types"
 import { AddMonitorDialog, EditMonitorDialog, MonitorMultiSelect, SystemMultiSelect } from "./monitor-dialog"
@@ -105,6 +106,17 @@ export default function NetworkMonitorsTableNew({
 
 	const { toast } = useToast()
 	const canManageMonitors = !isReadOnlyUser()
+
+	// Ohmz fork: load per-container bandwidth for the monitored systems (feeds the Now/24h/7d columns).
+	const netSystems = useMemo(() => [...new Set(monitors.map((m) => m.system))].join(","), [monitors])
+	useEffect(() => {
+		const ids = netSystems ? netSystems.split(",") : []
+		if (!ids.length) return
+		const run = () => ids.forEach((id) => void loadContainerNet(id))
+		run()
+		const timer = setInterval(run, 60000)
+		return () => clearInterval(timer)
+	}, [netSystems])
 
 	// Apply settings from server once they load (handles incognito / new devices)
 	const appliedSettings = useRef(new Set<string>())
