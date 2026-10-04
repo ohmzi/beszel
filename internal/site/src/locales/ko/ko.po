@@ -133,6 +133,10 @@ msgstr "15분"
 msgid "24 hours"
 msgstr "24시간"
 
+#: src/components/routes/system/charts/container-network.tsx
+msgid "24h (↓ / ↑)"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30일"
@@ -141,6 +145,10 @@ msgstr "30일"
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "5 min"
 msgstr "5분"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "7d (↓ / ↑)"
+msgstr ""
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
@@ -597,6 +605,7 @@ msgstr "충돌"
 msgid "Connection is down"
 msgstr "연결이 끊겼습니다"
 
+#: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
 msgstr "컨테이너"
@@ -604,6 +613,10 @@ msgstr "컨테이너"
 #: src/lib/alerts.ts
 msgid "Container Health"
 msgstr "컨테이너 상태"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Container network"
+msgstr ""
 
 #: src/components/routes/system.tsx
 msgid "Containers"
@@ -1548,6 +1561,10 @@ msgstr "아니오"
 msgid "No alerts reported yet."
 msgstr ""
 
+#: src/components/routes/system/charts/container-network.tsx
+msgid "No container traffic recorded yet."
+msgstr ""
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "이 풀에 대한 상세 데이터가 없습니다."
@@ -1607,6 +1624,10 @@ msgstr "알림"
 #: src/lib/alerts.ts
 msgid "Notifications may include recent container log excerpts."
 msgstr "알림에는 최근 컨테이너 로그의 일부가 포함될 수 있습니다."
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Now (↓ / ↑)"
+msgstr ""
 
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
@@ -1753,6 +1774,10 @@ msgstr "일시 정지됨 ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "페이로드 형식"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Per-container upload and download: now, last 24 hours, last 7 days."
+msgstr ""
 
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/cpu-sheet.tsx

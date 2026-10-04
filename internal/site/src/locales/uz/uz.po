@@ -133,6 +133,10 @@ msgstr "15 daq"
 msgid "24 hours"
 msgstr "24 soat"
 
+#: src/components/routes/system/charts/container-network.tsx
+msgid "24h (↓ / ↑)"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 kun"
@@ -141,6 +145,10 @@ msgstr "30 kun"
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "5 min"
 msgstr "5 daq"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "7d (↓ / ↑)"
+msgstr ""
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
@@ -597,6 +605,7 @@ msgstr "Ziddiyatlar"
 msgid "Connection is down"
 msgstr "Ulanish uzildi"
 
+#: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
 msgstr "Konteyner"
@@ -604,6 +613,10 @@ msgstr "Konteyner"
 #: src/lib/alerts.ts
 msgid "Container Health"
 msgstr "Konteyner holati"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Container network"
+msgstr ""
 
 #: src/components/routes/system.tsx
 msgid "Containers"
@@ -1548,6 +1561,10 @@ msgstr "Yo'q"
 msgid "No alerts reported yet."
 msgstr ""
 
+#: src/components/routes/system/charts/container-network.tsx
+msgid "No container traffic recorded yet."
+msgstr ""
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "Bu pool uchun batafsil ma’lumot mavjud emas."
@@ -1607,6 +1624,10 @@ msgstr "Bildirishnomalar"
 #: src/lib/alerts.ts
 msgid "Notifications may include recent container log excerpts."
 msgstr "Bildirishnomalarda konteyner jurnallarining so‘nggi parchalari bo‘lishi mumkin."
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Now (↓ / ↑)"
+msgstr ""
 
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
@@ -1753,6 +1774,10 @@ msgstr "To'xtatilgan ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Yuklanma formati"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Per-container upload and download: now, last 24 hours, last 7 days."
+msgstr ""
 
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/cpu-sheet.tsx

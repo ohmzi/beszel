@@ -128,6 +128,10 @@ msgstr "15 min"
 msgid "24 hours"
 msgstr "24 hours"
 
+#: src/components/routes/system/charts/container-network.tsx
+msgid "24h (↓ / ↑)"
+msgstr "24h (↓ / ↑)"
+
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 days"
@@ -136,6 +140,10 @@ msgstr "30 days"
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "5 min"
 msgstr "5 min"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "7d (↓ / ↑)"
+msgstr "7d (↓ / ↑)"
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
@@ -592,6 +600,7 @@ msgstr "Conflicts"
 msgid "Connection is down"
 msgstr "Connection is down"
 
+#: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
 msgstr "Container"
@@ -599,6 +608,10 @@ msgstr "Container"
 #: src/lib/alerts.ts
 msgid "Container Health"
 msgstr "Container Health"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Container network"
+msgstr "Container network"
 
 #: src/components/routes/system.tsx
 msgid "Containers"
@@ -1543,6 +1556,10 @@ msgstr "No"
 msgid "No alerts reported yet."
 msgstr "No alerts reported yet."
 
+#: src/components/routes/system/charts/container-network.tsx
+msgid "No container traffic recorded yet."
+msgstr "No container traffic recorded yet."
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "No detail data for this pool."
@@ -1602,6 +1619,10 @@ msgstr "Notifications"
 #: src/lib/alerts.ts
 msgid "Notifications may include recent container log excerpts."
 msgstr "Notifications may include recent container log excerpts."
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Now (↓ / ↑)"
+msgstr "Now (↓ / ↑)"
 
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
@@ -1748,6 +1769,10 @@ msgstr "Paused ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Payload format"
+
+#: src/components/routes/system/charts/container-network.tsx
+msgid "Per-container upload and download: now, last 24 hours, last 7 days."
+msgstr "Per-container upload and download: now, last 24 hours, last 7 days."
 
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/cpu-sheet.tsx
