@@ -173,7 +173,13 @@ def hermes_pages(wire, res, now, confirm=2, name="surrealdb_health", title="Surr
 
 
 # --------------------------------------------------------------------------- sandboxed legacy scripts
-LEGACY_DIRS = ["/usr/local/sbin", "/usr/local/bin", *sorted(glob.glob("/usr/local/lib/homelab-maint/legacy/*"))]
+# RETIRED COPIES WIN. A script the port replaced is moved under lib/.../legacy/ and the file left
+# at the same name in /usr/local/sbin is a FORWARDING STUB -- it calls the umbrella and only falls
+# back to the legacy copy. Searching the sbin dirs first therefore read the stub and reported the
+# real script as "changed: LOGFILE=... not found", which is what made the smart_event parity checks
+# fail. The port implements the retired script, so that is the one to read.
+LEGACY_DIRS = [*sorted(glob.glob("/usr/local/lib/homelab-maint/legacy/*")),
+               "/usr/local/sbin", "/usr/local/bin"]
 _HOST_PATH = re.compile(r"(?<![\w$./-])/(?:var|run|etc|usr/local|home|volume1|sys|proc|media|mnt|root|opt|srv)/")
 _DANGEROUS = ("docker", "systemctl", "runuser", "curl", "nvidia-smi", "logger", "sudo", "kill", "snap", "apt-get")
 
