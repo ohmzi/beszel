@@ -1,0 +1,16 @@
+[Unit]
+Description=Beszel agent (Ohmz fork)
+After=network.target beszel-hub.service
+Wants=beszel-hub.service
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/beszel-agent.env
+ExecStart=/home/ohmz/StudioProjects/beszel/build/beszel-agent_linux_amd64
+Restart=always
+RestartSec=5
+SyslogIdentifier=beszel-agent
+
+[Install]
+WantedBy=multi-user.target

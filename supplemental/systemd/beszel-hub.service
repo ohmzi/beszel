@@ -1,0 +1,14 @@
+[Unit]
+Description=Beszel hub (Ohmz fork)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/home/ohmz/StudioProjects/beszel/build/beszel_linux_amd64 serve --dir /var/lib/beszel --http 127.0.0.1:8088
+Restart=always
+RestartSec=5
+SyslogIdentifier=beszel-hub
+
+[Install]
+WantedBy=multi-user.target

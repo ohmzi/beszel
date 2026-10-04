@@ -58,3 +58,19 @@ collector can read the published state. `maintenance-web` is retired only at the
 - No reimplementation of the check/cleaner engine in Go; the Python daemon stays the source of truth.
 - No running of arbitrary scripts from the agent.
 - No SQLite/protocol changes beyond what the fork already uses; no multi-host ambitions.
+
+## Status (built)
+
+- **Phase 1** — Ohmz skin + native maintenance metric (verdict, failing checks, incidents and
+  acknowledgements counts) with a Maintenance column. Done.
+- **Phase 2** — `Stats.MaintenanceLevel` history + Maintenance chart; native **Maintenance** alert
+  (migration + evaluator + alert form); fired on a crit verdict. Done.
+- **Phase 3** — read surfaces **Alerts** (the engine's delivery log), **Incidents** (the ledger) and
+  **Reports** (grade/score); and the **acknowledge bridge** (UI → hub → agent → signed request in the
+  engine's inbox → runner applies it). Done.
+- **Deploy** — `supplemental/systemd/` runs the built hub and agent as services; the agent runs as
+  root to read the published state and write the inbox.
+
+Remaining for a full cut-over: the acknowledge *e-mail link* page (`/ack`) still lives on the old
+`maintenance-web` container, and the public hostname still points at it. Retire that container only
+after `/ack` (or an equivalent) is served here, or keep it solely for the e-mail links.
