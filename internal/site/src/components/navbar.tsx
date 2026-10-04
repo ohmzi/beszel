@@ -234,6 +234,7 @@ export default function Navbar() {
 					onMouseEnter={() => import("@/components/routes/settings/general")}
 				>
 					<SectionButtons className="min-w-0" />
+					<span className="mx-1.5 h-6 w-px shrink-0 bg-border" aria-hidden="true" />
 					<ModeToggle />
 					<Tooltip>
 						<TooltipTrigger asChild>
