@@ -273,15 +273,15 @@ msgstr ""
 msgid "Automatic copy requires a secure context."
 msgstr "Автоматичното копиране изисква защитен контескт."
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
-msgid "Available"
-msgstr "Налично"
-
 #. Package version available to install
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Налични"
+
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
+msgid "Available"
+msgstr "Налично"
 
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
