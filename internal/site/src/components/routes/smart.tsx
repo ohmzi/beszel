@@ -4,7 +4,7 @@ import { FooterRepoLink } from "@/components/footer-repo-link"
 
 export default function Smart() {
 	useEffect(() => {
-		document.title = `S.M.A.R.T. / OhmzMaintainer`
+		document.title = "OhmzMaintainer"
 	}, [])
 
 	return (

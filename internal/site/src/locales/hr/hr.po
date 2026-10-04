@@ -253,7 +253,6 @@ msgstr "Povijest Upozorenja"
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/navbar.tsx
 #: src/components/routes/alerts.tsx
-#: src/components/routes/alerts.tsx
 msgid "Alerts"
 msgstr "Upozorenja"
 
@@ -261,13 +260,11 @@ msgstr "Upozorenja"
 #: src/components/containers-table/containers-table.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
-#: src/components/routes/containers.tsx
 msgid "All Containers"
 msgstr "Svi spremnici"
 
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
-#: src/components/routes/home.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -1296,7 +1293,6 @@ msgstr "Neaktivno"
 
 #: src/components/navbar.tsx
 #: src/components/routes/incidents.tsx
-#: src/components/routes/incidents.tsx
 msgid "Incidents"
 msgstr ""
 
@@ -1386,8 +1382,8 @@ msgid "Log Out"
 msgstr "Odjava"
 
 #: src/components/login/login.tsx
-msgid "Login"
-msgstr "Prijava"
+#~ msgid "Login"
+#~ msgstr "Prijava"
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1537,7 +1533,6 @@ msgstr "Gubitak mrežnog monitora"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
-#: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "Mrežni monitori"
 
@@ -1962,7 +1957,6 @@ msgstr "Odnosi"
 
 #: src/components/navbar.tsx
 #: src/components/routes/reports.tsx
-#: src/components/routes/reports.tsx
 msgid "Reports"
 msgstr ""
 
@@ -2176,7 +2170,6 @@ msgstr "Detalji usluge"
 
 #: src/components/navbar.tsx
 #: src/components/routes/services.tsx
-#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "Usluge"
@@ -2193,7 +2186,6 @@ msgstr "Postavite sljedeće varijable okruženja na svom Beszel hubu kako biste 
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
-#: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"

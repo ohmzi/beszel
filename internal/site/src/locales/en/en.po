@@ -248,7 +248,6 @@ msgstr "Alert History"
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/navbar.tsx
 #: src/components/routes/alerts.tsx
-#: src/components/routes/alerts.tsx
 msgid "Alerts"
 msgstr "Alerts"
 
@@ -256,13 +255,11 @@ msgstr "Alerts"
 #: src/components/containers-table/containers-table.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
-#: src/components/routes/containers.tsx
 msgid "All Containers"
 msgstr "All Containers"
 
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
-#: src/components/routes/home.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -1291,7 +1288,6 @@ msgstr "Inactive"
 
 #: src/components/navbar.tsx
 #: src/components/routes/incidents.tsx
-#: src/components/routes/incidents.tsx
 msgid "Incidents"
 msgstr "Incidents"
 
@@ -1381,8 +1377,8 @@ msgid "Log Out"
 msgstr "Log Out"
 
 #: src/components/login/login.tsx
-msgid "Login"
-msgstr "Login"
+#~ msgid "Login"
+#~ msgstr "Login"
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1532,7 +1528,6 @@ msgstr "Network Monitor Loss"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
-#: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "Network Monitors"
 
@@ -1957,7 +1952,6 @@ msgstr "Relationships"
 
 #: src/components/navbar.tsx
 #: src/components/routes/reports.tsx
-#: src/components/routes/reports.tsx
 msgid "Reports"
 msgstr "Reports"
 
@@ -2171,7 +2165,6 @@ msgstr "Service Details"
 
 #: src/components/navbar.tsx
 #: src/components/routes/services.tsx
-#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "Services"
@@ -2188,7 +2181,6 @@ msgstr "Set the following environment variables on your Beszel hub to enable hea
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
-#: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"

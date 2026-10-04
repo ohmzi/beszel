@@ -14,7 +14,7 @@ export default memo(() => {
 	const solo = systems.length === 1 ? systems[0] : null
 
 	useEffect(() => {
-		document.title = solo ? `${solo.name || solo.info?.h || ""} / OhmzMaintainer` : `${t`All Systems`} / OhmzMaintainer`
+		document.title = "OhmzMaintainer"
 	}, [t, solo])
 
 	if (solo) {

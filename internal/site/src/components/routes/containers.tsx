@@ -7,7 +7,7 @@ export default memo(() => {
 	const { t } = useLingui()
 
 	useEffect(() => {
-		document.title = `${t`All Containers`} / OhmzMaintainer`
+		document.title = "OhmzMaintainer"
 	}, [t])
 
 	return useMemo(

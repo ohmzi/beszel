@@ -21,7 +21,7 @@ export default memo(() => {
 	const sysId = Object.keys(systems)[0] ?? ""
 
 	useEffect(() => {
-		document.title = `${t`Network Monitors`} / OhmzMaintainer`
+		document.title = "OhmzMaintainer"
 	}, [t])
 
 	return (

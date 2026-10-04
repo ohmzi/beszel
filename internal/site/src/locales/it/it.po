@@ -253,7 +253,6 @@ msgstr "Cronologia Avvisi"
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/navbar.tsx
 #: src/components/routes/alerts.tsx
-#: src/components/routes/alerts.tsx
 msgid "Alerts"
 msgstr "Avvisi"
 
@@ -261,13 +260,11 @@ msgstr "Avvisi"
 #: src/components/containers-table/containers-table.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
-#: src/components/routes/containers.tsx
 msgid "All Containers"
 msgstr "Tutti i contenitori"
 
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
-#: src/components/routes/home.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -1296,7 +1293,6 @@ msgstr "Inattivo"
 
 #: src/components/navbar.tsx
 #: src/components/routes/incidents.tsx
-#: src/components/routes/incidents.tsx
 msgid "Incidents"
 msgstr ""
 
@@ -1386,8 +1382,8 @@ msgid "Log Out"
 msgstr "Disconnetti"
 
 #: src/components/login/login.tsx
-msgid "Login"
-msgstr "Accedi"
+#~ msgid "Login"
+#~ msgstr "Accedi"
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1537,7 +1533,6 @@ msgstr "Perdita del monitor di rete"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
-#: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "Monitor di rete"
 
@@ -1962,7 +1957,6 @@ msgstr "Relazioni"
 
 #: src/components/navbar.tsx
 #: src/components/routes/reports.tsx
-#: src/components/routes/reports.tsx
 msgid "Reports"
 msgstr ""
 
@@ -2176,7 +2170,6 @@ msgstr "Dettagli servizio"
 
 #: src/components/navbar.tsx
 #: src/components/routes/services.tsx
-#: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
 msgstr "Servizi"
@@ -2193,7 +2186,6 @@ msgstr "Imposta le seguenti variabili d'ambiente sul tuo Beszel hub per abilitar
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
-#: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"

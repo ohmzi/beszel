@@ -112,7 +112,7 @@ export function useSystemData(id: string) {
 			const sys = newSystems[id]
 			if (sys) {
 				setSystem(sys)
-				document.title = `${sys?.name} / OhmzMaintainer`
+				document.title = "OhmzMaintainer"
 			}
 		})
 	}, [id, systems.length])

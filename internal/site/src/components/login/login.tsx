@@ -18,7 +18,7 @@ export default function () {
 	const { resolvedTheme } = useTheme()
 
 	useEffect(() => {
-		document.title = t`Login` + " / OhmzMaintainer"
+		document.title = "OhmzMaintainer"
 
 		pb.send("/api/beszel/first-run", {}).then(({ firstRun }) => {
 			setFirstRun(firstRun)
