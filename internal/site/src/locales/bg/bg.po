@@ -18,6 +18,21 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+#. placeholder {0}: mt.a
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# acknowledged} other {# acknowledged}}"
+msgstr ""
+
+#. placeholder {0}: mt.f
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# failing check} other {# failing checks}}"
+msgstr ""
+
+#. placeholder {0}: mt.i
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# open incident} other {# open incidents}}"
+msgstr ""
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -238,19 +253,23 @@ msgstr "Сигурен ли си, че искаш да изтриеш {name}?"
 msgid "Are you sure?"
 msgstr "Сигурни ли сте?"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Attention"
+msgstr ""
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "Автоматичното копиране изисква защитен контескт."
-
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
-msgid "Available"
-msgstr "Налично"
 
 #. Package version available to install
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Налични"
+
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
+msgid "Available"
+msgstr "Налично"
 
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
@@ -698,6 +717,10 @@ msgstr "Създай акаунт"
 msgid "Created"
 msgstr "Създаден"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Critical"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Critical (%)"
 msgstr "Критично (%)"
@@ -1126,6 +1149,10 @@ msgstr "Мрежово"
 msgid "Health"
 msgstr "Здраве"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Healthy"
+msgstr ""
+
 #: src/components/routes/settings/layout.tsx
 msgid "Heartbeat"
 msgstr ""
@@ -1302,6 +1329,10 @@ msgstr "Загуба 1h"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Main PID"
 msgstr "Главен PID"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Maintenance"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx

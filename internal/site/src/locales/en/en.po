@@ -13,6 +13,21 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: mt.a
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# acknowledged} other {# acknowledged}}"
+msgstr "{0, plural, one {# acknowledged} other {# acknowledged}}"
+
+#. placeholder {0}: mt.f
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# failing check} other {# failing checks}}"
+msgstr "{0, plural, one {# failing check} other {# failing checks}}"
+
+#. placeholder {0}: mt.i
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# open incident} other {# open incidents}}"
+msgstr "{0, plural, one {# open incident} other {# open incidents}}"
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -233,17 +248,21 @@ msgstr "Are you sure you want to delete {name}?"
 msgid "Are you sure?"
 msgstr "Are you sure?"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Attention"
+msgstr "Attention"
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "Automatic copy requires a secure context."
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Available"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "Available"
 
@@ -693,6 +712,10 @@ msgstr "Create account"
 msgid "Created"
 msgstr "Created"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Critical"
+msgstr "Critical"
+
 #: src/components/routes/settings/general.tsx
 msgid "Critical (%)"
 msgstr "Critical (%)"
@@ -1121,6 +1144,10 @@ msgstr "Grid"
 msgid "Health"
 msgstr "Health"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Healthy"
+msgstr "Healthy"
+
 #: src/components/routes/settings/layout.tsx
 msgid "Heartbeat"
 msgstr "Heartbeat"
@@ -1297,6 +1324,10 @@ msgstr "Loss 1h"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Main PID"
 msgstr "Main PID"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Maintenance"
+msgstr "Maintenance"
 
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx

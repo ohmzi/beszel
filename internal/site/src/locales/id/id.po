@@ -18,6 +18,21 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+#. placeholder {0}: mt.a
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# acknowledged} other {# acknowledged}}"
+msgstr ""
+
+#. placeholder {0}: mt.f
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# failing check} other {# failing checks}}"
+msgstr ""
+
+#. placeholder {0}: mt.i
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# open incident} other {# open incidents}}"
+msgstr ""
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -238,17 +253,21 @@ msgstr "Apakah anda yakin ingin menghapus {name}?"
 msgid "Are you sure?"
 msgstr "Apakah anda yakin?"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Attention"
+msgstr ""
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "Copy memerlukan https."
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Tersedia"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "Tersedia"
 
@@ -698,6 +717,10 @@ msgstr "Buat akun"
 msgid "Created"
 msgstr "Dibuat"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Critical"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Critical (%)"
 msgstr "Kritis (%)"
@@ -1126,6 +1149,10 @@ msgstr "Kartu"
 msgid "Health"
 msgstr "Kesehatan"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Healthy"
+msgstr ""
+
 #: src/components/routes/settings/layout.tsx
 msgid "Heartbeat"
 msgstr "Denyut jantung"
@@ -1302,6 +1329,10 @@ msgstr "Kehilangan paket 1 jam"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Main PID"
 msgstr "PID utama"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Maintenance"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx

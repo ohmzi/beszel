@@ -18,6 +18,21 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+#. placeholder {0}: mt.a
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# acknowledged} other {# acknowledged}}"
+msgstr ""
+
+#. placeholder {0}: mt.f
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# failing check} other {# failing checks}}"
+msgstr ""
+
+#. placeholder {0}: mt.i
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# open incident} other {# open incidents}}"
+msgstr ""
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -238,17 +253,21 @@ msgstr "Ali ste prepričani, da želite izbrisati {name}?"
 msgid "Are you sure?"
 msgstr "Ali ste prepričani?"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Attention"
+msgstr ""
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "Za samodejno kopiranje je potreben varen kontekst."
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Na voljo"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "Na voljo"
 
@@ -698,6 +717,10 @@ msgstr "Ustvari račun"
 msgid "Created"
 msgstr "Ustvarjeno"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Critical"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Critical (%)"
 msgstr "Kritično (%)"
@@ -1126,6 +1149,10 @@ msgstr "Mreža"
 msgid "Health"
 msgstr "Zdravje"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Healthy"
+msgstr ""
+
 #: src/components/routes/settings/layout.tsx
 msgid "Heartbeat"
 msgstr "Srčni utrip (Heartbeat)"
@@ -1302,6 +1329,10 @@ msgstr "Izguba 1 h"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Main PID"
 msgstr "Glavni PID"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Maintenance"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx

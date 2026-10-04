@@ -38,6 +38,21 @@ export interface WiFi {
 	r?: number
 }
 
+export interface Maintenance {
+	/** ok | warn | crit | unknown */
+	st?: string
+	/** one-line summary from the maintenance engine */
+	sm?: string
+	/** checks failing now (warn/crit/error) */
+	f?: number
+	/** open incidents */
+	i?: number
+	/** active acknowledgements */
+	a?: number
+	/** epoch seconds of the newest input file */
+	u?: number
+}
+
 export interface SystemInfo {
 	/** connected Wi-Fi interfaces */
 	wf?: Record<string, WiFi>
@@ -91,6 +106,8 @@ export interface SystemInfo {
 	rdn?: string
 	/** pending package updates [total, security] (security omitted if unknown) */
 	pu?: [number, number?]
+	/** homelab-maint verdict (Ohmz fork): pipeline health + what it is tracking */
+	mt?: Maintenance
 }
 
 export interface SystemStats {

@@ -5,61 +5,65 @@
 @custom-variant dark (&:is(.dark *));
 @custom-variant safari (@supports (hanging-punctuation: first) and (-webkit-appearance: none));
 
+/* Ohmz skin: the warm ramp + single amber accent (ohms.ai brand). Warm neutrals, not pure #fff/#000
+   — a pure-white card on warm grey is the tell that a theme is bolted on. Amber is the one accent:
+   primary buttons, focus ring, active states. Status colours (the green ramp) stay status. */
 :root {
-	--background: hsl(30 8% 98%);
-	--foreground: hsl(30 0% 10%);
-	--card: hsl(30 0% 100%);
-	--card-foreground: hsl(240 6% 12%);
-	--popover: hsl(30 0% 100%);
-	--popover-foreground: hsl(240 10% 6.2%);
-	--primary: hsl(240 5.88% 10%);
-	--primary-foreground: hsl(30 0% 100%);
-	--secondary: hsl(240 4.76% 95.88%);
-	--secondary-foreground: hsl(240 5.88% 10%);
-	--muted: hsl(26 6% 94%);
-	--muted-foreground: hsl(24 2.79% 35.1%);
-	--accent: hsl(20 23.08% 94%);
-	--accent-foreground: hsl(240 5.88% 10%);
-	--destructive: hsl(0 66% 53%);
-	--destructive-foreground: hsl(0 0% 97%);
-	--border: hsl(30 8.11% 85.49%);
-	--input: hsl(30 4.29% 72.55%);
-	--ring: hsl(30 3.97% 49.41%);
+	--background: #faf9f7;
+	--foreground: #1a1917;
+	--card: #fffdfb;
+	--card-foreground: #1a1917;
+	--popover: #fffdfb;
+	--popover-foreground: #1a1917;
+	--primary: #a8631d;
+	--primary-foreground: #fffdfb;
+	--secondary: #f0edea;
+	--secondary-foreground: #1a1917;
+	--muted: #f0edea;
+	--muted-foreground: #6b665f;
+	--accent: #f0ece7;
+	--accent-foreground: #1a1917;
+	--destructive: #c2402f;
+	--destructive-foreground: #fffdfb;
+	--border: #e6e1da;
+	--input: #ddd7d0;
+	--ring: #a8631d;
 	--radius: 0.8rem;
-	--chart-1: hsl(220 70% 50%);
-	--chart-2: hsl(160 60% 45%);
-	--chart-3: hsl(30 80% 55%);
-	--chart-4: hsl(280 65% 60%);
-	--chart-5: hsl(340 75% 55%);
-	--table-header: hsl(225, 6%, 97%);
-	--chart-saturation: 65%;
+	--chart-1: #b8721e;
+	--chart-2: #2f7d86;
+	--chart-3: #5a63c8;
+	--chart-4: #b23a55;
+	--chart-5: #6f7a33;
+	--table-header: #f5f2ee;
+	--chart-saturation: 60%;
 	--chart-lightness: 50%;
 	--container: 1500px;
 }
 
 .dark {
 	color-scheme: dark;
-	--background: hsl(220 5.5% 9%);
-	--foreground: hsl(220 2% 97%);
-	--card: hsl(220 5.5% 10.5%);
-	--card-foreground: hsl(220 2% 97%);
-	--popover: hsl(220 5.5% 9%);
-	--popover-foreground: hsl(220 2% 97%);
-	--primary: hsl(220 2% 96%);
-	--primary-foreground: hsl(220 4% 10%);
-	--secondary: hsl(220 4% 16%);
-	--secondary-foreground: hsl(220 0% 98%);
-	--muted: hsl(220 6% 16%);
-	--muted-foreground: hsl(220 4% 67%);
-	--accent: hsl(220 5% 15.5%);
-	--accent-foreground: hsl(220 2% 98%);
-	--destructive: hsl(0 62% 46%);
-	--border: hsl(220 3% 17%);
-	--input: hsl(220 4% 22%);
-	--ring: hsl(220 4% 80%);
-	--table-header: hsl(220, 6%, 13%);
+	--background: #1a1917;
+	--foreground: #f0edea;
+	--card: #211f1d;
+	--card-foreground: #f0edea;
+	--popover: #211f1d;
+	--popover-foreground: #f0edea;
+	--primary: #e0913f;
+	--primary-foreground: #241f18;
+	--secondary: #2d2a26;
+	--secondary-foreground: #f0edea;
+	--muted: #262421;
+	--muted-foreground: #9c958b;
+	--accent: #2d2a26;
+	--accent-foreground: #f0edea;
+	--destructive: #e05555;
+	--destructive-foreground: #241f18;
+	--border: #3a3733;
+	--input: #3a3733;
+	--ring: #edaa5f;
+	--table-header: #211f1d;
 	--radius: 0.8rem;
-	--chart-saturation: 60%;
+	--chart-saturation: 55%;
 	--chart-lightness: 55%;
 }
 

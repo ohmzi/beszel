@@ -22,6 +22,7 @@ import {
 	TerminalSquareIcon,
 	Trash2Icon,
 	WifiIcon,
+	WrenchIcon,
 } from "lucide-react"
 import { memo, useMemo, useRef, useState } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
@@ -89,6 +90,20 @@ function getUpdatesRank(pu: SystemRecord["info"]["pu"]): number {
 	}
 	const [total, security = 0] = pu
 	return security > 0 ? 2 : total > 0 ? 1 : 0
+}
+
+/** Rank of the homelab-maint verdict for sorting: crit 2, warn 1, ok 0, unknown/none -1 (Ohmz fork) */
+function getMaintenanceRank(mt: SystemRecord["info"]["mt"]): number {
+	switch (mt?.st) {
+		case "crit":
+			return 2
+		case "warn":
+			return 1
+		case "ok":
+			return 0
+		default:
+			return -1
+	}
 }
 
 function getMeterStateByThresholds(value: number, warn = 65, crit = 90): MeterState {
@@ -491,6 +506,56 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 						/>
 						{total === 0 ? t`Up to date` : plural(total, { one: "# update", other: "# updates" })}
 					</span>
+				)
+			},
+		},
+		{
+			accessorFn: ({ info }) => info.mt?.st,
+			id: "maintenance",
+			name: () => t`Maintenance`,
+			size: 50,
+			Icon: WrenchIcon,
+			header: sortableHeader,
+			hideSort: true,
+			sortingFn: (a, b) => getMaintenanceRank(a.original.info.mt) - getMaintenanceRank(b.original.info.mt),
+			cell(info) {
+				const sys = info.row.original
+				const mt = sys.info.mt
+				if (sys.status !== SystemStatus.Up || !mt?.st || mt.st === "unknown") {
+					return null
+				}
+				const dot =
+					mt.st === "crit"
+						? STATUS_COLORS[SystemStatus.Down]
+						: mt.st === "warn"
+							? STATUS_COLORS[SystemStatus.Pending]
+							: STATUS_COLORS[SystemStatus.Up]
+				const label = mt.st === "crit" ? t`Critical` : mt.st === "warn" ? t`Attention` : t`Healthy`
+				const content = (
+					<span className="tabular-nums whitespace-nowrap flex gap-1.5 items-center">
+						<span className={cn("block size-2 rounded-full", dot)} />
+						{label}
+					</span>
+				)
+				const detail = [
+					mt.f ? plural(mt.f, { one: "# failing check", other: "# failing checks" }) : null,
+					mt.i ? plural(mt.i, { one: "# open incident", other: "# open incidents" }) : null,
+					mt.a ? plural(mt.a, { one: "# acknowledged", other: "# acknowledged" }) : null,
+				]
+					.filter(Boolean)
+					.join(" · ")
+				if (!detail) {
+					return content
+				}
+				return (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Link href={getPagePath($router, "system", { id: sys.id })} tabIndex={-1} className="relative z-10 w-fit block">
+								{content}
+							</Link>
+						</TooltipTrigger>
+						<TooltipContent>{detail}</TooltipContent>
+					</Tooltip>
 				)
 			},
 		},

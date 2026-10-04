@@ -18,6 +18,21 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+#. placeholder {0}: mt.a
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# acknowledged} other {# acknowledged}}"
+msgstr ""
+
+#. placeholder {0}: mt.f
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# failing check} other {# failing checks}}"
+msgstr ""
+
+#. placeholder {0}: mt.i
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "{0, plural, one {# open incident} other {# open incidents}}"
+msgstr ""
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -238,17 +253,21 @@ msgstr "您確定要刪除 {name} 嗎？"
 msgid "Are you sure?"
 msgstr "您確定嗎？"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Attention"
+msgstr ""
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "只有在受保護的環境（HTTPS）才能自動複製。"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "可用"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "可用"
 
@@ -698,6 +717,10 @@ msgstr "建立帳號"
 msgid "Created"
 msgstr "已建立"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Critical"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Critical (%)"
 msgstr "嚴重 (%)"
@@ -1126,6 +1149,10 @@ msgstr "網格"
 msgid "Health"
 msgstr "健康狀態"
 
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Healthy"
+msgstr ""
+
 #: src/components/routes/settings/layout.tsx
 msgid "Heartbeat"
 msgstr ""
@@ -1302,6 +1329,10 @@ msgstr "1 小時封包遺失率"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Main PID"
 msgstr "主 PID"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Maintenance"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx
