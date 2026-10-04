@@ -182,13 +182,25 @@ type MaintenanceAlert struct {
 // published state (STATE_DIR/public/*.json) and surfaced as a native Beszel metric/tile: the health
 // of the maintenance pipeline plus the failing checks / open incidents it is tracking.
 type Maintenance struct {
-	Status    string             `json:"st,omitempty" cbor:"0,keyasint,omitempty"` // ok | warn | crit | unknown
-	Summary   string             `json:"sm,omitempty" cbor:"1,keyasint,omitempty"` // one line, from self.json
-	Failing   uint16             `json:"f,omitempty" cbor:"2,keyasint,omitempty"`  // checks failing now (warn/crit/error)
-	Incidents uint16             `json:"i,omitempty" cbor:"3,keyasint,omitempty"`  // open incidents
-	Acked     uint16             `json:"a,omitempty" cbor:"4,keyasint,omitempty"`  // active acknowledgements
-	Updated   uint64             `json:"u,omitempty" cbor:"5,keyasint,omitempty"`  // epoch seconds of the newest input file
-	Recent    []MaintenanceAlert `json:"r,omitempty" cbor:"6,keyasint,omitempty"`  // newest deliveries, bounded
+	Status    string                `json:"st,omitempty" cbor:"0,keyasint,omitempty"` // ok | warn | crit | unknown
+	Summary   string                `json:"sm,omitempty" cbor:"1,keyasint,omitempty"` // one line, from self.json
+	Failing   uint16                `json:"f,omitempty" cbor:"2,keyasint,omitempty"`  // checks failing now (warn/crit/error)
+	Incidents uint16                `json:"i,omitempty" cbor:"3,keyasint,omitempty"`  // open incidents
+	Acked     uint16                `json:"a,omitempty" cbor:"4,keyasint,omitempty"`  // active acknowledgements
+	Updated   uint64                `json:"u,omitempty" cbor:"5,keyasint,omitempty"`  // epoch seconds of the newest input file
+	Recent    []MaintenanceAlert    `json:"r,omitempty" cbor:"6,keyasint,omitempty"`  // newest deliveries, bounded
+	Open      []MaintenanceIncident `json:"o,omitempty" cbor:"7,keyasint,omitempty"`  // open incidents, bounded
+}
+
+// MaintenanceIncident is one open incident from the maintenance engine's ledger (Ohmz fork).
+type MaintenanceIncident struct {
+	ID       string `json:"i,omitempty" cbor:"0,keyasint,omitempty"`
+	Task     string `json:"k,omitempty" cbor:"1,keyasint,omitempty"`
+	Title    string `json:"n,omitempty" cbor:"2,keyasint,omitempty"`
+	Severity string `json:"s,omitempty" cbor:"3,keyasint,omitempty"` // sev1 | sev2 | sev3
+	Status   string `json:"y,omitempty" cbor:"4,keyasint,omitempty"` // open | acknowledged
+	Since    uint64 `json:"t,omitempty" cbor:"5,keyasint,omitempty"`
+	Summary  string `json:"d,omitempty" cbor:"6,keyasint,omitempty"`
 }
 
 // Core system data that is needed in All Systems table

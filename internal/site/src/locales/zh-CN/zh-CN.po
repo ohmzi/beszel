@@ -142,6 +142,10 @@ msgstr "30 天"
 msgid "5 min"
 msgstr "5 分钟"
 
+#: src/components/routes/incidents.tsx
+msgid "Acknowledged"
+msgstr ""
+
 #. Table column
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -264,13 +268,13 @@ msgstr ""
 msgid "Automatic copy requires a secure context."
 msgstr "自动复制所需的安全上下文。"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "可用"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "可用"
 
@@ -1241,6 +1245,12 @@ msgstr "有可用的镜像更新"
 msgid "Inactive"
 msgstr "非活跃"
 
+#: src/components/navbar.tsx
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Incidents"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/heartbeat.tsx
@@ -1505,6 +1515,10 @@ msgstr "此存储池没有可用的详细数据。"
 msgid "No logs found."
 msgstr "未找到日志。"
 
+#: src/components/routes/incidents.tsx
+msgid "No open incidents."
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1578,6 +1592,18 @@ msgstr "一次性"
 #: src/components/login/auth-form.tsx
 msgid "One-time password"
 msgstr "一次性密码"
+
+#: src/components/routes/incidents.tsx
+msgid "Open"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "Open for"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "Open incidents from the maintenance engine's ledger, worst first."
+msgstr ""
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2072,6 +2098,7 @@ msgid "Settings saved"
 msgstr "设置已保存"
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/incidents.tsx
 msgid "Severity"
 msgstr ""
 
@@ -2111,6 +2138,7 @@ msgid "State"
 msgstr "状态"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/incidents.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -2141,6 +2169,7 @@ msgstr "切换主题"
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/alerts.tsx
+#: src/components/routes/incidents.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2192,6 +2221,10 @@ msgstr "目标"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "target[,protocol[,port[,interval[,server]]]]"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "Task"
 msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
@@ -2259,6 +2292,7 @@ msgid "Time format"
 msgstr "时间格式"
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/incidents.tsx
 msgid "Title"
 msgstr ""
 

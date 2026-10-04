@@ -137,6 +137,10 @@ msgstr "30 days"
 msgid "5 min"
 msgstr "5 min"
 
+#: src/components/routes/incidents.tsx
+msgid "Acknowledged"
+msgstr "Acknowledged"
+
 #. Table column
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -259,13 +263,13 @@ msgstr "Attention"
 msgid "Automatic copy requires a secure context."
 msgstr "Automatic copy requires a secure context."
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "Available"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Available"
 
@@ -1236,6 +1240,12 @@ msgstr "Image update available"
 msgid "Inactive"
 msgstr "Inactive"
 
+#: src/components/navbar.tsx
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Incidents"
+msgstr "Incidents"
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/heartbeat.tsx
@@ -1500,6 +1510,10 @@ msgstr "No detail data for this pool."
 msgid "No logs found."
 msgstr "No logs found."
 
+#: src/components/routes/incidents.tsx
+msgid "No open incidents."
+msgstr "No open incidents."
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1573,6 +1587,18 @@ msgstr "One-time"
 #: src/components/login/auth-form.tsx
 msgid "One-time password"
 msgstr "One-time password"
+
+#: src/components/routes/incidents.tsx
+msgid "Open"
+msgstr "Open"
+
+#: src/components/routes/incidents.tsx
+msgid "Open for"
+msgstr "Open for"
+
+#: src/components/routes/incidents.tsx
+msgid "Open incidents from the maintenance engine's ledger, worst first."
+msgstr "Open incidents from the maintenance engine's ledger, worst first."
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2067,6 +2093,7 @@ msgid "Settings saved"
 msgstr "Settings saved"
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/incidents.tsx
 msgid "Severity"
 msgstr "Severity"
 
@@ -2106,6 +2133,7 @@ msgid "State"
 msgstr "State"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/incidents.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -2136,6 +2164,7 @@ msgstr "Switch theme"
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/alerts.tsx
+#: src/components/routes/incidents.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2188,6 +2217,10 @@ msgstr "Target"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "target[,protocol[,port[,interval[,server]]]]"
 msgstr "target[,protocol[,port[,interval[,server]]]]"
+
+#: src/components/routes/incidents.tsx
+msgid "Task"
+msgstr "Task"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Tasks"
@@ -2254,6 +2287,7 @@ msgid "Time format"
 msgstr "Time format"
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/incidents.tsx
 msgid "Title"
 msgstr "Title"
 

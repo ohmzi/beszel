@@ -1,6 +1,7 @@
 import { Trans } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
 import {
+	AlertTriangleIcon,
 	BellIcon,
 	ContainerIcon,
 	DatabaseBackupIcon,
@@ -172,6 +173,21 @@ export default function Navbar() {
 					</TooltipTrigger>
 					<TooltipContent>
 						<Trans>Alerts</Trans>
+					</TooltipContent>
+				</Tooltip>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Link
+							href={getPagePath($router, "incidents")}
+							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+							aria-label="Incidents"
+							onMouseEnter={() => import("@/components/routes/incidents")}
+						>
+							<AlertTriangleIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+						</Link>
+					</TooltipTrigger>
+					<TooltipContent>
+						<Trans>Incidents</Trans>
 					</TooltipContent>
 				</Tooltip>
 				<Tooltip>

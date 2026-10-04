@@ -70,6 +70,25 @@ export interface Maintenance {
 	u?: number
 	/** the engine's recent delivery log (everything it alerted about), newest first */
 	r?: MaintenanceAlert[]
+	/** open incidents from the engine's ledger */
+	o?: MaintenanceIncident[]
+}
+
+export interface MaintenanceIncident {
+	/** incident id (INC-…) */
+	i?: string
+	/** task */
+	k?: string
+	/** title */
+	n?: string
+	/** sev1 | sev2 | sev3 */
+	s?: string
+	/** open | acknowledged */
+	y?: string
+	/** epoch seconds the incident opened */
+	t?: number
+	/** summary */
+	d?: string
 }
 
 export interface SystemInfo {

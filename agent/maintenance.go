@@ -28,6 +28,8 @@ const (
 	maintenanceMaxFile = 8 << 20
 	// How many recent delivery-log entries to carry to the hub (newest first).
 	maintenanceRecentMax = 15
+	// How many open incidents to carry to the hub.
+	maintenanceIncidentsMax = 25
 )
 
 // maintenanceManager periodically reads the published maintenance state in the background and
@@ -164,6 +166,7 @@ func (m *maintenanceManager) read() system.Maintenance {
 			}
 		}
 		out.Incidents = open
+		out.Open = recentIncidents(d["open"], maintenanceIncidentsMax)
 		if crit > 0 {
 			status = worseStatus(status, "crit")
 		}
@@ -273,7 +276,6 @@ func truthy(v any) bool {
 	b, _ := v.(bool)
 	return b
 }
-
 func clampStr(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -297,4 +299,25 @@ func num(v any) float64 {
 
 func generatedAt(d map[string]any) int64 {
 	return int64(num(d["generated_at"]))
+}
+
+// recentIncidents maps the ledger's open[] into the bounded wire list.
+func recentIncidents(v any, n int) []system.MaintenanceIncident {
+	raw := listOf(v)
+	if len(raw) > n {
+		raw = raw[:n]
+	}
+	out := make([]system.MaintenanceIncident, 0, len(raw))
+	for _, r := range raw {
+		out = append(out, system.MaintenanceIncident{
+			ID:       clampStr(str(r["id"]), 32),
+			Task:     clampStr(str(r["task"]), 60),
+			Title:    clampStr(str(r["title"]), 120),
+			Severity: clampStr(str(r["severity"]), 8),
+			Status:   clampStr(str(r["status"]), 16),
+			Since:    uint64(max(int64(num(r["since"])), 0)),
+			Summary:  clampStr(str(r["summary"]), 200),
+		})
+	}
+	return out
 }
