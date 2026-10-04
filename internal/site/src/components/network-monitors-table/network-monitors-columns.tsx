@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Plural, Trans } from "@lingui/react/macro"
 import { $allSystemsById } from "@/lib/stores"
-import { $containerNet } from "@/lib/container-net"
+import type { ContainerNet } from "@/lib/container-net"
 import type { ReadableAtom } from "nanostores"
 import { useStore } from "@nanostores/react"
 import { SystemStatus } from "@/lib/enums"
@@ -67,14 +67,23 @@ const SYSTEM_STATUS_COLORS = {
 const isMuted = (record: NetworkMonitorRecord, systemRecord: SystemRecord | undefined) =>
 	!record.enabled || systemRecord?.status !== SystemStatus.Up
 
-// Ohmz fork: per-monitor bandwidth (matched to the container of the same name).
+// Ohmz fork: per-monitor bandwidth. The table merges each monitor's container bandwidth into the
+// row as `net` (so sorting sees it as row data, not a side store).
+type NetRow = NetworkMonitorRecord & { net?: ContainerNet }
+
 function fmtBytes(x: number): string {
 	const { value, unit } = formatBytes(x)
 	return `${value >= 100 ? Math.round(value).toLocaleString() : value.toFixed(1)} ${unit}`
 }
 
+function netTotal(record: NetworkMonitorRecord, which: "now" | "d24" | "d7"): number {
+	const net = (record as NetRow).net
+	if (!net) return -1
+	return which === "now" ? net.nowDown + net.nowUp : which === "d24" ? net.d24Down + net.d24Up : net.d7Down + net.d7Up
+}
+
 function NetCell({ record, which }: { record: NetworkMonitorRecord; which: "now" | "d24" | "d7" }) {
-	const net = useStore($containerNet)[`${record.system}:${record.name ?? ""}`]
+	const net = (record as NetRow).net
 	if (!net) return <span className="ms-1.5 text-muted-foreground">-</span>
 	const down = which === "now" ? net.nowDown : which === "d24" ? net.d24Down : net.d7Down
 	const up = which === "now" ? net.nowUp : which === "d24" ? net.d24Up : net.d7Up
@@ -276,21 +285,21 @@ export function getMonitorColumns(
 		{
 			id: "netNow",
 			meta: { label: t`Now ↓ / ↑` },
-			enableSorting: false,
+			accessorFn: (record) => netTotal(record, "now"),
 			header: ({ column }) => <HeaderButton column={column} name={t`Now ↓ / ↑`} Icon={ArrowDownUpIcon} />,
 			cell: ({ row }) => <NetCell record={row.original} which="now" />,
 		},
 		{
 			id: "net24",
 			meta: { label: t`24h ↓ / ↑` },
-			enableSorting: false,
+			accessorFn: (record) => netTotal(record, "d24"),
 			header: ({ column }) => <HeaderButton column={column} name={t`24h ↓ / ↑`} Icon={ArrowDownUpIcon} />,
 			cell: ({ row }) => <NetCell record={row.original} which="d24" />,
 		},
 		{
 			id: "net7",
 			meta: { label: t`7d ↓ / ↑` },
-			enableSorting: false,
+			accessorFn: (record) => netTotal(record, "d7"),
 			header: ({ column }) => <HeaderButton column={column} name={t`7d ↓ / ↑`} Icon={ArrowDownUpIcon} />,
 			cell: ({ row }) => <NetCell record={row.original} which="d7" />,
 		},

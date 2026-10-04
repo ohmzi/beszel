@@ -37,7 +37,7 @@ import { isReadOnlyUser, queueUserSettings } from "@/lib/api"
 import { pb } from "@/lib/api"
 import { SystemStatus } from "@/lib/enums"
 import { $allSystemsById, $direction, $textMeasureVersion, $userSettings, getUserChartTime } from "@/lib/stores"
-import { loadContainerNet } from "@/lib/container-net"
+import { loadContainerNet, $containerNet } from "@/lib/container-net"
 import { cn, formatShortDate, isVisuallyLonger, matchesFilterGroups, parseFilterGroups, parseSemVer } from "@/lib/utils"
 import type { ChartOptions, MonitorCertInfo, NetworkMonitorRecord } from "@/types"
 import { AddMonitorDialog, EditMonitorDialog, MonitorMultiSelect, SystemMultiSelect } from "./monitor-dialog"
@@ -161,6 +161,7 @@ export default function NetworkMonitorsTableNew({
 
 	// recompute when measured widths are invalidated (e.g. web font finished loading)
 	const textMeasureVersion = useStore($textMeasureVersion)
+	const containerNet = useStore($containerNet) // re-render (and re-sort) when bandwidth loads
 	const longestTarget = useMemo(() => {
 		let longestTarget = ""
 		for (const p of monitors) {
@@ -285,10 +286,18 @@ export default function NetworkMonitorsTableNew({
 		columns = systemId ? columns.filter((col) => col.id !== "system") : columns
 		columns = canManageMonitors ? columns : columns.filter((col) => col.id !== "actions")
 		return columns
-	}, [canManageMonitors, handleDeleteRequest, handleSetEnabled, systemId, longestTarget, $longestSystemName])
+	}, [canManageMonitors, handleDeleteRequest, handleSetEnabled, systemId, longestTarget, $longestSystemName, containerNet])
+
+	// Attach each monitor's container bandwidth to its row (as `net`) so the Now/24h/7d columns
+	// sort by real values and re-sort when the bandwidth loads. A fresh array gives the table a
+	// changed data identity.
+	const tableData = useMemo(() => {
+		const netMap = $containerNet.get()
+		return monitors.map((m) => Object.assign(m as object, { net: netMap[`${m.system}:${m.name ?? ""}`] }) as unknown as NetworkMonitorRecord)
+	}, [monitors, containerNet])
 
 	const table = useReactTable({
-		data: monitors,
+		data: tableData,
 		columns,
 		getRowId: (row) => row.id,
 		getCoreRowModel: getCoreRowModel(),
