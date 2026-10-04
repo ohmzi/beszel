@@ -169,6 +169,10 @@ msgstr ""
 msgid "Acknowledged"
 msgstr ""
 
+#: src/components/routes/maintenance.tsx
+msgid "Action"
+msgstr ""
+
 #. Table column
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -239,6 +243,10 @@ msgstr "Μετά"
 msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
 msgstr "Αφού ορίσετε τις μεταβλητές περιβάλλοντος, επανεκκινήστε τον κόμβο Beszel για να εφαρμοστούν οι αλλαγές."
 
+#: src/components/routes/health.tsx
+msgid "Age"
+msgstr ""
+
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Agent"
 msgstr "Πράκτορας"
@@ -287,6 +295,11 @@ msgstr ""
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "Η αυτόματη αντιγραφή απαιτεί ασφαλές περιβάλλον."
+
+#. placeholder {0}: d?.window_days ?? 30
+#: src/components/routes/slo.tsx
+msgid "Availability objectives and error budget over the last {0} days."
+msgstr ""
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgctxt "Disk space available"
@@ -432,6 +445,10 @@ msgstr "Byte (KB/s, MB/s, GB/s)"
 msgid "Cache / Buffers"
 msgstr "Cache / Buffer"
 
+#: src/components/routes/spikes.tsx
+msgid "Calm right now"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Can reload"
 msgstr "Δυνατότητα επαναφόρτωσης"
@@ -455,6 +472,8 @@ msgstr "Ακύρωση"
 msgid "Capabilities"
 msgstr "Δυνατότητες"
 
+#: src/components/navbar.tsx
+#: src/components/routes/capacity.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Capacity"
@@ -511,6 +530,11 @@ msgstr "Επιλογές γραφήματος"
 msgid "Chart width"
 msgstr "Πλάτος γραφήματος"
 
+#: src/components/routes/checks.tsx
+#: src/components/routes/health.tsx
+msgid "Check"
+msgstr ""
+
 #: src/components/login/forgot-pass-form.tsx
 msgid "Check {email} for a reset link."
 msgstr "Ελέγξτε το {email} για έναν σύνδεσμο επαναφοράς."
@@ -531,6 +555,11 @@ msgstr "Ελέγξτε την υπηρεσία ειδοποιήσεών σας"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Checked {0}"
 msgstr "Έλεγχος {0}"
+
+#: src/components/navbar.tsx
+#: src/components/routes/checks.tsx
+msgid "Checks"
+msgstr ""
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Checksum errors"
@@ -845,6 +874,7 @@ msgid "Description"
 msgstr "Περιγραφή"
 
 #: src/components/containers-table/containers-table.tsx
+#: src/components/routes/health.tsx
 msgid "Detail"
 msgstr "Λεπτομέρεια"
 
@@ -921,6 +951,10 @@ msgstr "Εκτός λειτουργίας ({downSystemsLength})"
 #: src/components/routes/system/network-sheet.tsx
 msgid "Download"
 msgstr "Λήψη"
+
+#: src/components/routes/spikes.tsx
+msgid "Drivers"
+msgstr ""
 
 #: src/components/alerts-history-columns.tsx
 msgid "Duration"
@@ -1005,6 +1039,10 @@ msgstr "Προσωρινό"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Error"
 msgstr "Σφάλμα"
+
+#: src/components/routes/checks.tsx
+msgid "Every maintenance check, problems first."
+msgstr ""
 
 #: src/components/routes/alerts.tsx
 msgid "Everything the maintenance engine reported, newest first."
@@ -1142,6 +1180,10 @@ msgstr "Για <0>{min}</0> {min, plural, one {λεπτό} other {λεπτά}}"
 msgid "Forgot password?"
 msgstr "Ξεχάσατε τον κωδικό πρόσβασης;"
 
+#: src/components/routes/capacity.tsx
+msgid "Free"
+msgstr ""
+
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgctxt "Free space"
@@ -1154,11 +1196,19 @@ msgctxt "Button to copy install command"
 msgid "FreeBSD command"
 msgstr "Εντολή FreeBSD"
 
+#: src/components/routes/maintenance.tsx
+msgid "Freed"
+msgstr ""
+
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
 #: src/lib/i18n.ts
 msgid "Full"
 msgstr "Πλήρες"
+
+#: src/components/routes/capacity.tsx
+msgid "Full in"
+msgstr ""
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1311,6 +1361,7 @@ msgid "Invalid email address."
 msgstr "Μη έγκυρη διεύθυνση email."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/migration.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
@@ -1329,6 +1380,14 @@ msgstr ""
 msgid "Last 7 days"
 msgstr ""
 
+#: src/components/routes/checks.tsx
+msgid "Last run"
+msgstr ""
+
+#: src/components/routes/spikes.tsx
+msgid "Lasted"
+msgstr ""
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr "Διάταξη"
@@ -1336,6 +1395,15 @@ msgstr "Διάταξη"
 #: src/components/routes/settings/general.tsx
 msgid "Layout width"
 msgstr "Πλάτος διάταξης"
+
+#: src/components/routes/migration.tsx
+msgid "Legacy units retired one at a time; the rest observed until they are cut over."
+msgstr ""
+
+#: src/components/routes/spikes.tsx
+#: src/components/routes/spikes.tsx
+msgid "Level"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Lifecycle"
@@ -1366,6 +1434,11 @@ msgstr "Μέσο φορτίο 5λ"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Load Avg"
 msgstr "Μέσ. φορτίο"
+
+#: src/components/navbar.tsx
+#: src/components/routes/spikes.tsx
+msgid "Load spikes"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Load state"
@@ -1415,6 +1488,10 @@ msgstr "Απώλεια 1ώρου"
 msgid "Main PID"
 msgstr "Κύριο PID"
 
+#: src/components/navbar.tsx
+#: src/components/navbar.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/maintenance.tsx
 #: src/components/routes/system/charts/maintenance-chart.tsx
 #: src/components/routes/system/charts/maintenance-chart.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -1472,6 +1549,11 @@ msgstr "Χρήση μνήμης"
 msgid "Memory usage of containers"
 msgstr "Χρήση μνήμης των κοντέινερ"
 
+#: src/components/navbar.tsx
+#: src/components/routes/migration.tsx
+msgid "Migration"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 msgid "Min 1h"
@@ -1481,6 +1563,10 @@ msgstr "Ελάχιστο 1ώρου"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Minor"
 msgstr "Δευτερεύουσα"
+
+#: src/components/routes/migration.tsx
+msgid "Mode"
+msgstr ""
 
 #. Device model
 #: src/components/routes/system/smart-table.tsx
@@ -1496,6 +1582,10 @@ msgstr ""
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Monitors created"
 msgstr "Τα monitors δημιουργήθηκαν"
+
+#: src/components/routes/capacity.tsx
+msgid "Mount"
+msgstr ""
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Mountpoint"
@@ -1562,8 +1652,16 @@ msgstr "Μονάδα δικτύου"
 msgid "No"
 msgstr "Όχι"
 
+#: src/components/routes/maintenance.tsx
+msgid "No actions recorded."
+msgstr ""
+
 #: src/components/routes/alerts.tsx
 msgid "No alerts reported yet."
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "No check data yet."
 msgstr ""
 
 #: src/components/routes/system/charts/container-network.tsx
@@ -1573,6 +1671,10 @@ msgstr ""
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "Δεν υπάρχουν λεπτομερή δεδομένα για αυτό το pool."
+
+#: src/components/routes/spikes.tsx
+msgid "No load spikes recorded."
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No logs found."
@@ -1705,6 +1807,11 @@ msgstr "Ή συνεχίστε με"
 msgid "Other"
 msgstr "Άλλο"
 
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/spikes.tsx
+msgid "Outcome"
+msgstr ""
+
 #: src/components/alerts/alerts-sheet.tsx
 msgid "Overwrite existing alerts"
 msgstr "Αντικατάσταση υπαρχουσών ειδοποιήσεων"
@@ -1818,6 +1925,11 @@ msgstr "Διατήρηση"
 msgid "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
 msgstr "Φυσικός χώρος συσκευής. Η πραγματική ωφέλιμη χωρητικότητα είναι άγνωστη. Οι ειδοποιήσεις χρήσης δίσκων του pool είναι απενεργοποιημένες."
 
+#: src/components/navbar.tsx
+#: src/components/routes/health.tsx
+msgid "Pipeline health"
+msgstr ""
+
 #: src/components/routes/settings/notifications.tsx
 msgid "Please <0>configure an SMTP server</0> to ensure alerts are delivered."
 msgstr "Παρακαλώ <0>ρυθμίστε έναν διακομιστή SMTP</0> για να διασφαλίσετε την παράδοση των ειδοποιήσεων."
@@ -1883,6 +1995,10 @@ msgstr "Ακριβής χρήση κατά τον καταγεγραμμένο �
 msgid "Preferred Language"
 msgstr "Προτιμώμενη γλώσσα"
 
+#: src/components/routes/spikes.tsx
+msgid "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Process started"
 msgstr "Η διεργασία ξεκίνησε"
@@ -1942,6 +2058,10 @@ msgstr "Σφάλματα ανάγνωσης"
 msgid "Received"
 msgstr "Λήφθηκαν"
 
+#: src/components/routes/maintenance.tsx
+msgid "Recent actions"
+msgstr ""
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/logs-display.tsx
 #: src/components/logs-display.tsx
@@ -1954,6 +2074,10 @@ msgstr "Ανανέωση"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "Σχέσεις"
+
+#: src/components/routes/migration.tsx
+msgid "Replaced by"
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/routes/reports.tsx
@@ -2025,6 +2149,10 @@ msgstr "Ρίζα"
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Rotate token"
 msgstr "Ανανέωση token"
+
+#: src/components/routes/maintenance.tsx
+msgid "Routine"
+msgstr ""
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/system/package-updates-table.tsx
@@ -2169,6 +2297,15 @@ msgid "Service Details"
 msgstr "Λεπτομέρειες υπηρεσίας"
 
 #: src/components/navbar.tsx
+#: src/components/routes/slo.tsx
+msgid "Service levels"
+msgstr ""
+
+#: src/components/routes/slo.tsx
+msgid "Service objectives are still collecting data."
+msgstr ""
+
+#: src/components/navbar.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2218,6 +2355,10 @@ msgstr "Ισχύς σήματος των συνδεδεμένων διεπαφώ
 msgid "Since data (up to 30 days)"
 msgstr ""
 
+#: src/components/routes/capacity.tsx
+msgid "Size"
+msgstr ""
+
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
 msgstr "Ρυθμίσεις SMTP"
@@ -2234,6 +2375,8 @@ msgstr "Ώρα έναρξης"
 
 #. Context: alert state (active or resolved)
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/health.tsx
+#: src/components/routes/migration.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -2241,6 +2384,8 @@ msgid "State"
 msgstr "Κατάσταση"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/capacity.tsx
+#: src/components/routes/checks.tsx
 #: src/components/routes/incidents.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -2249,9 +2394,17 @@ msgstr "Κατάσταση"
 msgid "Status"
 msgstr "Κατάσταση"
 
+#: src/components/routes/capacity.tsx
+msgid "Storage headroom and how soon each mount fills at the current rate."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table-columns.tsx
 msgid "Sub State"
 msgstr "Υποκατάσταση"
+
+#: src/components/routes/checks.tsx
+msgid "Summary"
+msgstr ""
 
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Swap space used by the system"
@@ -2331,6 +2484,7 @@ msgid "target[,protocol[,port[,interval[,server]]]]"
 msgstr ""
 
 #: src/components/routes/incidents.tsx
+#: src/components/routes/maintenance.tsx
 msgid "Task"
 msgstr ""
 
@@ -2368,6 +2522,10 @@ msgstr "Δοκιμή heartbeat"
 #: src/components/routes/settings/notifications.tsx
 msgid "Test notification sent"
 msgstr "Η δοκιμαστική ειδοποίηση στάλθηκε"
+
+#: src/components/routes/health.tsx
+msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
+msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2542,6 +2700,10 @@ msgstr ""
 msgid "Unhealthy"
 msgstr "Μη υγιές"
 
+#: src/components/routes/migration.tsx
+msgid "Unit"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unit file"
 msgstr "Αρχείο μονάδας"
@@ -2631,6 +2793,7 @@ msgstr "Χρήση"
 msgid "Usage of storage pool {displayName}"
 msgstr "Χρήση του pool αποθήκευσης {displayName}"
 
+#: src/components/routes/capacity.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
 #: src/components/routes/system/storage-pools-table.tsx
@@ -2705,7 +2868,13 @@ msgstr "Όρια προειδοποίησης"
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Ειδοποιήσεις Push"
 
+#: src/components/routes/maintenance.tsx
+msgid "What the engine did, and what the routine is doing."
+msgstr ""
+
 #: src/components/routes/alerts.tsx
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/spikes.tsx
 msgid "When"
 msgstr ""
 
@@ -2716,6 +2885,10 @@ msgstr "Όταν είναι ενεργοποιημένο, αυτό το διακ
 #: src/components/routes/settings/heartbeat.tsx
 msgid "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
 msgstr "Όταν χρησιμοποιείται το POST, κάθε heartbeat περιλαμβάνει JSON payload με σύνοψη κατάστασης συστημάτων, λίστα συστημάτων εκτός λειτουργίας και ενεργοποιημένες ειδοποιήσεις."
+
+#: src/components/routes/health.tsx
+msgid "Why"
+msgstr ""
 
 #: src/components/routes/system/charts/wifi-chart.tsx
 msgid "Wi-Fi signal"

@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -208,6 +210,9 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	apiAuth.GET("/systemd/logs", h.getSystemdLogs)
 	// get pending package updates
 	apiAuth.GET("/package-updates", h.getPackageUpdates)
+	// Ohmz fork: proxy the maintenance engine's published JSON (allowlisted, read-only) so the
+	// dashboard pages (checks, maintenance, slo, ...) can render it.
+	apiAuth.GET("/maintenance/file", h.maintenanceFile)
 	// Ohmz fork: forward an acknowledge / un-acknowledge request to the agent, which writes a
 	// signed request into the maintenance engine's inbox.
 	apiAuth.POST("/maintenance/ack", h.maintenanceAck).BindFunc(excludeReadOnlyRole)
@@ -586,4 +591,38 @@ func (h *Hub) maintenanceAck(e *core.RequestEvent) error {
 		return e.BadRequestError(result.Error, nil)
 	}
 	return e.JSON(http.StatusOK, map[string]any{"ok": true})
+}
+
+// maintenanceFiles is the allowlist of published maintenance files the dashboard may read.
+var maintenanceFiles = map[string]struct{}{
+	"checks.json": {}, "incidents.json": {}, "routine.json": {}, "jobs.json": {}, "schedule.json": {},
+	"slo.json": {}, "pressure.json": {}, "migration.json": {}, "actions.json": {}, "storage.json": {},
+	"metrics.json": {}, "self.json": {}, "acks.json": {}, "notifications.json": {}, "monitors.json": {},
+	"overview.json": {}, "health-history.json": {}, "manifest.json": {}, "rules.json": {},
+}
+
+// maintenanceFile handles GET /api/beszel/maintenance/file?name=<file> (Ohmz fork): it serves one
+// allowlisted file from the maintenance engine's published directory, read-only. Nothing outside the
+// allowlist is reachable and no path can escape it. MAINTENANCE_PUBLIC_DIR overrides the directory.
+func (h *Hub) maintenanceFile(e *core.RequestEvent) error {
+	name := e.Request.URL.Query().Get("name")
+	if _, ok := maintenanceFiles[name]; !ok {
+		return e.BadRequestError("unknown file", nil)
+	}
+	dir := os.Getenv("MAINTENANCE_PUBLIC_DIR")
+	if dir == "" {
+		dir = "/var/lib/homelab-maint/public"
+	}
+	data, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		return e.NotFoundError("", nil)
+	}
+	if len(data) > 6<<20 {
+		return e.InternalServerError("file too large", nil)
+	}
+	e.Response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	e.Response.Header().Set("Cache-Control", "no-store")
+	e.Response.WriteHeader(http.StatusOK)
+	_, _ = e.Response.Write(data)
+	return nil
 }

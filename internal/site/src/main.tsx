@@ -35,6 +35,13 @@ const Services = lazy(() => import("@/components/routes/services.tsx"))
 const Containers = lazy(() => import("@/components/routes/containers.tsx"))
 const Smart = lazy(() => import("@/components/routes/smart.tsx"))
 const Monitors = lazy(() => import("@/components/routes/monitors.tsx"))
+const Checks = lazy(() => import("@/components/routes/checks.tsx"))
+const Maintenance = lazy(() => import("@/components/routes/maintenance.tsx"))
+const Capacity = lazy(() => import("@/components/routes/capacity.tsx"))
+const Slo = lazy(() => import("@/components/routes/slo.tsx"))
+const Spikes = lazy(() => import("@/components/routes/spikes.tsx"))
+const Migration = lazy(() => import("@/components/routes/migration.tsx"))
+const Health = lazy(() => import("@/components/routes/health.tsx"))
 const SystemDetail = lazy(() => import("@/components/routes/system.tsx"))
 const CopyToClipboardDialog = lazy(() => import("@/components/copy-to-clipboard.tsx"))
 const ActiveAlerts = lazy(() => import("@/components/active-alerts.tsx").then((m) => ({ default: m.ActiveAlerts })))
@@ -95,6 +102,20 @@ const App = memo(() => {
 		return <Smart />
 	} else if (page.route === "monitors") {
 		return <Monitors />
+	} else if (page.route === "checks") {
+		return <Checks />
+	} else if (page.route === "maintenance") {
+		return <Maintenance />
+	} else if (page.route === "capacity") {
+		return <Capacity />
+	} else if (page.route === "slo") {
+		return <Slo />
+	} else if (page.route === "spikes") {
+		return <Spikes />
+	} else if (page.route === "migration") {
+		return <Migration />
+	} else if (page.route === "health") {
+		return <Health />
 	} else if (page.route === "settings") {
 		return <Settings />
 	}

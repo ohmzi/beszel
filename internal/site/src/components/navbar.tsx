@@ -1,12 +1,17 @@
 import { Trans } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
 import {
+	ActivityIcon,
 	AlertTriangleIcon,
+	ArrowRightLeftIcon,
 	BellIcon,
 	ContainerIcon,
 	DatabaseBackupIcon,
 	FileTextIcon,
+	GaugeIcon,
 	HardDriveIcon,
+	HeartPulseIcon,
+	ListChecksIcon,
 	LogOutIcon,
 	LogsIcon,
 	MenuIcon,
@@ -15,9 +20,11 @@ import {
 	SearchIcon,
 	ServerIcon,
 	SettingsIcon,
+	TargetIcon,
 	TerminalSquareIcon,
 	UserIcon,
 	UsersIcon,
+	WrenchIcon,
 } from "lucide-react"
 import { lazy, Suspense, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -120,6 +127,13 @@ export default function Navbar() {
 								<NetworkIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
 								<Trans>Network Monitors</Trans>
 							</DropdownMenuItem>
+							<DropdownMenuSub>
+								<DropdownMenuSubTrigger>
+									<WrenchIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
+									<Trans>Maintenance</Trans>
+								</DropdownMenuSubTrigger>
+								<DropdownMenuSubContent>{MaintenanceDropdownGroup()}</DropdownMenuSubContent>
+							</DropdownMenuSub>
 							<DropdownMenuItem
 								onClick={() => navigate(getPagePath($router, "settings", { name: "general" }))}
 								className="flex items-center"
@@ -165,6 +179,16 @@ export default function Navbar() {
 				className="hidden md:flex items-center ms-auto"
 				onMouseEnter={() => import("@/components/routes/settings/general")}
 			>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<button aria-label="Maintenance" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
+							<WrenchIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+						</button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="min-w-52">
+						{MaintenanceDropdownGroup()}
+					</DropdownMenuContent>
+				</DropdownMenu>
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<Link
@@ -320,6 +344,35 @@ const Kbd = ({ children }: { children: React.ReactNode }) => (
 		{children}
 	</kbd>
 )
+
+function MaintenanceDropdownGroup() {
+	const items = [
+		{ route: "checks", icon: ListChecksIcon, label: <Trans>Checks</Trans> },
+		{ route: "maintenance", icon: WrenchIcon, label: <Trans>Maintenance</Trans> },
+		{ route: "capacity", icon: GaugeIcon, label: <Trans>Capacity</Trans> },
+		{ route: "slo", icon: TargetIcon, label: <Trans>Service levels</Trans> },
+		{ route: "spikes", icon: ActivityIcon, label: <Trans>Load spikes</Trans> },
+		{ route: "migration", icon: ArrowRightLeftIcon, label: <Trans>Migration</Trans> },
+		{ route: "health", icon: HeartPulseIcon, label: <Trans>Pipeline health</Trans> },
+	] as const
+	return (
+		<DropdownMenuGroup>
+			<DropdownMenuLabel>
+				<Trans>Maintenance</Trans>
+			</DropdownMenuLabel>
+			{items.map(({ route, icon: Icon, label }) => (
+				<DropdownMenuItem
+					key={route}
+					onClick={() => navigate(getPagePath($router, route))}
+					className="flex items-center"
+				>
+					<Icon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
+					<span>{label}</span>
+				</DropdownMenuItem>
+			))}
+		</DropdownMenuGroup>
+	)
+}
 
 function AdminDropdownGroup() {
 	return (
