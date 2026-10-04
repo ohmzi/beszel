@@ -38,6 +38,15 @@ export function FooterRepoLink() {
 					</a>
 				</>
 			)}
+			<Separator orientation="vertical" className="h-2.5 bg-muted-foreground opacity-70" />
+			<a
+				href="https://github.com/ohmzi"
+				target="_blank"
+				className="text-muted-foreground hover:text-foreground duration-75"
+				rel="noopener"
+			>
+				Built by <span className="font-medium text-foreground/80">Omar</span>
+			</a>
 		</div>
 	)
 }

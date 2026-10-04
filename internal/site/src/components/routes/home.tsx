@@ -23,6 +23,9 @@ export default memo(() => {
 			<>
 				<SystemDetail id={solo.id} />
 				<LivePanels />
+				{/* the true end of the page, so the feed below the charts is clearly finished */}
+				<div className="pb-10" />
+				<FooterRepoLink />
 			</>
 		)
 	}
