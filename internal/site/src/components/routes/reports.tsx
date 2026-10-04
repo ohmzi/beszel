@@ -27,7 +27,7 @@ export default memo(() => {
 	const systems = useStore($systems)
 
 	useEffect(() => {
-		document.title = `${t`Reports`} / Beszel`
+		document.title = `${t`Reports`} / OhmzMaintainer`
 	}, [t])
 
 	const rows = useMemo(() => {

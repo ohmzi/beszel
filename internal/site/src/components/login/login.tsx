@@ -18,7 +18,7 @@ export default function () {
 	const { resolvedTheme } = useTheme()
 
 	useEffect(() => {
-		document.title = t`Login` + " / Beszel"
+		document.title = t`Login` + " / OhmzMaintainer"
 
 		pb.send("/api/beszel/first-run", {}).then(({ firstRun }) => {
 			setFirstRun(firstRun)
@@ -60,9 +60,11 @@ export default function () {
 					<ModeToggle />
 				</div>
 				<div className="text-center">
-					<h1 className="mb-3">
-						<Logo className="h-7 fill-foreground mx-auto" />
-						<span className="sr-only">Beszel</span>
+					<h1 className="mb-3 flex items-center justify-center gap-2">
+						<Logo className="h-8 w-8" />
+						<span className="text-xl font-semibold tracking-tight text-foreground">
+							Ohmz<span className="font-normal text-muted-foreground">Maintainer</span>
+						</span>
 					</h1>
 					<p className="text-sm text-muted-foreground">{subtitle}</p>
 				</div>

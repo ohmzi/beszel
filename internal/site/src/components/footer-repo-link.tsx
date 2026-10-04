@@ -23,7 +23,7 @@ export function FooterRepoLink() {
 				className="text-muted-foreground hover:text-foreground duration-75"
 				rel="noopener"
 			>
-				Beszel {globalThis.BESZEL.HUB_VERSION}
+				OhmzMaintainer {globalThis.BESZEL.HUB_VERSION}
 			</a>
 			{newVersion?.v && (
 				<>

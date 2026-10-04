@@ -60,11 +60,14 @@ export default function Navbar() {
 
 			<Link
 				href={basePath}
-				aria-label="Home"
-				className="p-2 ps-0 me-3 group"
+				aria-label="OhmzMaintainer home"
+				className="p-2 ps-0 me-3 group flex items-center gap-2"
 				onMouseEnter={runOnce(() => import("@/components/routes/home"))}
 			>
-				<Logo className="h-[1.2rem] md:h-5 fill-foreground" />
+				<Logo className="h-6 w-6 shrink-0" />
+				<span className="hidden sm:inline text-base font-semibold tracking-tight text-foreground">
+					Ohmz<span className="font-normal text-muted-foreground">Maintainer</span>
+				</span>
 			</Link>
 			<Button
 				variant="outline"

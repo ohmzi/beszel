@@ -15,7 +15,7 @@ export default memo(() => {
 	const counts = sys?.info?.pu?.[0] ? sys.info.pu.join(",") : ""
 
 	useEffect(() => {
-		document.title = `${t`Services`} / Beszel`
+		document.title = `${t`Services`} / OhmzMaintainer`
 	}, [t])
 
 	return (

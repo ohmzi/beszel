@@ -34,7 +34,7 @@ export default memo(() => {
 	const [note, setNote] = useState<{ fp: string; text: string; ok: boolean } | null>(null)
 
 	useEffect(() => {
-		document.title = `${t`Incidents`} / Beszel`
+		document.title = `${t`Incidents`} / OhmzMaintainer`
 	}, [t])
 
 	const rows = useMemo(() => {

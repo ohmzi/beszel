@@ -50,7 +50,7 @@ export default memo(() => {
 	const systems = useStore($systems)
 
 	useEffect(() => {
-		document.title = `${t`Alerts`} / Beszel`
+		document.title = `${t`Alerts`} / OhmzMaintainer`
 	}, [t])
 
 	const feed = useMemo(() => {
