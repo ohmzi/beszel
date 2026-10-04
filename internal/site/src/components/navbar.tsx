@@ -17,7 +17,6 @@ import {
 	MenuIcon,
 	NetworkIcon,
 	PlusIcon,
-	SearchIcon,
 	ScrollTextIcon,
 	ServerIcon,
 	SettingsIcon,
@@ -28,7 +27,7 @@ import {
 	WrenchIcon,
 } from "lucide-react"
 import { lazy, Suspense, useState } from "react"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -128,8 +127,6 @@ function SectionButtons({ className }: { className?: string }) {
 	)
 }
 
-const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
-
 export default function Navbar() {
 	const [addSystemDialogOpen, setAddSystemDialogOpen] = useState(false)
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -155,27 +152,10 @@ export default function Navbar() {
 						Ohmz<span className="font-normal text-muted-foreground">Maintainer</span>
 					</span>
 				</Link>
-				<Button
-					variant="outline"
-					className="hidden md:block text-sm text-muted-foreground px-4"
-					onClick={() => setCommandPaletteOpen(true)}
-				>
-					<span className="flex items-center">
-						<SearchIcon className="me-1.5 h-4 w-4" />
-						<Trans>Search</Trans>
-						<span className="flex items-center ms-3.5">
-							<Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-							<Kbd>K</Kbd>
-						</span>
-					</span>
-				</Button>
 
 				{/* mobile menu */}
 				<div className="ms-auto flex items-center text-xl md:hidden">
 					<ModeToggle />
-					<Button variant="ghost" size="icon" onClick={() => setCommandPaletteOpen(true)}>
-						<SearchIcon className="h-[1.2rem] w-[1.2rem]" />
-					</Button>
 					<DropdownMenu>
 						<DropdownMenuTrigger
 							onMouseEnter={() => import("@/components/routes/settings/general")}
@@ -273,12 +253,6 @@ export default function Navbar() {
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					{!isReadOnlyUser() && (
-						<Button variant="outline" className="flex gap-1 ms-2" onClick={() => setAddSystemDialogOpen(true)}>
-							<PlusIcon className="h-4 w-4 -ms-1" />
-							<Trans>Add System</Trans>
-						</Button>
-					)}
 				</div>
 			</div>
 			<div className="md:hidden">
@@ -287,12 +261,6 @@ export default function Navbar() {
 		</>
 	)
 }
-
-const Kbd = ({ children }: { children: React.ReactNode }) => (
-	<kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-		{children}
-	</kbd>
-)
 
 function AdminDropdownGroup() {
 	return (

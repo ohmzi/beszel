@@ -3,7 +3,6 @@
 // they are deliberately not repeated here. This is rendered under the system charts on the home page.
 import { Trans } from "@lingui/react/macro"
 import { memo } from "react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { bytes, dotFor, dur, useMaintenanceFile, when } from "@/lib/maintenance"
 
 type Top = { name?: string; class?: string; cpu_pct?: number; mem_gib?: number }
@@ -147,34 +146,30 @@ export const LivePanels = memo(() => {
 					<h2 className="text-lg font-semibold mb-2">
 						<Trans>Disk activity</Trans>
 					</h2>
-					<Table className="mb-6">
-						<TableHeader>
-							<TableRow>
-								<TableHead>
-									<Trans>Process</Trans>
-								</TableHead>
-								<TableHead className="w-48">
-									<Trans>Container</Trans>
-								</TableHead>
-								<TableHead className="w-28 text-right">
-									<Trans>Read</Trans>
-								</TableHead>
-								<TableHead className="w-28 text-right">
-									<Trans>Write</Trans>
-								</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{(d.io_top?.readers ?? []).slice(0, 8).map((r, i) => (
-								<TableRow key={i}>
-									<TableCell className="font-mono text-xs">{r.name}</TableCell>
-									<TableCell className="text-muted-foreground text-xs">{r.container ?? "—"}</TableCell>
-									<TableCell className="text-right tabular-nums">{rate(r.read_bps)}</TableCell>
-									<TableCell className="text-right tabular-nums">{rate(r.write_bps)}</TableCell>
-								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+					<ul className="text-sm mb-6">
+						<li className="flex items-center gap-2 py-1 border-t border-border/40 text-xs uppercase tracking-wide text-muted-foreground">
+							<span className="flex-1">
+								<Trans>Process</Trans>
+							</span>
+							<span className="w-40">
+								<Trans>Container</Trans>
+							</span>
+							<span className="w-28 text-right">
+								<Trans>Read</Trans>
+							</span>
+							<span className="w-28 text-right">
+								<Trans>Write</Trans>
+							</span>
+						</li>
+						{(d.io_top?.readers ?? []).slice(0, 8).map((r, i) => (
+							<li key={i} className="flex items-center gap-2 py-1 border-t border-border/40">
+								<span className="flex-1 font-mono text-xs truncate">{r.name}</span>
+								<span className="w-40 text-muted-foreground text-xs truncate">{r.container ?? "—"}</span>
+								<span className="w-28 text-right tabular-nums">{rate(r.read_bps)}</span>
+								<span className="w-28 text-right tabular-nums">{rate(r.write_bps)}</span>
+							</li>
+						))}
+					</ul>
 				</>
 			) : null}
 

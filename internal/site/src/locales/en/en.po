@@ -250,7 +250,6 @@ msgstr "Add {foo}"
 #: src/components/add-system.tsx
 #: src/components/add-system.tsx
 #: src/components/navbar.tsx
-#: src/components/navbar.tsx
 msgid "Add System"
 msgstr "Add System"
 
@@ -2572,8 +2571,8 @@ msgid "Scheduler:"
 msgstr "Scheduler:"
 
 #: src/components/navbar.tsx
-msgid "Search"
-msgstr "Search"
+#~ msgid "Search"
+#~ msgstr "Search"
 
 #: src/components/command-palette.tsx
 msgid "Search for systems or settings..."

@@ -255,7 +255,6 @@ msgstr "Hozzáadás {foo}"
 #: src/components/add-system.tsx
 #: src/components/add-system.tsx
 #: src/components/navbar.tsx
-#: src/components/navbar.tsx
 msgid "Add System"
 msgstr "Hozzáadás Rendszer"
 
@@ -2577,8 +2576,8 @@ msgid "Scheduler:"
 msgstr ""
 
 #: src/components/navbar.tsx
-msgid "Search"
-msgstr "Keresés"
+#~ msgid "Search"
+#~ msgstr "Keresés"
 
 #: src/components/command-palette.tsx
 msgid "Search for systems or settings..."
