@@ -72,6 +72,25 @@ export interface Maintenance {
 	r?: MaintenanceAlert[]
 	/** open incidents from the engine's ledger */
 	o?: MaintenanceIncident[]
+	/** recent daily/weekly reports with their health score */
+	p?: MaintenanceReport[]
+}
+
+export interface MaintenanceReport {
+	/** report id (date or ISO week) */
+	i?: string
+	/** daily | weekly */
+	k?: string
+	/** headline */
+	n?: string
+	/** health score 0-100 */
+	s?: number
+	/** grade letter */
+	g?: string
+	/** worst status in the period */
+	w?: string
+	/** epoch seconds generated */
+	t?: number
 }
 
 export interface MaintenanceIncident {

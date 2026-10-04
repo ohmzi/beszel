@@ -190,6 +190,18 @@ type Maintenance struct {
 	Updated   uint64                `json:"u,omitempty" cbor:"5,keyasint,omitempty"`  // epoch seconds of the newest input file
 	Recent    []MaintenanceAlert    `json:"r,omitempty" cbor:"6,keyasint,omitempty"`  // newest deliveries, bounded
 	Open      []MaintenanceIncident `json:"o,omitempty" cbor:"7,keyasint,omitempty"`  // open incidents, bounded
+	Reports   []MaintenanceReport   `json:"p,omitempty" cbor:"8,keyasint,omitempty"`  // recent reports, bounded
+}
+
+// MaintenanceReport is one daily/weekly report from the maintenance engine (Ohmz fork).
+type MaintenanceReport struct {
+	ID       string `json:"i,omitempty" cbor:"0,keyasint,omitempty"`
+	Kind     string `json:"k,omitempty" cbor:"1,keyasint,omitempty"` // daily | weekly
+	Headline string `json:"n,omitempty" cbor:"2,keyasint,omitempty"`
+	Score    uint16 `json:"s,omitempty" cbor:"3,keyasint,omitempty"`
+	Grade    string `json:"g,omitempty" cbor:"4,keyasint,omitempty"`
+	Worst    string `json:"w,omitempty" cbor:"5,keyasint,omitempty"`
+	At       uint64 `json:"t,omitempty" cbor:"6,keyasint,omitempty"`
 }
 
 // MaintenanceIncident is one open incident from the maintenance engine's ledger (Ohmz fork).

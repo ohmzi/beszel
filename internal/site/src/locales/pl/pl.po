@@ -787,6 +787,10 @@ msgstr "Cykle"
 msgid "Daily"
 msgstr "Codziennie"
 
+#: src/components/routes/reports.tsx
+msgid "Daily and weekly maintenance reports, newest first."
+msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -1143,6 +1147,10 @@ msgstr "Pełny ekran"
 msgid "General"
 msgstr "Ogólne"
 
+#: src/components/routes/reports.tsx
+msgid "Generated"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "Globalny"
@@ -1168,7 +1176,12 @@ msgstr "Użycie GPU"
 msgid "Grid"
 msgstr "Siatka"
 
+#: src/components/routes/reports.tsx
+msgid "Headline"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/reports.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Health"
 msgstr "Kondycja"
@@ -1275,6 +1288,7 @@ msgid "Invalid email address."
 msgstr "Nieprawidłowy adres e-mail."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
 
@@ -1528,6 +1542,10 @@ msgstr "Nie znaleziono logów."
 msgid "No open incidents."
 msgstr ""
 
+#: src/components/routes/reports.tsx
+msgid "No reports yet."
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1731,6 +1749,10 @@ msgstr "Procent czasu, w którym dysk jest zajęty operacjami I/O"
 msgid "Percentage of time spent in each state"
 msgstr "Procent czasu spędzonego w każdym stanie"
 
+#: src/components/routes/reports.tsx
+msgid "Period"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "Stały"
@@ -1879,6 +1901,12 @@ msgstr "Odśwież"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "Relacje"
+
+#: src/components/navbar.tsx
+#: src/components/routes/reports.tsx
+#: src/components/routes/reports.tsx
+msgid "Reports"
+msgstr ""
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"

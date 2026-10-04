@@ -787,6 +787,10 @@ msgstr "Döngüler"
 msgid "Daily"
 msgstr "Günlük"
 
+#: src/components/routes/reports.tsx
+msgid "Daily and weekly maintenance reports, newest first."
+msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -1143,6 +1147,10 @@ msgstr "Tam ekran"
 msgid "General"
 msgstr "Genel"
 
+#: src/components/routes/reports.tsx
+msgid "Generated"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "Genel"
@@ -1168,7 +1176,12 @@ msgstr "GPU Kullanımı"
 msgid "Grid"
 msgstr "Izgara"
 
+#: src/components/routes/reports.tsx
+msgid "Headline"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/reports.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Health"
 msgstr "Sağlık"
@@ -1275,6 +1288,7 @@ msgid "Invalid email address."
 msgstr "Geçersiz e-posta adresi."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
 
@@ -1528,6 +1542,10 @@ msgstr "Günlük bulunamadı."
 msgid "No open incidents."
 msgstr ""
 
+#: src/components/routes/reports.tsx
+msgid "No reports yet."
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1731,6 +1749,10 @@ msgstr "Diskin G/Ç işlemleriyle meşgul olduğu sürenin yüzdesi"
 msgid "Percentage of time spent in each state"
 msgstr "Her durumda harcanan zamanın yüzdesi"
 
+#: src/components/routes/reports.tsx
+msgid "Period"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "Kalıcı"
@@ -1879,6 +1901,12 @@ msgstr "Yenile"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "İlişkiler"
+
+#: src/components/navbar.tsx
+#: src/components/routes/reports.tsx
+#: src/components/routes/reports.tsx
+msgid "Reports"
+msgstr ""
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"

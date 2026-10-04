@@ -5,6 +5,7 @@ import {
 	BellIcon,
 	ContainerIcon,
 	DatabaseBackupIcon,
+	FileTextIcon,
 	HardDriveIcon,
 	LogOutIcon,
 	LogsIcon,
@@ -188,6 +189,21 @@ export default function Navbar() {
 					</TooltipTrigger>
 					<TooltipContent>
 						<Trans>Incidents</Trans>
+					</TooltipContent>
+				</Tooltip>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Link
+							href={getPagePath($router, "reports")}
+							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+							aria-label="Reports"
+							onMouseEnter={() => import("@/components/routes/reports")}
+						>
+							<FileTextIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+						</Link>
+					</TooltipTrigger>
+					<TooltipContent>
+						<Trans>Reports</Trans>
 					</TooltipContent>
 				</Tooltip>
 				<Tooltip>

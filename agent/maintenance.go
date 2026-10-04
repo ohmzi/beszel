@@ -30,6 +30,8 @@ const (
 	maintenanceRecentMax = 15
 	// How many open incidents to carry to the hub.
 	maintenanceIncidentsMax = 25
+	// How many recent reports to carry to the hub.
+	maintenanceReportsMax = 10
 )
 
 // maintenanceManager periodically reads the published maintenance state in the background and
@@ -189,6 +191,14 @@ func (m *maintenanceManager) read() system.Maintenance {
 		newest = max(newest, generatedAt(d))
 	}
 
+	// The report index (a JSON array) -> recent daily/weekly reports with their health score.
+	if list := m.readJSONList("reports/index.json"); list != nil {
+		out.Reports = recentReports(list, maintenanceReportsMax)
+		if len(list) > 0 {
+			newest = max(newest, int64(num(list[0]["generated_at"])))
+		}
+	}
+
 	if status == "" {
 		// Data was read and nothing was wrong: healthy. No file at all: unknown.
 		status = "ok"
@@ -318,6 +328,45 @@ func recentIncidents(v any, n int) []system.MaintenanceIncident {
 			Since:    uint64(max(int64(num(r["since"])), 0)),
 			Summary:  clampStr(str(r["summary"]), 200),
 			Fp:       clampStr(str(r["fp"]), 16),
+		})
+	}
+	return out
+}
+
+// readJSONList is readJSON for a file whose top level is a JSON array (the report index).
+func (m *maintenanceManager) readJSONList(name string) []map[string]any {
+	path := filepath.Join(m.dir, name)
+	info, err := os.Stat(path)
+	if err != nil || info.Size() > maintenanceMaxFile {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var list []map[string]any
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil
+	}
+	return list
+}
+
+// recentReports maps the report index into the bounded wire list.
+func recentReports(list []map[string]any, n int) []system.MaintenanceReport {
+	if len(list) > n {
+		list = list[:n]
+	}
+	out := make([]system.MaintenanceReport, 0, len(list))
+	for _, r := range list {
+		h, _ := r["health"].(map[string]any)
+		out = append(out, system.MaintenanceReport{
+			ID:       clampStr(str(r["id"]), 32),
+			Kind:     clampStr(str(r["kind"]), 12),
+			Headline: clampStr(str(r["headline"]), 200),
+			Score:    uint16(max(int64(num(h["score"])), 0)),
+			Grade:    clampStr(str(h["grade"]), 4),
+			Worst:    clampStr(str(h["worst_status"]), 8),
+			At:       uint64(max(int64(num(r["generated_at"])), 0)),
 		})
 	}
 	return out

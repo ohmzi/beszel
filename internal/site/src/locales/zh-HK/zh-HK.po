@@ -787,6 +787,10 @@ msgstr "週期"
 msgid "Daily"
 msgstr "每日"
 
+#: src/components/routes/reports.tsx
+msgid "Daily and weekly maintenance reports, newest first."
+msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -1143,6 +1147,10 @@ msgstr "全螢幕"
 msgid "General"
 msgstr "一般"
 
+#: src/components/routes/reports.tsx
+msgid "Generated"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "全域"
@@ -1168,7 +1176,12 @@ msgstr "GPU 使用率"
 msgid "Grid"
 msgstr "網格"
 
+#: src/components/routes/reports.tsx
+msgid "Headline"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/reports.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Health"
 msgstr "健康狀態"
@@ -1275,6 +1288,7 @@ msgid "Invalid email address."
 msgstr "無效的電子郵件地址。"
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
 
@@ -1528,6 +1542,10 @@ msgstr "找不到日誌。"
 msgid "No open incidents."
 msgstr ""
 
+#: src/components/routes/reports.tsx
+msgid "No reports yet."
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1731,6 +1749,10 @@ msgstr "磁碟忙於 I/O 操作的時間百分比"
 msgid "Percentage of time spent in each state"
 msgstr "在每個狀態下花費的時間百分比"
 
+#: src/components/routes/reports.tsx
+msgid "Period"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "永久"
@@ -1879,6 +1901,12 @@ msgstr "重新整理"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "關係"
+
+#: src/components/navbar.tsx
+#: src/components/routes/reports.tsx
+#: src/components/routes/reports.tsx
+msgid "Reports"
+msgstr ""
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"

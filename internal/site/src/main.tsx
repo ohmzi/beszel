@@ -30,6 +30,7 @@ const LoginPage = lazy(() => import("@/components/login/login.tsx"))
 const Home = lazy(() => import("@/components/routes/home.tsx"))
 const Alerts = lazy(() => import("@/components/routes/alerts.tsx"))
 const Incidents = lazy(() => import("@/components/routes/incidents.tsx"))
+const Reports = lazy(() => import("@/components/routes/reports.tsx"))
 const Containers = lazy(() => import("@/components/routes/containers.tsx"))
 const Smart = lazy(() => import("@/components/routes/smart.tsx"))
 const Monitors = lazy(() => import("@/components/routes/monitors.tsx"))
@@ -81,6 +82,8 @@ const App = memo(() => {
 		return <Alerts />
 	} else if (page.route === "incidents") {
 		return <Incidents />
+	} else if (page.route === "reports") {
+		return <Reports />
 	} else if (page.route === "system") {
 		return <SystemDetail id={page.params.id} />
 	} else if (page.route === "containers") {

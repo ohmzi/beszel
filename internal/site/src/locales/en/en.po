@@ -782,6 +782,10 @@ msgstr "Cycles"
 msgid "Daily"
 msgstr "Daily"
 
+#: src/components/routes/reports.tsx
+msgid "Daily and weekly maintenance reports, newest first."
+msgstr "Daily and weekly maintenance reports, newest first."
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -1138,6 +1142,10 @@ msgstr "Fullscreen"
 msgid "General"
 msgstr "General"
 
+#: src/components/routes/reports.tsx
+msgid "Generated"
+msgstr "Generated"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "Global"
@@ -1163,7 +1171,12 @@ msgstr "GPU Usage"
 msgid "Grid"
 msgstr "Grid"
 
+#: src/components/routes/reports.tsx
+msgid "Headline"
+msgstr "Headline"
+
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/reports.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Health"
 msgstr "Health"
@@ -1270,6 +1283,7 @@ msgid "Invalid email address."
 msgstr "Invalid email address."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr "Kind"
 
@@ -1523,6 +1537,10 @@ msgstr "No logs found."
 msgid "No open incidents."
 msgstr "No open incidents."
 
+#: src/components/routes/reports.tsx
+msgid "No reports yet."
+msgstr "No reports yet."
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1726,6 +1744,10 @@ msgstr "Percent of time the disk is busy with I/O"
 msgid "Percentage of time spent in each state"
 msgstr "Percentage of time spent in each state"
 
+#: src/components/routes/reports.tsx
+msgid "Period"
+msgstr "Period"
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "Permanent"
@@ -1874,6 +1896,12 @@ msgstr "Refresh"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "Relationships"
+
+#: src/components/navbar.tsx
+#: src/components/routes/reports.tsx
+#: src/components/routes/reports.tsx
+msgid "Reports"
+msgstr "Reports"
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"

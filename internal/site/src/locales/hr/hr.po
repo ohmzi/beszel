@@ -787,6 +787,10 @@ msgstr "Ciklusi"
 msgid "Daily"
 msgstr "Dnevno"
 
+#: src/components/routes/reports.tsx
+msgid "Daily and weekly maintenance reports, newest first."
+msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -1143,6 +1147,10 @@ msgstr "Cijeli zaslon"
 msgid "General"
 msgstr "Općenito"
 
+#: src/components/routes/reports.tsx
+msgid "Generated"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "Globalno"
@@ -1168,7 +1176,12 @@ msgstr "Iskorištenost GPU-a"
 msgid "Grid"
 msgstr "Rešetka"
 
+#: src/components/routes/reports.tsx
+msgid "Headline"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/reports.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Health"
 msgstr "Zdravlje"
@@ -1275,6 +1288,7 @@ msgid "Invalid email address."
 msgstr "Nevažeća email adresa."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
 
@@ -1528,6 +1542,10 @@ msgstr "Zapisi nisu pronađeni."
 msgid "No open incidents."
 msgstr ""
 
+#: src/components/routes/reports.tsx
+msgid "No reports yet."
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1731,6 +1749,10 @@ msgstr "Postotak vremena u kojem je disk zauzet I/O operacijama"
 msgid "Percentage of time spent in each state"
 msgstr "Postotak vremena provedenog u svakom stanju"
 
+#: src/components/routes/reports.tsx
+msgid "Period"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "Trajan"
@@ -1879,6 +1901,12 @@ msgstr "Osvježi"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "Odnosi"
+
+#: src/components/navbar.tsx
+#: src/components/routes/reports.tsx
+#: src/components/routes/reports.tsx
+msgid "Reports"
+msgstr ""
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"

@@ -787,6 +787,10 @@ msgstr "الدورات"
 msgid "Daily"
 msgstr "يوميًا"
 
+#: src/components/routes/reports.tsx
+msgid "Daily and weekly maintenance reports, newest first."
+msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -1143,6 +1147,10 @@ msgstr "ملء الشاشة"
 msgid "General"
 msgstr "عام"
 
+#: src/components/routes/reports.tsx
+msgid "Generated"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "عالمي"
@@ -1168,7 +1176,12 @@ msgstr "استخدام وحدة معالجة الرسوميات"
 msgid "Grid"
 msgstr "شبكة"
 
+#: src/components/routes/reports.tsx
+msgid "Headline"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/reports.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Health"
 msgstr "الصحة"
@@ -1275,6 +1288,7 @@ msgid "Invalid email address."
 msgstr "عنوان البريد الإشباكي غير صالح."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
 
@@ -1528,6 +1542,10 @@ msgstr "لم يتم العثور على سجلات."
 msgid "No open incidents."
 msgstr ""
 
+#: src/components/routes/reports.tsx
+msgid "No reports yet."
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1731,6 +1749,10 @@ msgstr "النسبة المئوية للوقت الذي يكون فيه القر
 msgid "Percentage of time spent in each state"
 msgstr "النسبة المئوية للوقت المقضي في كل حالة"
 
+#: src/components/routes/reports.tsx
+msgid "Period"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "دائم"
@@ -1879,6 +1901,12 @@ msgstr "تحديث"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "العلاقات"
+
+#: src/components/navbar.tsx
+#: src/components/routes/reports.tsx
+#: src/components/routes/reports.tsx
+msgid "Reports"
+msgstr ""
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"

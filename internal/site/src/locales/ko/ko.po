@@ -787,6 +787,10 @@ msgstr "사이클"
 msgid "Daily"
 msgstr "매일"
 
+#: src/components/routes/reports.tsx
+msgid "Daily and weekly maintenance reports, newest first."
+msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -1143,6 +1147,10 @@ msgstr "전체 화면"
 msgid "General"
 msgstr "일반"
 
+#: src/components/routes/reports.tsx
+msgid "Generated"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "전역"
@@ -1168,7 +1176,12 @@ msgstr "GPU 사용량"
 msgid "Grid"
 msgstr "그리드"
 
+#: src/components/routes/reports.tsx
+msgid "Headline"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/reports.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Health"
 msgstr "상태"
@@ -1275,6 +1288,7 @@ msgid "Invalid email address."
 msgstr "잘못된 이메일 주소입니다."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
 
@@ -1528,6 +1542,10 @@ msgstr "로그를 찾을 수 없습니다."
 msgid "No open incidents."
 msgstr ""
 
+#: src/components/routes/reports.tsx
+msgid "No reports yet."
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1731,6 +1749,10 @@ msgstr "디스크가 I/O로 바쁜 시간의 비율"
 msgid "Percentage of time spent in each state"
 msgstr "각 상태에서 보낸 시간의 백분율"
 
+#: src/components/routes/reports.tsx
+msgid "Period"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "영구적"
@@ -1879,6 +1901,12 @@ msgstr "새로고침"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "관계"
+
+#: src/components/navbar.tsx
+#: src/components/routes/reports.tsx
+#: src/components/routes/reports.tsx
+msgid "Reports"
+msgstr ""
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"
