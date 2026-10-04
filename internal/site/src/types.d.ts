@@ -38,6 +38,23 @@ export interface WiFi {
 	r?: number
 }
 
+export interface MaintenanceAlert {
+	/** epoch seconds */
+	t?: number
+	/** alert | recovery | maintenance | incident_open | ... */
+	k?: string
+	/** ok | info | warn | crit */
+	s?: string
+	/** short title */
+	n?: string
+	/** delivery succeeded */
+	o?: boolean
+	/** delivery note */
+	d?: string
+	/** skip reason (budget, acknowledged, dedupe, ...) */
+	x?: string
+}
+
 export interface Maintenance {
 	/** ok | warn | crit | unknown */
 	st?: string
@@ -51,6 +68,8 @@ export interface Maintenance {
 	a?: number
 	/** epoch seconds of the newest input file */
 	u?: number
+	/** the engine's recent delivery log (everything it alerted about), newest first */
+	r?: MaintenanceAlert[]
 }
 
 export interface SystemInfo {

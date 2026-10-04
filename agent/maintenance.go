@@ -26,6 +26,8 @@ const (
 	// Cap what we will parse from a single published file. The real files are tens of KB; a
 	// saboteur-sized file is refused rather than loaded.
 	maintenanceMaxFile = 8 << 20
+	// How many recent delivery-log entries to carry to the hub (newest first).
+	maintenanceRecentMax = 15
 )
 
 // maintenanceManager periodically reads the published maintenance state in the background and
@@ -176,6 +178,14 @@ func (m *maintenanceManager) read() system.Maintenance {
 		newest = max(newest, generatedAt(d))
 	}
 
+	// The delivery log: everything the engine alerted about (its own alerts and the external ones
+	// bridged through it, e.g. Hermes). Surfaced as the central alerts feed. It is not a health
+	// signal, so it does not set readAny.
+	if d := m.readJSON("notifications.json"); d != nil {
+		out.Recent = recentAlerts(d["recent"], maintenanceRecentMax)
+		newest = max(newest, generatedAt(d))
+	}
+
 	if status == "" {
 		// Data was read and nothing was wrong: healthy. No file at all: unknown.
 		status = "ok"
@@ -223,6 +233,44 @@ func listOf(v any) []map[string]any {
 		}
 	}
 	return out
+}
+
+// recentAlerts maps the delivery log's recent[] into the bounded wire list (newest first as
+// published). Every field is clamped so one hostile title cannot bloat the payload.
+func recentAlerts(v any, n int) []system.MaintenanceAlert {
+	raw := listOf(v)
+	if len(raw) > n {
+		raw = raw[:n]
+	}
+	out := make([]system.MaintenanceAlert, 0, len(raw))
+	for _, r := range raw {
+		out = append(out, system.MaintenanceAlert{
+			TS:       uint64(max(int64(num(r["ts"])), 0)),
+			Kind:     clampStr(str(r["kind"]), 24),
+			Severity: clampStr(str(r["severity"]), 8),
+			Title:    clampStr(str(r["title"]), 120),
+			OK:       truthy(r["ok"]),
+			Note:     clampStr(str(r["note"]), 160),
+			Skipped:  clampStr(str(r["skipped"]), 24),
+		})
+	}
+	return out
+}
+
+func truthy(v any) bool {
+	b, _ := v.(bool)
+	return b
+}
+
+func clampStr(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	r := []rune(s)
+	if len(r) > n {
+		r = r[:n]
+	}
+	return string(r)
 }
 
 func str(v any) string {

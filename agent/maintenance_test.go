@@ -44,6 +44,29 @@ func TestMaintenanceRead(t *testing.T) {
 	}
 }
 
+// The delivery log becomes the bounded recent-alerts feed; it is not a health signal on its own.
+func TestMaintenanceRecentAlerts(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"generated_at":5,"recent":[{"ts":10,"kind":"alert","severity":"crit","title":"Search engine is down","ok":true,"channels":["email"]},{"ts":9,"kind":"recovery","severity":"ok","title":"Flightclaw is down","ok":false,"note":"suppressed","skipped":"acknowledged"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "notifications.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := &maintenanceManager{dir: dir, result: system.Maintenance{Status: "unknown"}}
+	got := m.read()
+	if len(got.Recent) != 2 {
+		t.Fatalf("recent = %d, want 2", len(got.Recent))
+	}
+	if got.Recent[0].Title != "Search engine is down" || got.Recent[0].Severity != "crit" || !got.Recent[0].OK {
+		t.Fatalf("recent[0] = %+v", got.Recent[0])
+	}
+	if got.Recent[1].Skipped != "acknowledged" {
+		t.Fatalf("recent[1] = %+v", got.Recent[1])
+	}
+	if got.Status != "unknown" {
+		t.Fatalf("status = %q, want unknown (notifications alone are not a health signal)", got.Status)
+	}
+}
+
 // A missing directory is not fatal: the verdict is simply unknown.
 func TestMaintenanceMissing(t *testing.T) {
 	m := &maintenanceManager{dir: filepath.Join(t.TempDir(), "nope"), result: system.Maintenance{Status: "unknown"}}

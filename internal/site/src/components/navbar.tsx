@@ -1,6 +1,7 @@
 import { Trans } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
 import {
+	BellIcon,
 	ContainerIcon,
 	DatabaseBackupIcon,
 	HardDriveIcon,
@@ -158,6 +159,21 @@ export default function Navbar() {
 				className="hidden md:flex items-center ms-auto"
 				onMouseEnter={() => import("@/components/routes/settings/general")}
 			>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Link
+							href={getPagePath($router, "alerts")}
+							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+							aria-label="Alerts"
+							onMouseEnter={() => import("@/components/routes/alerts")}
+						>
+							<BellIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+						</Link>
+					</TooltipTrigger>
+					<TooltipContent>
+						<Trans>Alerts</Trans>
+					</TooltipContent>
+				</Tooltip>
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<Link

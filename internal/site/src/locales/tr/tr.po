@@ -224,6 +224,9 @@ msgstr "Uyarı Geçmişi"
 
 #: src/components/alerts/alert-button.tsx
 #: src/components/alerts/alerts-sheet.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/alerts.tsx
+#: src/components/routes/alerts.tsx
 msgid "Alerts"
 msgstr "Uyarılar"
 
@@ -792,6 +795,10 @@ msgstr "Sil"
 msgid "Delete fingerprint"
 msgstr "Parmak izini sil"
 
+#: src/components/routes/alerts.tsx
+msgid "Delivery"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Description"
 msgstr "Açıklama"
@@ -957,6 +964,10 @@ msgstr "Geçici"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Error"
 msgstr "Hata"
+
+#: src/components/routes/alerts.tsx
+msgid "Everything the maintenance engine reported, newest first."
+msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
@@ -1240,6 +1251,10 @@ msgstr "Aralık (saniye)"
 msgid "Invalid email address."
 msgstr "Geçersiz e-posta adresi."
 
+#: src/components/routes/alerts.tsx
+msgid "Kind"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Language"
 msgstr "Dil"
@@ -1470,6 +1485,10 @@ msgstr "Ağ birimi"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No"
 msgstr "Hayır"
+
+#: src/components/routes/alerts.tsx
+msgid "No alerts reported yet."
+msgstr ""
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
@@ -2045,6 +2064,10 @@ msgstr "Ayarlar"
 msgid "Settings saved"
 msgstr "Ayarlar kaydedildi"
 
+#: src/components/routes/alerts.tsx
+msgid "Severity"
+msgstr ""
+
 #: src/components/logs-display.tsx
 #: src/components/logs-display.tsx
 msgid "Show timestamps"
@@ -2110,6 +2133,7 @@ msgstr "Temayı değiştir"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/alerts.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2226,6 +2250,10 @@ msgstr "Depolama pool'u {displayName} veri aktarım hızı"
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
 msgstr "Zaman formatı"
+
+#: src/components/routes/alerts.tsx
+msgid "Title"
+msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
 msgid "To email(s)"
@@ -2517,6 +2545,10 @@ msgstr "Uyarı eşikleri"
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Anlık bildirimler"
+
+#: src/components/routes/alerts.tsx
+msgid "When"
+msgstr ""
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "When enabled, this token allows agents to self-register without prior system creation."

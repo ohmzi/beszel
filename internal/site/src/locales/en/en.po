@@ -219,6 +219,9 @@ msgstr "Alert History"
 
 #: src/components/alerts/alert-button.tsx
 #: src/components/alerts/alerts-sheet.tsx
+#: src/components/navbar.tsx
+#: src/components/routes/alerts.tsx
+#: src/components/routes/alerts.tsx
 msgid "Alerts"
 msgstr "Alerts"
 
@@ -787,6 +790,10 @@ msgstr "Delete"
 msgid "Delete fingerprint"
 msgstr "Delete fingerprint"
 
+#: src/components/routes/alerts.tsx
+msgid "Delivery"
+msgstr "Delivery"
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Description"
 msgstr "Description"
@@ -952,6 +959,10 @@ msgstr "Ephemeral"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Error"
 msgstr "Error"
+
+#: src/components/routes/alerts.tsx
+msgid "Everything the maintenance engine reported, newest first."
+msgstr "Everything the maintenance engine reported, newest first."
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
@@ -1235,6 +1246,10 @@ msgstr "Interval (seconds)"
 msgid "Invalid email address."
 msgstr "Invalid email address."
 
+#: src/components/routes/alerts.tsx
+msgid "Kind"
+msgstr "Kind"
+
 #: src/components/routes/settings/general.tsx
 msgid "Language"
 msgstr "Language"
@@ -1465,6 +1480,10 @@ msgstr "Network unit"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No"
 msgstr "No"
+
+#: src/components/routes/alerts.tsx
+msgid "No alerts reported yet."
+msgstr "No alerts reported yet."
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
@@ -2040,6 +2059,10 @@ msgstr "Settings"
 msgid "Settings saved"
 msgstr "Settings saved"
 
+#: src/components/routes/alerts.tsx
+msgid "Severity"
+msgstr "Severity"
+
 #: src/components/logs-display.tsx
 #: src/components/logs-display.tsx
 msgid "Show timestamps"
@@ -2105,6 +2128,7 @@ msgstr "Switch theme"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/alerts.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2221,6 +2245,10 @@ msgstr "Throughput of storage pool {displayName}"
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
 msgstr "Time format"
+
+#: src/components/routes/alerts.tsx
+msgid "Title"
+msgstr "Title"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "To email(s)"
@@ -2512,6 +2540,10 @@ msgstr "Warning thresholds"
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Push notifications"
+
+#: src/components/routes/alerts.tsx
+msgid "When"
+msgstr "When"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "When enabled, this token allows agents to self-register without prior system creation."

@@ -16,6 +16,7 @@ func TestIsAppRoute(t *testing.T) {
 	}{
 		// known routes
 		{"/", "/", true},
+		{"/alerts", "/", true},
 		{"/containers", "/", true},
 		{"/containers/", "/", true},
 		{"/Containers", "/", true},

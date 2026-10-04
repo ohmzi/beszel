@@ -163,16 +163,29 @@ const (
 	ConnectionTypeWebSocket
 )
 
+// MaintenanceAlert is one entry of the maintenance engine's delivery log (what it alerted about):
+// kind, severity, title, whether delivery succeeded, and any note/skip reason. Ohmz fork.
+type MaintenanceAlert struct {
+	TS       uint64 `json:"t,omitempty" cbor:"0,keyasint,omitempty"`
+	Kind     string `json:"k,omitempty" cbor:"1,keyasint,omitempty"`
+	Severity string `json:"s,omitempty" cbor:"2,keyasint,omitempty"`
+	Title    string `json:"n,omitempty" cbor:"3,keyasint,omitempty"`
+	OK       bool   `json:"o,omitempty" cbor:"4,keyasint,omitempty"`
+	Note     string `json:"d,omitempty" cbor:"5,keyasint,omitempty"`
+	Skipped  string `json:"x,omitempty" cbor:"6,keyasint,omitempty"`
+}
+
 // Maintenance is the homelab-maint verdict (Ohmz fork). It is read from the maintenance engine's
 // published state (STATE_DIR/public/*.json) and surfaced as a native Beszel metric/tile: the health
 // of the maintenance pipeline plus the failing checks / open incidents it is tracking.
 type Maintenance struct {
-	Status    string `json:"st,omitempty" cbor:"0,keyasint,omitempty"` // ok | warn | crit | unknown
-	Summary   string `json:"sm,omitempty" cbor:"1,keyasint,omitempty"` // one line, from self.json
-	Failing   uint16 `json:"f,omitempty" cbor:"2,keyasint,omitempty"`  // checks failing now (warn/crit/error)
-	Incidents uint16 `json:"i,omitempty" cbor:"3,keyasint,omitempty"`  // open incidents
-	Acked     uint16 `json:"a,omitempty" cbor:"4,keyasint,omitempty"`  // active acknowledgements
-	Updated   uint64 `json:"u,omitempty" cbor:"5,keyasint,omitempty"`  // epoch seconds of the newest input file
+	Status    string             `json:"st,omitempty" cbor:"0,keyasint,omitempty"` // ok | warn | crit | unknown
+	Summary   string             `json:"sm,omitempty" cbor:"1,keyasint,omitempty"` // one line, from self.json
+	Failing   uint16             `json:"f,omitempty" cbor:"2,keyasint,omitempty"`  // checks failing now (warn/crit/error)
+	Incidents uint16             `json:"i,omitempty" cbor:"3,keyasint,omitempty"`  // open incidents
+	Acked     uint16             `json:"a,omitempty" cbor:"4,keyasint,omitempty"`  // active acknowledgements
+	Updated   uint64             `json:"u,omitempty" cbor:"5,keyasint,omitempty"`  // epoch seconds of the newest input file
+	Recent    []MaintenanceAlert `json:"r,omitempty" cbor:"6,keyasint,omitempty"`  // newest deliveries, bounded
 }
 
 // Core system data that is needed in All Systems table
@@ -207,7 +220,7 @@ type Info struct {
 	PackageUpdates []uint16           `json:"pu,omitempty" cbor:"25,keyasint,omitempty"`  // [totalUpdates, securityUpdates] (security omitted if unknown)
 	WiFi           map[string]WiFi    `json:"wf,omitempty" cbor:"26,keyasint,omitempty"`  // connected Wi-Fi interfaces
 	SystemdLogs    bool               `json:"jl,omitempty" cbor:"27,keyasint,omitempty"`  // agent can read the system journal
-	Maintenance    Maintenance        `json:"mt,omitzero" cbor:"28,keyasint,omitzero"`     // homelab-maint verdict (Ohmz fork)
+	Maintenance    Maintenance        `json:"mt,omitzero" cbor:"28,keyasint,omitzero"`    // homelab-maint verdict (Ohmz fork)
 }
 
 // Data that does not change during process lifetime and is not needed in All Systems table
