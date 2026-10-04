@@ -210,6 +210,8 @@ export interface SystemStats {
 	wf?: Record<string, number>
 	/** network interfaces [upload bytes, download bytes, total upload bytes, total download bytes] */
 	ni?: Record<string, [number, number, number, number]>
+	/** homelab-maint verdict level (Ohmz fork): 0 ok, 1 warn, 2 crit */
+	mtl?: number
 }
 
 export interface GPUData {

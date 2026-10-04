@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro"
-import { ContainerIcon, CpuIcon, HardDriveIcon, MemoryStickIcon, NetworkIcon, ServerCrashIcon, ServerIcon } from "lucide-react"
+import { ContainerIcon, CpuIcon, HardDriveIcon, MemoryStickIcon, NetworkIcon, ServerCrashIcon, ServerIcon, WrenchIcon } from "lucide-react"
 import type { RecordSubscription } from "pocketbase"
 import { EthernetIcon, GpuIcon } from "@/components/ui/icons"
 import { $alerts } from "@/lib/stores"
@@ -120,6 +120,16 @@ export const alertInfo: Record<string, AlertInfo> = {
     desc: () => t`Triggers when battery charge drops below a threshold`,
     start: 20,
     invert: true,
+  },
+  Maintenance: {
+    name: () => t`Maintenance`,
+    unit: "",
+    icon: WrenchIcon,
+    desc: () => t`Triggers when the homelab-maint verdict exceeds a threshold (0 healthy, 1 attention, 2 critical)`,
+    min: 0,
+    max: 2,
+    start: 1,
+    step: 1,
   },
   ContainerHealth: {
     name: () => t`Container Health`,

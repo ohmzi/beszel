@@ -108,6 +108,9 @@ func (am *AlertManager) HandleSystemAlerts(systemRecord *core.Record, data *syst
 				continue
 			}
 			val = float64(data.Stats.Battery[0])
+		case "Maintenance":
+			val = data.Stats.MaintenanceLevel
+			unit = ""
 		default:
 			var ok bool
 			if val, ok = cpuStateAlertValue(name, data.Stats.CpuBreakdown); !ok {
@@ -296,6 +299,8 @@ func (am *AlertManager) HandleSystemAlerts(systemRecord *core.Record, data *syst
 					continue
 				}
 				alert.val += float64(stats.Battery[0])
+			case "Maintenance":
+				alert.val += stats.MaintenanceLevel
 			default:
 				value, ok := cpuStateAlertValue(alert.name, stats.CpuBreakdown)
 				if !ok {

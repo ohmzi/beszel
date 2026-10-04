@@ -1181,6 +1181,10 @@ msgctxt "Button to copy install command"
 msgid "Homebrew command"
 msgstr "Homebrew command"
 
+#: src/components/routes/system/charts/maintenance-chart.tsx
+msgid "homelab-maint verdict over time (0 healthy, 1 attention, 2 critical)"
+msgstr "homelab-maint verdict over time (0 healthy, 1 attention, 2 critical)"
+
 #: src/components/add-system.tsx
 msgid "Host / IP"
 msgstr "Host / IP"
@@ -1340,7 +1344,10 @@ msgstr "Loss 1h"
 msgid "Main PID"
 msgstr "Main PID"
 
+#: src/components/routes/system/charts/maintenance-chart.tsx
+#: src/components/routes/system/charts/maintenance-chart.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/lib/alerts.ts
 msgid "Maintenance"
 msgstr "Maintenance"
 
@@ -2365,6 +2372,10 @@ msgstr "Triggers when one hour loss exceeds a threshold"
 #: src/lib/alerts.ts
 msgid "Triggers when status switches between up and down"
 msgstr "Triggers when status switches between up and down"
+
+#: src/lib/alerts.ts
+msgid "Triggers when the homelab-maint verdict exceeds a threshold (0 healthy, 1 attention, 2 critical)"
+msgstr "Triggers when the homelab-maint verdict exceeds a threshold (0 healthy, 1 attention, 2 critical)"
 
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"

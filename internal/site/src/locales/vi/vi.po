@@ -1186,6 +1186,10 @@ msgctxt "Button to copy install command"
 msgid "Homebrew command"
 msgstr "Lệnh Homebrew"
 
+#: src/components/routes/system/charts/maintenance-chart.tsx
+msgid "homelab-maint verdict over time (0 healthy, 1 attention, 2 critical)"
+msgstr ""
+
 #: src/components/add-system.tsx
 msgid "Host / IP"
 msgstr "Máy chủ / IP"
@@ -1345,7 +1349,10 @@ msgstr "Mất gói 1 giờ"
 msgid "Main PID"
 msgstr "PID chính"
 
+#: src/components/routes/system/charts/maintenance-chart.tsx
+#: src/components/routes/system/charts/maintenance-chart.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/lib/alerts.ts
 msgid "Maintenance"
 msgstr ""
 
@@ -2370,6 +2377,10 @@ msgstr "Kích hoạt khi tỷ lệ mất gói trong một giờ vượt quá ng�
 #: src/lib/alerts.ts
 msgid "Triggers when status switches between up and down"
 msgstr "Kích hoạt khi trạng thái chuyển đổi giữa lên và xuống"
+
+#: src/lib/alerts.ts
+msgid "Triggers when the homelab-maint verdict exceeds a threshold (0 healthy, 1 attention, 2 critical)"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"

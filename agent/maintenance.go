@@ -221,6 +221,18 @@ func (m *maintenanceManager) readJSON(name string) map[string]any {
 	return d
 }
 
+// maintenanceLevel maps the verdict to the numeric stat used for history/charts/alerts.
+func maintenanceLevel(status string) float64 {
+	switch status {
+	case "crit":
+		return 2
+	case "warn":
+		return 1
+	default: // ok, unknown, ""
+		return 0
+	}
+}
+
 func listOf(v any) []map[string]any {
 	raw, ok := v.([]any)
 	if !ok {

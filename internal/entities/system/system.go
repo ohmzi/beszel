@@ -65,6 +65,9 @@ type Stats struct {
 	DiskIOTotal       [2]uint64            `json:"diot,omitzero" cbor:"38,keyasint,omitzero"` // [total read bytes, total write bytes] cumulative device counters
 	WiFi              map[string]int8      `json:"wf,omitempty" cbor:"40,keyasint,omitempty"` // RSSI dBm keyed by interface; unavailable readings omitted
 
+	// MaintenanceLevel is the homelab-maint verdict as a number for history/charts/alerts (Ohmz
+	// fork): 0 ok, 1 warn, 2 crit. Absent when the engine is not installed.
+	MaintenanceLevel float64 `json:"mtl,omitempty" cbor:"41,keyasint,omitempty"`
 }
 
 // ZfsPool holds per-pool ZFS metrics for a single collection interval.

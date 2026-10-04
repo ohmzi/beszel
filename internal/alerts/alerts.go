@@ -48,18 +48,19 @@ type SystemAlertFsStats struct {
 
 // Values pulled from system_stats.stats that are relevant to alerts.
 type SystemAlertStats struct {
-	Cpu          float64                       `json:"cpu"`
-	CpuBreakdown []float64                     `json:"cpub"`
-	Mem          float64                       `json:"mp"`
-	Disk         float64                       `json:"dp"`
-	Bandwidth    [2]uint64                     `json:"b"`
-	GPU          map[string]SystemAlertGPUData `json:"g"`
-	Temperatures map[string]float32            `json:"t"`
-	LoadAvg      [3]float64                    `json:"la"`
-	Battery      [2]uint8                      `json:"bat"`
-	Batteries    map[string]uint8              `json:"bats"`
-	ExtraFs      map[string]SystemAlertFsStats `json:"efs"`
-	ZfsPools     map[string]SystemAlertZfsPool `json:"z"`
+	Cpu              float64                       `json:"cpu"`
+	CpuBreakdown     []float64                     `json:"cpub"`
+	Mem              float64                       `json:"mp"`
+	Disk             float64                       `json:"dp"`
+	Bandwidth        [2]uint64                     `json:"b"`
+	GPU              map[string]SystemAlertGPUData `json:"g"`
+	Temperatures     map[string]float32            `json:"t"`
+	LoadAvg          [3]float64                    `json:"la"`
+	Battery          [2]uint8                      `json:"bat"`
+	Batteries        map[string]uint8              `json:"bats"`
+	ExtraFs          map[string]SystemAlertFsStats `json:"efs"`
+	ZfsPools         map[string]SystemAlertZfsPool `json:"z"`
+	MaintenanceLevel float64                       `json:"mtl"` // Ohmz fork: homelab-maint verdict level
 }
 
 type SystemAlertGPUData struct {

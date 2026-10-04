@@ -323,6 +323,7 @@ func AverageSystemStatsSlice(records []system.Stats) system.Stats {
 		sum.Bandwidth[1] += stats.Bandwidth[1]
 		sum.DiskIO[0] += stats.DiskIO[0]
 		sum.DiskIO[1] += stats.DiskIO[1]
+		sum.MaintenanceLevel += stats.MaintenanceLevel // Ohmz fork: keep the verdict through rollups
 		for i := range stats.DiskIoStats {
 			sum.DiskIoStats[i] += stats.DiskIoStats[i]
 		}
@@ -509,6 +510,7 @@ func AverageSystemStatsSlice(records []system.Stats) system.Stats {
 	sum.DiskWritePs = twoDecimals(sum.DiskWritePs / count)
 	sum.DiskIO[0] = sum.DiskIO[0] / uint64(count)
 	sum.DiskIO[1] = sum.DiskIO[1] / uint64(count)
+	sum.MaintenanceLevel = twoDecimals(sum.MaintenanceLevel / count) // Ohmz fork
 	for i := range sum.DiskIoStats {
 		sum.DiskIoStats[i] = twoDecimals(sum.DiskIoStats[i] / count)
 	}

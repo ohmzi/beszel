@@ -1186,6 +1186,10 @@ msgctxt "Button to copy install command"
 msgid "Homebrew command"
 msgstr "Команда Homebrew"
 
+#: src/components/routes/system/charts/maintenance-chart.tsx
+msgid "homelab-maint verdict over time (0 healthy, 1 attention, 2 critical)"
+msgstr ""
+
 #: src/components/add-system.tsx
 msgid "Host / IP"
 msgstr "Хост / IP"
@@ -1345,7 +1349,10 @@ msgstr "Загуба 1h"
 msgid "Main PID"
 msgstr "Главен PID"
 
+#: src/components/routes/system/charts/maintenance-chart.tsx
+#: src/components/routes/system/charts/maintenance-chart.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/lib/alerts.ts
 msgid "Maintenance"
 msgstr ""
 
@@ -2370,6 +2377,10 @@ msgstr "Сработва, когато загубата за един час н�
 #: src/lib/alerts.ts
 msgid "Triggers when status switches between up and down"
 msgstr "Задейства се, когато статуса превключва между долу и горе"
+
+#: src/lib/alerts.ts
+msgid "Triggers when the homelab-maint verdict exceeds a threshold (0 healthy, 1 attention, 2 critical)"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"

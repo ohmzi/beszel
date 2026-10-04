@@ -55,7 +55,7 @@ type Agent struct {
 	monitorManager            *MonitorManager                                       // Manages network monitors
 	storagePoolManager        *StoragePoolManager                                   // Manages storage pool and dataset data
 	packageUpdates            *packageUpdatesManager                                // Checks for pending package updates
-	maintenance               *maintenanceManager                                  // Reads the homelab-maint verdict (Ohmz fork)
+	maintenance               *maintenanceManager                                   // Reads the homelab-maint verdict (Ohmz fork)
 }
 
 // NewAgent creates a new agent with the given data directory for persisting data.
@@ -235,7 +235,9 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 		data.Info.PackageUpdates = a.packageUpdates.get(time.Now())
 	}
 	if a.maintenance != nil {
-		data.Info.Maintenance = a.maintenance.get(time.Now()) // Ohmz fork: homelab-maint verdict
+		maint := a.maintenance.get(time.Now()) // Ohmz fork: homelab-maint verdict
+		data.Info.Maintenance = maint
+		data.Stats.MaintenanceLevel = maintenanceLevel(maint.Status)
 	}
 
 	data.Stats.ExtraFs = make(map[string]*system.FsStats)
