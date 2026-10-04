@@ -17,7 +17,9 @@ import {
 	MenuIcon,
 	NetworkIcon,
 	PlusIcon,
+	RadioIcon,
 	SearchIcon,
+	ScrollTextIcon,
 	ServerIcon,
 	SettingsIcon,
 	TargetIcon,
@@ -50,6 +52,84 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
 
 const CommandPalette = lazy(() => import("./command-palette"))
 
+// Every section, shown as its own toolbar button (the owner asked for no hidden wrench menu).
+// Grouped with a separator: the alert/ops pages first, then the maintenance engine's pages.
+const SECTIONS = [
+	{ route: "alerts", icon: BellIcon, label: "Alerts", load: () => import("@/components/routes/alerts") },
+	{
+		route: "incidents",
+		icon: AlertTriangleIcon,
+		label: "Incidents",
+		load: () => import("@/components/routes/incidents"),
+	},
+	{ route: "reports", icon: FileTextIcon, label: "Reports", load: () => import("@/components/routes/reports") },
+	{
+		route: "services",
+		icon: TerminalSquareIcon,
+		label: "Services",
+		load: () => import("@/components/routes/services"),
+	},
+	{ route: "containers", icon: ContainerIcon, label: "All Containers", load: () => null },
+	{ route: "smart", icon: HardDriveIcon, label: "S.M.A.R.T.", load: () => null },
+	{
+		route: "monitors",
+		icon: NetworkIcon,
+		label: "Network Monitors",
+		load: () => import("@/components/routes/monitors"),
+	},
+	{ divider: true },
+	{ route: "live", icon: RadioIcon, label: "Live", load: () => import("@/components/routes/live") },
+	{ route: "checks", icon: ListChecksIcon, label: "Checks", load: () => import("@/components/routes/checks") },
+	{
+		route: "maintenance",
+		icon: WrenchIcon,
+		label: "Maintenance",
+		load: () => import("@/components/routes/maintenance"),
+	},
+	{ route: "capacity", icon: GaugeIcon, label: "Capacity", load: () => import("@/components/routes/capacity") },
+	{ route: "slo", icon: TargetIcon, label: "Service levels", load: () => import("@/components/routes/slo") },
+	{ route: "spikes", icon: ActivityIcon, label: "Load spikes", load: () => import("@/components/routes/spikes") },
+	{
+		route: "migration",
+		icon: ArrowRightLeftIcon,
+		label: "Migration",
+		load: () => import("@/components/routes/migration"),
+	},
+	{ route: "registry", icon: ScrollTextIcon, label: "Registry", load: () => import("@/components/routes/registry") },
+	{
+		route: "health",
+		icon: HeartPulseIcon,
+		label: "Pipeline health",
+		load: () => import("@/components/routes/health"),
+	},
+] as const
+
+function SectionButtons({ className }: { className?: string }) {
+	return (
+		<div className={cn("flex items-center gap-0.5 overflow-x-auto scrollbar-hide", className)}>
+			{SECTIONS.map((s, i) =>
+				"divider" in s ? (
+					<span key={`d${i}`} className="mx-1 h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+				) : (
+					<Tooltip key={s.route}>
+						<TooltipTrigger asChild>
+							<Link
+								href={getPagePath($router, s.route)}
+								aria-label={s.label}
+								className={cn("shrink-0", buttonVariants({ variant: "ghost", size: "icon" }))}
+								onMouseEnter={runOnce(s.load)}
+							>
+								<s.icon className="h-[1.1rem] w-[1.1rem]" strokeWidth={1.5} />
+							</Link>
+						</TooltipTrigger>
+						<TooltipContent>{s.label}</TooltipContent>
+					</Tooltip>
+				)
+			)}
+		</div>
+	)
+}
+
 const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
 
 export default function Navbar() {
@@ -59,283 +139,153 @@ export default function Navbar() {
 	const AdminLinks = AdminDropdownGroup()
 
 	return (
-		<div className="flex items-center h-14 md:h-16 bg-card px-4 pe-3 sm:px-6 border border-border/60 bt-0 rounded-md my-4">
-			<Suspense>
-				<CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
-			</Suspense>
-			<AddSystemDialog open={addSystemDialogOpen} setOpen={setAddSystemDialogOpen} />
+		<>
+			<div className="flex items-center h-14 md:h-16 bg-card px-4 pe-3 sm:px-6 border border-border/60 bt-0 rounded-md my-4">
+				<Suspense>
+					<CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
+				</Suspense>
+				<AddSystemDialog open={addSystemDialogOpen} setOpen={setAddSystemDialogOpen} />
 
-			<Link
-				href={basePath}
-				aria-label="OhmzMaintainer home"
-				className="p-2 ps-0 me-3 group flex items-center gap-2"
-				onMouseEnter={runOnce(() => import("@/components/routes/home"))}
-			>
-				<Logo className="h-6 w-6 shrink-0" />
-				<span className="hidden sm:inline text-base font-semibold tracking-tight text-foreground">
-					Ohmz<span className="font-normal text-muted-foreground">Maintainer</span>
-				</span>
-			</Link>
-			<Button
-				variant="outline"
-				className="hidden md:block text-sm text-muted-foreground px-4"
-				onClick={() => setCommandPaletteOpen(true)}
-			>
-				<span className="flex items-center">
-					<SearchIcon className="me-1.5 h-4 w-4" />
-					<Trans>Search</Trans>
-					<span className="flex items-center ms-3.5">
-						<Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-						<Kbd>K</Kbd>
+				<Link
+					href={basePath}
+					aria-label="OhmzMaintainer home"
+					className="p-2 ps-0 me-3 group flex items-center gap-2"
+					onMouseEnter={runOnce(() => import("@/components/routes/home"))}
+				>
+					<Logo className="h-6 w-6 shrink-0" />
+					<span className="hidden sm:inline text-base font-semibold tracking-tight text-foreground">
+						Ohmz<span className="font-normal text-muted-foreground">Maintainer</span>
 					</span>
-				</span>
-			</Button>
-
-			{/* mobile menu */}
-			<div className="ms-auto flex items-center text-xl md:hidden">
-				<ModeToggle />
-				<Button variant="ghost" size="icon" onClick={() => setCommandPaletteOpen(true)}>
-					<SearchIcon className="h-[1.2rem] w-[1.2rem]" />
+				</Link>
+				<Button
+					variant="outline"
+					className="hidden md:block text-sm text-muted-foreground px-4"
+					onClick={() => setCommandPaletteOpen(true)}
+				>
+					<span className="flex items-center">
+						<SearchIcon className="me-1.5 h-4 w-4" />
+						<Trans>Search</Trans>
+						<span className="flex items-center ms-3.5">
+							<Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+							<Kbd>K</Kbd>
+						</span>
+					</span>
 				</Button>
-				<DropdownMenu>
-					<DropdownMenuTrigger
-						onMouseEnter={() => import("@/components/routes/settings/general")}
-						className="ms-3"
-						aria-label="Open Menu"
-					>
-						<MenuIcon />
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuLabel className="max-w-40 truncate">{pb.authStore.record?.email}</DropdownMenuLabel>
-						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
-							<DropdownMenuItem
-								onClick={() => navigate(getPagePath($router, "containers"))}
-								className="flex items-center"
-							>
-								<ContainerIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-								<Trans>All Containers</Trans>
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => navigate(getPagePath($router, "smart"))} className="flex items-center">
-								<HardDriveIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-								<span>S.M.A.R.T.</span>
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() => navigate(getPagePath($router, "monitors"))}
-								className="flex items-center"
-							>
-								<NetworkIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-								<Trans>Network Monitors</Trans>
-							</DropdownMenuItem>
-							<DropdownMenuSub>
-								<DropdownMenuSubTrigger>
-									<WrenchIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-									<Trans>Maintenance</Trans>
-								</DropdownMenuSubTrigger>
-								<DropdownMenuSubContent>{MaintenanceDropdownGroup()}</DropdownMenuSubContent>
-							</DropdownMenuSub>
-							<DropdownMenuItem
-								onClick={() => navigate(getPagePath($router, "settings", { name: "general" }))}
-								className="flex items-center"
-							>
-								<SettingsIcon className="h-4 w-4 me-2.5" />
-								<Trans>Settings</Trans>
-							</DropdownMenuItem>
-							{isAdmin() && (
-								<DropdownMenuSub>
-									<DropdownMenuSubTrigger>
-										<UserIcon className="h-4 w-4 me-2.5" />
-										<Trans>Admin</Trans>
-									</DropdownMenuSubTrigger>
-									<DropdownMenuSubContent>{AdminLinks}</DropdownMenuSubContent>
-								</DropdownMenuSub>
-							)}
-							{!isReadOnlyUser() && (
-								<DropdownMenuItem
-									className="flex items-center"
-									onSelect={() => {
-										setAddSystemDialogOpen(true)
-									}}
-								>
-									<PlusIcon className="h-4 w-4 me-2.5" />
-									<Trans>Add System</Trans>
-								</DropdownMenuItem>
-							)}
-						</DropdownMenuGroup>
-						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
-							<DropdownMenuItem onSelect={logOut} className="flex items-center">
-								<LogOutIcon className="h-4 w-4 me-2.5" />
-								<Trans>Log Out</Trans>
-							</DropdownMenuItem>
-						</DropdownMenuGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
 
-			{/* desktop nav */}
-			{/** biome-ignore lint/a11y/noStaticElementInteractions: ignore */}
-			<div
-				className="hidden md:flex items-center ms-auto"
-				onMouseEnter={() => import("@/components/routes/settings/general")}
-			>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<button aria-label="Maintenance" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
-							<WrenchIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" className="min-w-52">
-						{MaintenanceDropdownGroup()}
-					</DropdownMenuContent>
-				</DropdownMenu>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "alerts")}
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Alerts"
-							onMouseEnter={() => import("@/components/routes/alerts")}
-						>
-							<BellIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Alerts</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "incidents")}
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Incidents"
-							onMouseEnter={() => import("@/components/routes/incidents")}
-						>
-							<AlertTriangleIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Incidents</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "reports")}
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Reports"
-							onMouseEnter={() => import("@/components/routes/reports")}
-						>
-							<FileTextIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Reports</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "services")}
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Services"
-							onMouseEnter={() => import("@/components/routes/services")}
-						>
-							<TerminalSquareIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Services</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "containers")}
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Containers"
-						>
-							<ContainerIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>All Containers</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "smart")}
-							className={cn("hidden md:grid", buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="S.M.A.R.T."
-						>
-							<HardDriveIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>S.M.A.R.T.</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "monitors")}
-							className={cn("hidden md:grid", buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Network Monitors"
-							onMouseEnter={() => import("@/components/routes/monitors")}
-						>
-							<NetworkIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Network Monitors</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<ModeToggle />
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "settings", { name: "general" })}
-							aria-label="Settings"
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-						>
-							<SettingsIcon className="h-[1.2rem] w-[1.2rem]" />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Settings</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<button aria-label="User Actions" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
-							<UserIcon className="h-[1.2rem] w-[1.2rem]" />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align={isReadOnlyUser() ? "end" : "center"} className="min-w-44">
-						<DropdownMenuLabel>{pb.authStore.record?.email}</DropdownMenuLabel>
-						<DropdownMenuSeparator />
-						{isAdmin() && (
-							<>
-								{AdminLinks}
-								<DropdownMenuSeparator />
-							</>
-						)}
-						<DropdownMenuItem onSelect={logOut}>
-							<LogOutIcon className="me-2.5 h-4 w-4" />
-							<span>
-								<Trans>Log Out</Trans>
-							</span>
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-				{!isReadOnlyUser() && (
-					<Button variant="outline" className="flex gap-1 ms-2" onClick={() => setAddSystemDialogOpen(true)}>
-						<PlusIcon className="h-4 w-4 -ms-1" />
-						<Trans>Add System</Trans>
+				{/* mobile menu */}
+				<div className="ms-auto flex items-center text-xl md:hidden">
+					<ModeToggle />
+					<Button variant="ghost" size="icon" onClick={() => setCommandPaletteOpen(true)}>
+						<SearchIcon className="h-[1.2rem] w-[1.2rem]" />
 					</Button>
-				)}
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							onMouseEnter={() => import("@/components/routes/settings/general")}
+							className="ms-3"
+							aria-label="Open Menu"
+						>
+							<MenuIcon />
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuLabel className="max-w-40 truncate">{pb.authStore.record?.email}</DropdownMenuLabel>
+							<DropdownMenuSeparator />
+							<DropdownMenuGroup>
+								<DropdownMenuItem
+									onClick={() => navigate(getPagePath($router, "settings", { name: "general" }))}
+									className="flex items-center"
+								>
+									<SettingsIcon className="h-4 w-4 me-2.5" />
+									<Trans>Settings</Trans>
+								</DropdownMenuItem>
+								{isAdmin() && (
+									<DropdownMenuSub>
+										<DropdownMenuSubTrigger>
+											<UserIcon className="h-4 w-4 me-2.5" />
+											<Trans>Admin</Trans>
+										</DropdownMenuSubTrigger>
+										<DropdownMenuSubContent>{AdminLinks}</DropdownMenuSubContent>
+									</DropdownMenuSub>
+								)}
+								{!isReadOnlyUser() && (
+									<DropdownMenuItem
+										className="flex items-center"
+										onSelect={() => {
+											setAddSystemDialogOpen(true)
+										}}
+									>
+										<PlusIcon className="h-4 w-4 me-2.5" />
+										<Trans>Add System</Trans>
+									</DropdownMenuItem>
+								)}
+							</DropdownMenuGroup>
+							<DropdownMenuSeparator />
+							<DropdownMenuGroup>
+								<DropdownMenuItem onSelect={logOut} className="flex items-center">
+									<LogOutIcon className="h-4 w-4 me-2.5" />
+									<Trans>Log Out</Trans>
+								</DropdownMenuItem>
+							</DropdownMenuGroup>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+
+				{/* desktop nav */}
+				{/** biome-ignore lint/a11y/noStaticElementInteractions: ignore */}
+				<div
+					className="hidden md:flex items-center ms-auto min-w-0"
+					onMouseEnter={() => import("@/components/routes/settings/general")}
+				>
+					<SectionButtons className="min-w-0" />
+					<ModeToggle />
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Link
+								href={getPagePath($router, "settings", { name: "general" })}
+								aria-label="Settings"
+								className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+							>
+								<SettingsIcon className="h-[1.2rem] w-[1.2rem]" />
+							</Link>
+						</TooltipTrigger>
+						<TooltipContent>
+							<Trans>Settings</Trans>
+						</TooltipContent>
+					</Tooltip>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button aria-label="User Actions" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
+								<UserIcon className="h-[1.2rem] w-[1.2rem]" />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align={isReadOnlyUser() ? "end" : "center"} className="min-w-44">
+							<DropdownMenuLabel>{pb.authStore.record?.email}</DropdownMenuLabel>
+							<DropdownMenuSeparator />
+							{isAdmin() && (
+								<>
+									{AdminLinks}
+									<DropdownMenuSeparator />
+								</>
+							)}
+							<DropdownMenuItem onSelect={logOut}>
+								<LogOutIcon className="me-2.5 h-4 w-4" />
+								<span>
+									<Trans>Log Out</Trans>
+								</span>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+					{!isReadOnlyUser() && (
+						<Button variant="outline" className="flex gap-1 ms-2" onClick={() => setAddSystemDialogOpen(true)}>
+							<PlusIcon className="h-4 w-4 -ms-1" />
+							<Trans>Add System</Trans>
+						</Button>
+					)}
+				</div>
 			</div>
-		</div>
+			<div className="md:hidden">
+				<SectionButtons className="px-1" />
+			</div>
+		</>
 	)
 }
 
@@ -344,37 +294,6 @@ const Kbd = ({ children }: { children: React.ReactNode }) => (
 		{children}
 	</kbd>
 )
-
-function MaintenanceDropdownGroup() {
-	const items = [
-		{ route: "live", icon: ActivityIcon, label: <Trans>Live</Trans> },
-		{ route: "checks", icon: ListChecksIcon, label: <Trans>Checks</Trans> },
-		{ route: "maintenance", icon: WrenchIcon, label: <Trans>Maintenance</Trans> },
-		{ route: "capacity", icon: GaugeIcon, label: <Trans>Capacity</Trans> },
-		{ route: "slo", icon: TargetIcon, label: <Trans>Service levels</Trans> },
-		{ route: "spikes", icon: ActivityIcon, label: <Trans>Load spikes</Trans> },
-		{ route: "migration", icon: ArrowRightLeftIcon, label: <Trans>Migration</Trans> },
-		{ route: "registry", icon: FileTextIcon, label: <Trans>Registry</Trans> },
-		{ route: "health", icon: HeartPulseIcon, label: <Trans>Pipeline health</Trans> },
-	] as const
-	return (
-		<DropdownMenuGroup>
-			<DropdownMenuLabel>
-				<Trans>Maintenance</Trans>
-			</DropdownMenuLabel>
-			{items.map(({ route, icon: Icon, label }) => (
-				<DropdownMenuItem
-					key={route}
-					onClick={() => navigate(getPagePath($router, route))}
-					className="flex items-center"
-				>
-					<Icon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-					<span>{label}</span>
-				</DropdownMenuItem>
-			))}
-		</DropdownMenuGroup>
-	)
-}
 
 function AdminDropdownGroup() {
 	return (

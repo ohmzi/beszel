@@ -293,7 +293,6 @@ msgstr "Historial de alertas"
 
 #: src/components/alerts/alert-button.tsx
 #: src/components/alerts/alerts-sheet.tsx
-#: src/components/navbar.tsx
 #: src/components/routes/alerts.tsx
 msgid "Alerts"
 msgstr "Alertas"
@@ -304,8 +303,6 @@ msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/containers-table/containers-table.tsx
-#: src/components/navbar.tsx
-#: src/components/navbar.tsx
 msgid "All Containers"
 msgstr "Todos los contenedores"
 
@@ -531,7 +528,6 @@ msgstr "Cancelar"
 msgid "Capabilities"
 msgstr "Capacidades"
 
-#: src/components/navbar.tsx
 #: src/components/routes/capacity.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
@@ -631,7 +627,6 @@ msgstr "Comprobado {0}"
 msgid "checks"
 msgstr ""
 
-#: src/components/navbar.tsx
 #: src/components/routes/checks.tsx
 msgid "Checks"
 msgstr ""
@@ -1507,7 +1502,6 @@ msgstr "Actualización de imagen disponible"
 msgid "Inactive"
 msgstr "Inactivo"
 
-#: src/components/navbar.tsx
 #: src/components/routes/incidents.tsx
 #: src/components/routes/report.tsx
 #: src/components/routes/report.tsx
@@ -1605,7 +1599,6 @@ msgstr "Ciclo de vida"
 msgid "limit"
 msgstr "límite"
 
-#: src/components/navbar.tsx
 #: src/components/routes/live.tsx
 msgid "Live"
 msgstr ""
@@ -1635,7 +1628,6 @@ msgstr "Carga media 5m"
 msgid "Load Avg"
 msgstr "Carga media"
 
-#: src/components/navbar.tsx
 #: src/components/routes/report.tsx
 #: src/components/routes/spikes.tsx
 msgid "Load spikes"
@@ -1689,9 +1681,6 @@ msgstr "Pérdida 1 h"
 msgid "Main PID"
 msgstr "PID principal"
 
-#: src/components/navbar.tsx
-#: src/components/navbar.tsx
-#: src/components/navbar.tsx
 #: src/components/routes/maintenance.tsx
 #: src/components/routes/system/charts/maintenance-chart.tsx
 #: src/components/routes/system/charts/maintenance-chart.tsx
@@ -1767,7 +1756,6 @@ msgstr "Uso de memoria de los contenedores"
 msgid "Memory, load & thermals — last 7 days"
 msgstr ""
 
-#: src/components/navbar.tsx
 #: src/components/routes/migration.tsx
 msgid "Migration"
 msgstr ""
@@ -1853,8 +1841,6 @@ msgid "Network Monitor Loss"
 msgstr "Pérdida del monitor de red"
 
 #: src/components/command-palette.tsx
-#: src/components/navbar.tsx
-#: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
@@ -2194,7 +2180,6 @@ msgstr "Persistencia"
 msgid "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
 msgstr "Espacio físico del dispositivo. La capacidad útil real se desconoce. Las alertas de uso de disco del pool están desactivadas."
 
-#: src/components/navbar.tsx
 #: src/components/routes/health.tsx
 msgid "Pipeline health"
 msgstr ""
@@ -2357,7 +2342,6 @@ msgstr ""
 msgid "registry"
 msgstr ""
 
-#: src/components/navbar.tsx
 #: src/components/routes/registry.tsx
 #: src/components/routes/registry.tsx
 msgid "Registry"
@@ -2379,7 +2363,6 @@ msgstr ""
 msgid "report-only"
 msgstr ""
 
-#: src/components/navbar.tsx
 #: src/components/routes/reports.tsx
 msgid "Reports"
 msgstr ""
@@ -2500,6 +2483,10 @@ msgstr ""
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Runtime Metrics"
 msgstr "Métricas de tiempo de ejecución"
+
+#: src/components/navbar.tsx
+#~ msgid "S.M.A.R.T."
+#~ msgstr ""
 
 #: src/components/routes/system/smart-table.tsx
 msgid "S.M.A.R.T. Details"
@@ -2651,7 +2638,6 @@ msgstr ""
 msgid "Service Details"
 msgstr "Detalles del servicio"
 
-#: src/components/navbar.tsx
 #: src/components/routes/report.tsx
 #: src/components/routes/slo.tsx
 msgid "Service levels"
@@ -2661,7 +2647,6 @@ msgstr ""
 msgid "Service objectives are still collecting data."
 msgstr ""
 
-#: src/components/navbar.tsx
 #: src/components/routes/live.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
