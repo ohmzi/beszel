@@ -2,6 +2,8 @@ import { useLingui } from "@lingui/react/macro"
 import { memo, useEffect } from "react"
 import NetworkMonitorsTableNew from "@/components/network-monitors-table/network-monitors-table"
 import { FooterRepoLink } from "@/components/footer-repo-link"
+import { NetworkTotals } from "@/components/routes/system/charts/network-totals"
+import { ContainerNetwork } from "@/components/routes/system/charts/container-network"
 import { useNetworkMonitors } from "@/lib/use-network-monitors"
 import { $allSystemsById } from "@/lib/stores"
 import { supportsNetworkMonitors } from "@/lib/utils"
@@ -15,6 +17,9 @@ export default memo(() => {
 		const system = systems[monitor.system]
 		return !system || supportsNetworkMonitors(system)
 	})
+	// Ohmz fork: bandwidth lives per container/system, not per monitor; show it here so the
+	// monitors page answers "what is each service moving, now and over time".
+	const sysId = Object.keys(systems)[0] ?? ""
 
 	useEffect(() => {
 		document.title = `${t`Network Monitors`} / Beszel`
@@ -23,6 +28,12 @@ export default memo(() => {
 	return (
 		<>
 			<NetworkMonitorsTableNew monitors={visibleMonitors} isLoading={isLoading} />
+			{sysId ? (
+				<div className="grid xl:grid-cols-2 gap-4 mt-6">
+					<NetworkTotals systemId={sysId} />
+					<ContainerNetwork systemId={sysId} />
+				</div>
+			) : null}
 			<FooterRepoLink />
 		</>
 	)
