@@ -11,23 +11,23 @@ export function Logo({ className }: { className?: string }) {
 			<rect width="40" height="40" rx="11" fill="var(--color-primary)" />
 			<text
 				x="20"
-				y="25"
+				y="24.5"
 				textAnchor="middle"
 				fontFamily="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
-				fontSize="22"
+				fontSize="23"
 				fontWeight="700"
 				fill="var(--color-primary-foreground)"
 			>
 				Ω
 			</text>
 			<path
-				d="M9.5 35l4.6-3.3 3 2.5 4.6-5.6 3.4 3.6 5.3-6.1"
+				d="M8.5 35l4.4-3.2 2.9 2.4 4.5-5.4 3.3 3.5 5.2-6"
 				fill="none"
 				stroke="var(--color-primary-foreground)"
 				strokeWidth="2.2"
 				strokeLinecap="round"
 				strokeLinejoin="round"
-				opacity="0.85"
+				opacity="0.9"
 			/>
 		</svg>
 	)
