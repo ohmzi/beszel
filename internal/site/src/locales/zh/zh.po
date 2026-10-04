@@ -129,6 +129,10 @@ msgstr "12小時"
 msgid "15 min"
 msgstr "15 分鐘"
 
+#: src/components/routes/capacity.tsx
+msgid "24 h avg"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "24 hours"
 msgstr "24小時"
@@ -145,6 +149,10 @@ msgstr ""
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30天"
+
+#: src/components/routes/checks.tsx
+msgid "30-day health calendar"
+msgstr ""
 
 #. Load average
 #: src/components/routes/system/charts/load-average-chart.tsx
@@ -192,6 +200,10 @@ msgstr "啟用中"
 #: src/components/active-alerts.tsx
 msgid "Active Alerts"
 msgstr "活動警報"
+
+#: src/components/routes/maintenance.tsx
+msgid "active now"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Active state"
@@ -270,6 +282,10 @@ msgstr "警報"
 #: src/components/navbar.tsx
 msgid "All Containers"
 msgstr "所有容器"
+
+#: src/components/routes/registry.tsx
+msgid "All rules"
+msgstr ""
 
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
@@ -436,6 +452,14 @@ msgstr "批次新增"
 msgid "Bulk Add {foo}"
 msgstr "批次新增{foo}"
 
+#: src/components/routes/live.tsx
+msgid "Busiest by CPU"
+msgstr ""
+
+#: src/components/routes/capacity.tsx
+msgid "by cleanup tasks"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
 msgid "Bytes (KB/s, MB/s, GB/s)"
@@ -444,6 +468,10 @@ msgstr "位元組 (KB/s, MB/s, GB/s)"
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Cache / Buffers"
 msgstr "快取/緩衝"
+
+#: src/components/routes/maintenance.tsx
+msgid "Cadence"
+msgstr ""
 
 #: src/components/routes/spikes.tsx
 msgid "Calm right now"
@@ -509,9 +537,17 @@ msgstr "變更"
 msgid "Change display units for metrics."
 msgstr "更改指標的顯示單位。"
 
+#: src/components/routes/maintenance.tsx
+msgid "Change freeze"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Change general application options."
 msgstr "修改一般應用程式選項。"
+
+#: src/components/routes/maintenance.tsx
+msgid "Change log"
+msgstr ""
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Charge"
@@ -556,6 +592,10 @@ msgstr "檢查您的通知服務"
 msgid "Checked {0}"
 msgstr "已於 {0} 檢查"
 
+#: src/components/routes/checks.tsx
+msgid "checks"
+msgstr ""
+
 #: src/components/navbar.tsx
 #: src/components/routes/checks.tsx
 msgid "Checks"
@@ -564,6 +604,14 @@ msgstr ""
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Checksum errors"
 msgstr "校驗和錯誤"
+
+#: src/components/routes/maintenance.tsx
+msgid "Class"
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "Cleanup"
+msgstr ""
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
@@ -641,6 +689,7 @@ msgstr "衝突"
 msgid "Connection is down"
 msgstr "連線中斷"
 
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
@@ -652,6 +701,10 @@ msgstr "容器健康狀態"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "Container network"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "containers"
 msgstr ""
 
 #: src/components/routes/system.tsx
@@ -731,6 +784,10 @@ msgstr "複製 YAML"
 msgctxt "Core system metrics"
 msgid "Core"
 msgstr "核心指標"
+
+#: src/components/routes/live.tsx
+msgid "cores"
+msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -873,6 +930,14 @@ msgstr ""
 msgid "Description"
 msgstr "描述"
 
+#: src/components/routes/registry.tsx
+msgid "destructive"
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "Destructive"
+msgstr ""
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/routes/health.tsx
 msgid "Detail"
@@ -881,6 +946,10 @@ msgstr "詳細資訊"
 #: src/components/routes/system/smart-table.tsx
 msgid "Device"
 msgstr "裝置"
+
+#: src/components/routes/registry.tsx
+msgid "Disabled"
+msgstr ""
 
 #. Context: Battery state
 #: src/lib/i18n.ts
@@ -891,6 +960,14 @@ msgstr "放電中"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "磁碟"
+
+#: src/components/routes/live.tsx
+msgid "Disk activity"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Disk I/O"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Disk unit"
@@ -935,6 +1012,10 @@ msgstr "Docker 網路 I/O"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Documentation"
 msgstr "文件"
+
+#: src/components/routes/registry.tsx
+msgid "Does not validate"
+msgstr ""
 
 #. Context: System is down
 #: src/components/alerts-history-columns.tsx
@@ -990,6 +1071,10 @@ msgstr "電子郵件通知"
 msgid "Empty"
 msgstr "空電"
 
+#: src/components/routes/registry.tsx
+msgid "enabled"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "End Time"
@@ -1040,8 +1125,25 @@ msgstr "臨時"
 msgid "Error"
 msgstr "錯誤"
 
+#: src/components/routes/live.tsx
+msgid "errors"
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "evaluated in 24 h"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "Every maintenance check, problems first."
+msgstr ""
+
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "Every rule the script runs under, read-only."
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "Everything that runs"
 msgstr ""
 
 #: src/components/routes/alerts.tsx
@@ -1200,6 +1302,10 @@ msgstr "FreeBSD 指令"
 msgid "Freed"
 msgstr ""
 
+#: src/components/routes/capacity.tsx
+msgid "Freed · 30 days"
+msgstr ""
+
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
 #: src/lib/i18n.ts
@@ -1249,6 +1355,10 @@ msgstr "GPU 使用率"
 #: src/components/systems-table/systems-table.tsx
 msgid "Grid"
 msgstr "網格"
+
+#: src/components/routes/maintenance.tsx
+msgid "Halted:"
+msgstr ""
 
 #: src/components/routes/reports.tsx
 msgid "Headline"
@@ -1361,6 +1471,7 @@ msgid "Invalid email address."
 msgstr "無效的電子郵件地址。"
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
@@ -1370,9 +1481,21 @@ msgstr ""
 msgid "Language"
 msgstr "語言"
 
+#: src/components/routes/live.tsx
+msgid "Largest by memory"
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "last"
+msgstr ""
+
 #: src/components/routes/system/charts/network-totals.tsx
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "Last 24 hours"
+msgstr ""
+
+#: src/components/routes/capacity.tsx
+msgid "last 30 days"
 msgstr ""
 
 #: src/components/routes/system/charts/network-totals.tsx
@@ -1381,6 +1504,8 @@ msgid "Last 7 days"
 msgstr ""
 
 #: src/components/routes/checks.tsx
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
 msgid "Last run"
 msgstr ""
 
@@ -1413,6 +1538,15 @@ msgstr "生命週期"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "limit"
 msgstr "限制"
+
+#: src/components/navbar.tsx
+#: src/components/routes/live.tsx
+msgid "Live"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Live monitor"
+msgstr ""
 
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "Load Average"
@@ -1499,6 +1633,10 @@ msgstr "主 PID"
 msgid "Maintenance"
 msgstr ""
 
+#: src/components/routes/checks.tsx
+msgid "Maintenance is paused (kill switch on): no cleanup actions run."
+msgstr ""
+
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Major"
@@ -1524,6 +1662,7 @@ msgid "Max 1h"
 msgstr "1 小時最大"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1548,6 +1687,10 @@ msgstr "記憶體使用量"
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Memory usage of containers"
 msgstr "容器的記憶體使用量"
+
+#: src/components/routes/capacity.tsx
+msgid "Memory, load & thermals — last 7 days"
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/routes/migration.tsx
@@ -1599,11 +1742,16 @@ msgstr "掛載點"
 msgid "Name"
 msgstr "名稱"
 
+#: src/components/routes/checks.tsx
+msgid "need attention"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Net"
 msgstr "網路"
 
+#: src/components/routes/live.tsx
 #: src/components/routes/system.tsx
 msgid "Network"
 msgstr "網路"
@@ -1645,6 +1793,15 @@ msgstr "公開介面的網路流量"
 #: src/components/routes/settings/general.tsx
 msgid "Network unit"
 msgstr "網路單位"
+
+#: src/components/routes/checks.tsx
+msgid "next"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
+msgid "Next run"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1704,6 +1861,10 @@ msgstr "找不到結果。"
 msgid "No results."
 msgstr "沒有結果。"
 
+#: src/components/routes/registry.tsx
+msgid "No rule matches."
+msgstr ""
+
 #: src/components/routes/system/smart-table.tsx
 msgid "No S.M.A.R.T. attributes available for this device."
 msgstr "此裝置沒有可用的 S.M.A.R.T. 屬性。"
@@ -1722,7 +1883,16 @@ msgstr "找不到目標。"
 msgid "None"
 msgstr "無"
 
+#: src/components/routes/checks.tsx
+msgid "not run yet"
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "not scheduled"
+msgstr ""
+
 #: src/components/command-palette.tsx
+#: src/components/routes/maintenance.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Notifications"
@@ -1744,6 +1914,10 @@ msgstr ""
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "支援 OAuth 2 / OIDC"
+
+#: src/components/routes/registry.tsx
+msgid "of"
+msgstr ""
 
 #: src/components/routes/settings/config-yaml.tsx
 msgid "On each restart, systems in the database will be updated to match the systems defined in the file."
@@ -1995,8 +2169,16 @@ msgstr "紀錄時間內的精確使用量"
 msgid "Preferred Language"
 msgstr "首選語言"
 
+#: src/components/routes/live.tsx
+msgid "Pressure"
+msgstr ""
+
 #: src/components/routes/spikes.tsx
 msgid "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Process"
 msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
@@ -2041,6 +2223,7 @@ msgstr "儲存池 {displayName} 的原始使用量"
 
 #. Disk read
 #. Disk read
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
@@ -2070,6 +2253,12 @@ msgstr ""
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Refresh"
 msgstr "重新整理"
+
+#: src/components/navbar.tsx
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "Registry"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
@@ -2108,6 +2297,10 @@ msgstr "依賴"
 msgid "Reset Password"
 msgstr "重設密碼"
 
+#: src/components/routes/live.tsx
+msgid "Resident"
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -2139,6 +2332,10 @@ msgstr "繼續"
 msgid "Revision"
 msgstr "修訂"
 
+#: src/components/routes/checks.tsx
+msgid "Right now"
+msgstr ""
+
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -2159,6 +2356,19 @@ msgstr ""
 msgid "Rows per page"
 msgstr "每頁列數"
 
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "rules"
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "rules match"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "Run by"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Runtime Metrics"
 msgstr "運行時指標"
@@ -2170,6 +2380,14 @@ msgstr "S.M.A.R.T. 詳細資訊"
 #: src/components/routes/system/smart-table.tsx
 msgid "S.M.A.R.T. Self-Test"
 msgstr "S.M.A.R.T. 自我測試"
+
+#: src/components/routes/registry.tsx
+msgid "Safety proof"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "samples"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Save {foo}"
@@ -2192,6 +2410,7 @@ msgstr "儲存 系統"
 msgid "Saved in the database and does not expire until you disable it."
 msgstr "儲存在資料庫中，在您停用之前不會過期。"
 
+#: src/components/routes/maintenance.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "排程"
@@ -2203,6 +2422,10 @@ msgstr "安排不會發送通知的靜音時段，例如在維護期間。"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "安排不會發送通知的靜音時段。"
+
+#: src/components/routes/maintenance.tsx
+msgid "Scheduler:"
+msgstr ""
 
 #: src/components/navbar.tsx
 msgid "Search"
@@ -2306,6 +2529,7 @@ msgid "Service objectives are still collecting data."
 msgstr ""
 
 #: src/components/navbar.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2335,6 +2559,11 @@ msgstr "已儲存設定"
 #: src/components/routes/alerts.tsx
 #: src/components/routes/incidents.tsx
 msgid "Severity"
+msgstr ""
+
+#. placeholder {0}: Math.min(40, filtered.length - limit)
+#: src/components/routes/registry.tsx
+msgid "Show {0} more"
 msgstr ""
 
 #: src/components/logs-display.tsx
@@ -2367,6 +2596,10 @@ msgstr "SMTP 設定"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "排序"
+
+#: src/components/routes/capacity.tsx
+msgid "Space freed per day"
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2406,6 +2639,14 @@ msgstr "子狀態"
 msgid "Summary"
 msgstr ""
 
+#: src/components/routes/live.tsx
+msgid "Swap"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Swap held by"
+msgstr ""
+
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Swap space used by the system"
 msgstr "系統的虛擬記憶體使用量"
@@ -2418,6 +2659,10 @@ msgstr "交換空間使用量"
 #: src/components/mode-toggle.tsx
 msgid "Switch theme"
 msgstr "切換主題"
+
+#: src/components/routes/registry.tsx
+msgid "synced"
+msgstr ""
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/containers-table/containers-table-columns.tsx
@@ -2507,6 +2752,10 @@ msgstr "溫度"
 msgid "Temperature unit"
 msgstr "溫度單位"
 
+#: src/components/routes/live.tsx
+msgid "Temperatures & fans"
+msgstr ""
+
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Temperatures of system sensors"
 msgstr "系統感應器的溫度"
@@ -2523,6 +2772,10 @@ msgstr "測試 Heartbeat"
 msgid "Test notification sent"
 msgstr "已發送測試通知"
 
+#: src/components/routes/live.tsx
+msgid "The live monitor has not published yet."
+msgstr ""
+
 #: src/components/routes/health.tsx
 msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
 msgstr ""
@@ -2530,6 +2783,14 @@ msgstr ""
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "當所有系統都正常運行時，整體狀態為 <0>正常</0>；當觸發警報時為 <1>警告</1>；當任何系統故障時為 <2>錯誤</2>。"
+
+#: src/components/routes/maintenance.tsx
+msgid "The routine file is not valid — the scheduler is not running it."
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "The rules have not been published yet."
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
@@ -2555,6 +2816,14 @@ msgstr "儲存池 {displayName} 的傳輸速率"
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
 msgstr "時間格式"
+
+#: src/components/routes/maintenance.tsx
+msgid "Timer"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "Timers"
+msgstr ""
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/incidents.tsx
@@ -2612,6 +2881,10 @@ msgstr "總計：{0}"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggered by"
 msgstr "觸發者"
+
+#: src/components/routes/registry.tsx
+msgid "triggered in 30 days"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggers"
@@ -2696,6 +2969,7 @@ msgstr "類型"
 msgid "Un-acknowledge"
 msgstr ""
 
+#: src/components/routes/live.tsx
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "不健康"
@@ -2812,6 +3086,10 @@ msgctxt "Disk I/O utilization"
 msgid "Utilization"
 msgstr "利用率"
 
+#: src/components/routes/registry.tsx
+msgid "Valid"
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 msgid "Value"
 msgstr "值"
@@ -2869,7 +3147,19 @@ msgid "Webhook / Push notifications"
 msgstr "Webhook / 推送通知"
 
 #: src/components/routes/maintenance.tsx
-msgid "What the engine did, and what the routine is doing."
+msgid "What"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+#~ msgid "What the engine did, and what the routine is doing."
+#~ msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "What the engine did, what runs when, and what it told you."
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "What the script does"
 msgstr ""
 
 #: src/components/routes/alerts.tsx
@@ -2885,6 +3175,10 @@ msgstr "啟用後，此 Token 可讓 Agent 自行註冊，無需預先在系統�
 #: src/components/routes/settings/heartbeat.tsx
 msgid "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
 msgstr "使用 POST 時，每個 Heartbeat 都會包含一個 JSON Payload，內容涵蓋系統狀態概況、離線系統清單以及已觸發的警報。"
+
+#: src/components/routes/live.tsx
+msgid "Who"
+msgstr ""
 
 #: src/components/routes/health.tsx
 msgid "Why"
@@ -2902,6 +3196,7 @@ msgstr "Windows 指令"
 
 #. Disk write
 #. Disk write
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx

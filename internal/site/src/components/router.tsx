@@ -10,6 +10,8 @@ const routes = {
 	smart: "/smart",
 	monitors: "/monitors",
 	checks: "/checks",
+	live: "/live",
+	registry: "/registry",
 	maintenance: "/maintenance",
 	capacity: "/capacity",
 	slo: "/slo",

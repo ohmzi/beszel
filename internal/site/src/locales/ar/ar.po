@@ -129,6 +129,10 @@ msgstr "12 ساعة"
 msgid "15 min"
 msgstr "15 دقيقة"
 
+#: src/components/routes/capacity.tsx
+msgid "24 h avg"
+msgstr ""
+
 #: src/lib/utils.ts
 msgid "24 hours"
 msgstr "24 ساعة"
@@ -145,6 +149,10 @@ msgstr ""
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 يومًا"
+
+#: src/components/routes/checks.tsx
+msgid "30-day health calendar"
+msgstr ""
 
 #. Load average
 #: src/components/routes/system/charts/load-average-chart.tsx
@@ -192,6 +200,10 @@ msgstr "نشط"
 #: src/components/active-alerts.tsx
 msgid "Active Alerts"
 msgstr "التنبيهات النشطة"
+
+#: src/components/routes/maintenance.tsx
+msgid "active now"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Active state"
@@ -270,6 +282,10 @@ msgstr "التنبيهات"
 #: src/components/navbar.tsx
 msgid "All Containers"
 msgstr "جميع الحاويات"
+
+#: src/components/routes/registry.tsx
+msgid "All rules"
+msgstr ""
 
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
@@ -436,6 +452,14 @@ msgstr "إضافة جماعية"
 msgid "Bulk Add {foo}"
 msgstr "إضافة جماعية {foo}"
 
+#: src/components/routes/live.tsx
+msgid "Busiest by CPU"
+msgstr ""
+
+#: src/components/routes/capacity.tsx
+msgid "by cleanup tasks"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
 msgid "Bytes (KB/s, MB/s, GB/s)"
@@ -444,6 +468,10 @@ msgstr "بايت (كيلوبايت/ثانية، ميجابايت/ثانية، ج
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Cache / Buffers"
 msgstr "ذاكرة التخزين المؤقت / المخازن المؤقتة"
+
+#: src/components/routes/maintenance.tsx
+msgid "Cadence"
+msgstr ""
 
 #: src/components/routes/spikes.tsx
 msgid "Calm right now"
@@ -509,9 +537,17 @@ msgstr "تغيير"
 msgid "Change display units for metrics."
 msgstr "تغيير وحدات عرض المقاييس."
 
+#: src/components/routes/maintenance.tsx
+msgid "Change freeze"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Change general application options."
 msgstr "تغيير خيارات التطبيق العامة."
+
+#: src/components/routes/maintenance.tsx
+msgid "Change log"
+msgstr ""
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Charge"
@@ -556,6 +592,10 @@ msgstr "تحقق من خدمة الإشعارات الخاصة بك"
 msgid "Checked {0}"
 msgstr "تم الفحص {0}"
 
+#: src/components/routes/checks.tsx
+msgid "checks"
+msgstr ""
+
 #: src/components/navbar.tsx
 #: src/components/routes/checks.tsx
 msgid "Checks"
@@ -564,6 +604,14 @@ msgstr ""
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Checksum errors"
 msgstr "أخطاء المجموع الاختباري"
+
+#: src/components/routes/maintenance.tsx
+msgid "Class"
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "Cleanup"
+msgstr ""
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
@@ -641,6 +689,7 @@ msgstr "التعارضات"
 msgid "Connection is down"
 msgstr "الاتصال مقطوع"
 
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
@@ -652,6 +701,10 @@ msgstr "صحة الحاوية"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "Container network"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "containers"
 msgstr ""
 
 #: src/components/routes/system.tsx
@@ -731,6 +784,10 @@ msgstr "نسخ YAML"
 msgctxt "Core system metrics"
 msgid "Core"
 msgstr "النواة"
+
+#: src/components/routes/live.tsx
+msgid "cores"
+msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -873,6 +930,14 @@ msgstr ""
 msgid "Description"
 msgstr "الوصف"
 
+#: src/components/routes/registry.tsx
+msgid "destructive"
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "Destructive"
+msgstr ""
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/routes/health.tsx
 msgid "Detail"
@@ -881,6 +946,10 @@ msgstr "التفاصيل"
 #: src/components/routes/system/smart-table.tsx
 msgid "Device"
 msgstr "الجهاز"
+
+#: src/components/routes/registry.tsx
+msgid "Disabled"
+msgstr ""
 
 #. Context: Battery state
 #: src/lib/i18n.ts
@@ -891,6 +960,14 @@ msgstr "قيد التفريغ"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "القرص"
+
+#: src/components/routes/live.tsx
+msgid "Disk activity"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Disk I/O"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Disk unit"
@@ -935,6 +1012,10 @@ msgstr "إدخال/إخراج الشبكة للدوكر"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Documentation"
 msgstr "التوثيق"
+
+#: src/components/routes/registry.tsx
+msgid "Does not validate"
+msgstr ""
 
 #. Context: System is down
 #: src/components/alerts-history-columns.tsx
@@ -990,6 +1071,10 @@ msgstr "إشعارات البريد الإشباكي"
 msgid "Empty"
 msgstr "فارغة"
 
+#: src/components/routes/registry.tsx
+msgid "enabled"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "End Time"
@@ -1040,8 +1125,25 @@ msgstr "مؤقت"
 msgid "Error"
 msgstr "خطأ"
 
+#: src/components/routes/live.tsx
+msgid "errors"
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "evaluated in 24 h"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "Every maintenance check, problems first."
+msgstr ""
+
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "Every rule the script runs under, read-only."
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "Everything that runs"
 msgstr ""
 
 #: src/components/routes/alerts.tsx
@@ -1200,6 +1302,10 @@ msgstr "أمر FreeBSD"
 msgid "Freed"
 msgstr ""
 
+#: src/components/routes/capacity.tsx
+msgid "Freed · 30 days"
+msgstr ""
+
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
 #: src/lib/i18n.ts
@@ -1249,6 +1355,10 @@ msgstr "استخدام وحدة معالجة الرسوميات"
 #: src/components/systems-table/systems-table.tsx
 msgid "Grid"
 msgstr "شبكة"
+
+#: src/components/routes/maintenance.tsx
+msgid "Halted:"
+msgstr ""
 
 #: src/components/routes/reports.tsx
 msgid "Headline"
@@ -1361,6 +1471,7 @@ msgid "Invalid email address."
 msgstr "عنوان البريد الإشباكي غير صالح."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
@@ -1370,9 +1481,21 @@ msgstr ""
 msgid "Language"
 msgstr "اللغة"
 
+#: src/components/routes/live.tsx
+msgid "Largest by memory"
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "last"
+msgstr ""
+
 #: src/components/routes/system/charts/network-totals.tsx
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "Last 24 hours"
+msgstr ""
+
+#: src/components/routes/capacity.tsx
+msgid "last 30 days"
 msgstr ""
 
 #: src/components/routes/system/charts/network-totals.tsx
@@ -1381,6 +1504,8 @@ msgid "Last 7 days"
 msgstr ""
 
 #: src/components/routes/checks.tsx
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
 msgid "Last run"
 msgstr ""
 
@@ -1413,6 +1538,15 @@ msgstr "دورة الحياة"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "limit"
 msgstr "الحد"
+
+#: src/components/navbar.tsx
+#: src/components/routes/live.tsx
+msgid "Live"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Live monitor"
+msgstr ""
 
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "Load Average"
@@ -1499,6 +1633,10 @@ msgstr "معرف العملية الرئيسي"
 msgid "Maintenance"
 msgstr ""
 
+#: src/components/routes/checks.tsx
+msgid "Maintenance is paused (kill switch on): no cleanup actions run."
+msgstr ""
+
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Major"
@@ -1524,6 +1662,7 @@ msgid "Max 1h"
 msgstr "الأقصى 1h"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1548,6 +1687,10 @@ msgstr "استخدام الذاكرة"
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Memory usage of containers"
 msgstr "استخدام الذاكرة للحاويات"
+
+#: src/components/routes/capacity.tsx
+msgid "Memory, load & thermals — last 7 days"
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/routes/migration.tsx
@@ -1599,11 +1742,16 @@ msgstr "نقطة الربط"
 msgid "Name"
 msgstr "الاسم"
 
+#: src/components/routes/checks.tsx
+msgid "need attention"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Net"
 msgstr "الشبكة"
 
+#: src/components/routes/live.tsx
 #: src/components/routes/system.tsx
 msgid "Network"
 msgstr "الشبكة"
@@ -1645,6 +1793,15 @@ msgstr "حركة مرور الشبكة للواجهات العامة"
 #: src/components/routes/settings/general.tsx
 msgid "Network unit"
 msgstr "وحدة الشبكة"
+
+#: src/components/routes/checks.tsx
+msgid "next"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
+msgid "Next run"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1704,6 +1861,10 @@ msgstr "لم يتم العثور على نتائج."
 msgid "No results."
 msgstr "لا توجد نتائج."
 
+#: src/components/routes/registry.tsx
+msgid "No rule matches."
+msgstr ""
+
 #: src/components/routes/system/smart-table.tsx
 msgid "No S.M.A.R.T. attributes available for this device."
 msgstr "لا توجد سمات S.M.A.R.T. متاحة لهذا الجهاز."
@@ -1722,7 +1883,16 @@ msgstr "لم يتم العثور على أهداف."
 msgid "None"
 msgstr "لا شيء"
 
+#: src/components/routes/checks.tsx
+msgid "not run yet"
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "not scheduled"
+msgstr ""
+
 #: src/components/command-palette.tsx
+#: src/components/routes/maintenance.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Notifications"
@@ -1744,6 +1914,10 @@ msgstr ""
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "دعم OAuth 2 / OIDC"
+
+#: src/components/routes/registry.tsx
+msgid "of"
+msgstr ""
 
 #: src/components/routes/settings/config-yaml.tsx
 msgid "On each restart, systems in the database will be updated to match the systems defined in the file."
@@ -1995,8 +2169,16 @@ msgstr "الاستخدام الدقيق في الوقت المسجل"
 msgid "Preferred Language"
 msgstr "اللغة المفضلة"
 
+#: src/components/routes/live.tsx
+msgid "Pressure"
+msgstr ""
+
 #: src/components/routes/spikes.tsx
 msgid "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Process"
 msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
@@ -2041,6 +2223,7 @@ msgstr "الاستخدام الخام لمجموعة التخزين {displayName
 
 #. Disk read
 #. Disk read
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
@@ -2070,6 +2253,12 @@ msgstr ""
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Refresh"
 msgstr "تحديث"
+
+#: src/components/navbar.tsx
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "Registry"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
@@ -2108,6 +2297,10 @@ msgstr "يتطلب"
 msgid "Reset Password"
 msgstr "إعادة تعيين كلمة المرور"
 
+#: src/components/routes/live.tsx
+msgid "Resident"
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -2139,6 +2332,10 @@ msgstr "استئناف"
 msgid "Revision"
 msgstr "المراجعة"
 
+#: src/components/routes/checks.tsx
+msgid "Right now"
+msgstr ""
+
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -2159,6 +2356,19 @@ msgstr ""
 msgid "Rows per page"
 msgstr "صفوف لكل صفحة"
 
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "rules"
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "rules match"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "Run by"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Runtime Metrics"
 msgstr "مقاييس وقت التشغيل"
@@ -2170,6 +2380,14 @@ msgstr "تفاصيل S.M.A.R.T."
 #: src/components/routes/system/smart-table.tsx
 msgid "S.M.A.R.T. Self-Test"
 msgstr "اختبار S.M.A.R.T. الذاتي"
+
+#: src/components/routes/registry.tsx
+msgid "Safety proof"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "samples"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Save {foo}"
@@ -2192,6 +2410,7 @@ msgstr "حفظ النظام"
 msgid "Saved in the database and does not expire until you disable it."
 msgstr "محفوظ في قاعدة البيانات ولا ينتهي حتى تقوم بتعطيله."
 
+#: src/components/routes/maintenance.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "جدولة"
@@ -2203,6 +2422,10 @@ msgstr "جدولة ساعات الهدوء حيث لن يتم إرسال الإ�
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "جدولة ساعات الهدوء حيث لن يتم إرسال الإشعارات."
+
+#: src/components/routes/maintenance.tsx
+msgid "Scheduler:"
+msgstr ""
 
 #: src/components/navbar.tsx
 msgid "Search"
@@ -2306,6 +2529,7 @@ msgid "Service objectives are still collecting data."
 msgstr ""
 
 #: src/components/navbar.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2335,6 +2559,11 @@ msgstr "تم حفظ الإعدادات"
 #: src/components/routes/alerts.tsx
 #: src/components/routes/incidents.tsx
 msgid "Severity"
+msgstr ""
+
+#. placeholder {0}: Math.min(40, filtered.length - limit)
+#: src/components/routes/registry.tsx
+msgid "Show {0} more"
 msgstr ""
 
 #: src/components/logs-display.tsx
@@ -2367,6 +2596,10 @@ msgstr "إعدادات SMTP"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "الترتيب حسب"
+
+#: src/components/routes/capacity.tsx
+msgid "Space freed per day"
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2406,6 +2639,14 @@ msgstr "الحالة الفرعية"
 msgid "Summary"
 msgstr ""
 
+#: src/components/routes/live.tsx
+msgid "Swap"
+msgstr ""
+
+#: src/components/routes/live.tsx
+msgid "Swap held by"
+msgstr ""
+
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Swap space used by the system"
 msgstr "مساحة التبديل المستخدمة من قبل النظام"
@@ -2418,6 +2659,10 @@ msgstr "استخدام التبديل"
 #: src/components/mode-toggle.tsx
 msgid "Switch theme"
 msgstr "تبديل السمة"
+
+#: src/components/routes/registry.tsx
+msgid "synced"
+msgstr ""
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/containers-table/containers-table-columns.tsx
@@ -2507,6 +2752,10 @@ msgstr "درجة الحرارة"
 msgid "Temperature unit"
 msgstr "وحدة درجة الحرارة"
 
+#: src/components/routes/live.tsx
+msgid "Temperatures & fans"
+msgstr ""
+
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Temperatures of system sensors"
 msgstr "درجات حرارة مستشعرات النظام"
@@ -2523,6 +2772,10 @@ msgstr "اختبار نبضة القلب"
 msgid "Test notification sent"
 msgstr "تم إرسال إشعار الاختبار"
 
+#: src/components/routes/live.tsx
+msgid "The live monitor has not published yet."
+msgstr ""
+
 #: src/components/routes/health.tsx
 msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
 msgstr ""
@@ -2530,6 +2783,14 @@ msgstr ""
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "الحالة العامة هي <0>موافق</0> عندما تكون جميع الأنظمة تعمل، و<1>تحذير</1> عند تشغيل التنبيهات، و<2>خطأ</2> عندما يكون أي نظام معطلاً."
+
+#: src/components/routes/maintenance.tsx
+msgid "The routine file is not valid — the scheduler is not running it."
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "The rules have not been published yet."
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
@@ -2555,6 +2816,14 @@ msgstr "معدل نقل مجموعة التخزين {displayName}"
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
 msgstr "تنسيق الوقت"
+
+#: src/components/routes/maintenance.tsx
+msgid "Timer"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "Timers"
+msgstr ""
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/incidents.tsx
@@ -2612,6 +2881,10 @@ msgstr "الإجمالي: {0}"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggered by"
 msgstr "تم التفعيل بواسطة"
+
+#: src/components/routes/registry.tsx
+msgid "triggered in 30 days"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggers"
@@ -2696,6 +2969,7 @@ msgstr "النوع"
 msgid "Un-acknowledge"
 msgstr ""
 
+#: src/components/routes/live.tsx
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "غير سليمة"
@@ -2812,6 +3086,10 @@ msgctxt "Disk I/O utilization"
 msgid "Utilization"
 msgstr "الاستخدام"
 
+#: src/components/routes/registry.tsx
+msgid "Valid"
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 msgid "Value"
 msgstr "القيمة"
@@ -2869,7 +3147,19 @@ msgid "Webhook / Push notifications"
 msgstr "إشعارات Webhook / Push"
 
 #: src/components/routes/maintenance.tsx
-msgid "What the engine did, and what the routine is doing."
+msgid "What"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+#~ msgid "What the engine did, and what the routine is doing."
+#~ msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "What the engine did, what runs when, and what it told you."
+msgstr ""
+
+#: src/components/routes/registry.tsx
+msgid "What the script does"
 msgstr ""
 
 #: src/components/routes/alerts.tsx
@@ -2885,6 +3175,10 @@ msgstr "عند التفعيل، يسمح هذا الرمز المميز للوك
 #: src/components/routes/settings/heartbeat.tsx
 msgid "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
 msgstr "عند استخدام POST، تتضمن كل نبضة قلب حمولة JSON مع ملخص حالة النظام وقائمة الأنظمة المعطلة والتنبيهات التي تم تشغيلها."
+
+#: src/components/routes/live.tsx
+msgid "Who"
+msgstr ""
 
 #: src/components/routes/health.tsx
 msgid "Why"
@@ -2902,6 +3196,7 @@ msgstr "أمر ويندوز"
 
 #. Disk write
 #. Disk write
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx

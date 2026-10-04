@@ -599,6 +599,7 @@ var maintenanceFiles = map[string]struct{}{
 	"slo.json": {}, "pressure.json": {}, "migration.json": {}, "actions.json": {}, "storage.json": {},
 	"metrics.json": {}, "self.json": {}, "acks.json": {}, "notifications.json": {}, "monitors.json": {},
 	"overview.json": {}, "health-history.json": {}, "manifest.json": {}, "rules.json": {},
+	"live.json": {}, "rules-history.json": {}, "journal.json": {},
 }
 
 // maintenanceFile handles GET /api/beszel/maintenance/file?name=<file> (Ohmz fork): it serves one

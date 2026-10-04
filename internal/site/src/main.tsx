@@ -36,6 +36,8 @@ const Containers = lazy(() => import("@/components/routes/containers.tsx"))
 const Smart = lazy(() => import("@/components/routes/smart.tsx"))
 const Monitors = lazy(() => import("@/components/routes/monitors.tsx"))
 const Checks = lazy(() => import("@/components/routes/checks.tsx"))
+const Live = lazy(() => import("@/components/routes/live.tsx"))
+const Registry = lazy(() => import("@/components/routes/registry.tsx"))
 const Maintenance = lazy(() => import("@/components/routes/maintenance.tsx"))
 const Capacity = lazy(() => import("@/components/routes/capacity.tsx"))
 const Slo = lazy(() => import("@/components/routes/slo.tsx"))
@@ -104,6 +106,10 @@ const App = memo(() => {
 		return <Monitors />
 	} else if (page.route === "checks") {
 		return <Checks />
+	} else if (page.route === "live") {
+		return <Live />
+	} else if (page.route === "registry") {
+		return <Registry />
 	} else if (page.route === "maintenance") {
 		return <Maintenance />
 	} else if (page.route === "capacity") {

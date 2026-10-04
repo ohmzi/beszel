@@ -124,6 +124,10 @@ msgstr "12 hours"
 msgid "15 min"
 msgstr "15 min"
 
+#: src/components/routes/capacity.tsx
+msgid "24 h avg"
+msgstr "24 h avg"
+
 #: src/lib/utils.ts
 msgid "24 hours"
 msgstr "24 hours"
@@ -140,6 +144,10 @@ msgstr "24h ↓ / ↑"
 #: src/lib/utils.ts
 msgid "30 days"
 msgstr "30 days"
+
+#: src/components/routes/checks.tsx
+msgid "30-day health calendar"
+msgstr "30-day health calendar"
 
 #. Load average
 #: src/components/routes/system/charts/load-average-chart.tsx
@@ -187,6 +195,10 @@ msgstr "Active"
 #: src/components/active-alerts.tsx
 msgid "Active Alerts"
 msgstr "Active Alerts"
+
+#: src/components/routes/maintenance.tsx
+msgid "active now"
+msgstr "active now"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Active state"
@@ -265,6 +277,10 @@ msgstr "Alerts"
 #: src/components/navbar.tsx
 msgid "All Containers"
 msgstr "All Containers"
+
+#: src/components/routes/registry.tsx
+msgid "All rules"
+msgstr "All rules"
 
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
@@ -431,6 +447,14 @@ msgstr "Bulk Add"
 msgid "Bulk Add {foo}"
 msgstr "Bulk Add {foo}"
 
+#: src/components/routes/live.tsx
+msgid "Busiest by CPU"
+msgstr "Busiest by CPU"
+
+#: src/components/routes/capacity.tsx
+msgid "by cleanup tasks"
+msgstr "by cleanup tasks"
+
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
 msgid "Bytes (KB/s, MB/s, GB/s)"
@@ -439,6 +463,10 @@ msgstr "Bytes (KB/s, MB/s, GB/s)"
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Cache / Buffers"
 msgstr "Cache / Buffers"
+
+#: src/components/routes/maintenance.tsx
+msgid "Cadence"
+msgstr "Cadence"
 
 #: src/components/routes/spikes.tsx
 msgid "Calm right now"
@@ -504,9 +532,17 @@ msgstr "Change"
 msgid "Change display units for metrics."
 msgstr "Change display units for metrics."
 
+#: src/components/routes/maintenance.tsx
+msgid "Change freeze"
+msgstr "Change freeze"
+
 #: src/components/routes/settings/general.tsx
 msgid "Change general application options."
 msgstr "Change general application options."
+
+#: src/components/routes/maintenance.tsx
+msgid "Change log"
+msgstr "Change log"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Charge"
@@ -551,6 +587,10 @@ msgstr "Check your notification service"
 msgid "Checked {0}"
 msgstr "Checked {0}"
 
+#: src/components/routes/checks.tsx
+msgid "checks"
+msgstr "checks"
+
 #: src/components/navbar.tsx
 #: src/components/routes/checks.tsx
 msgid "Checks"
@@ -559,6 +599,14 @@ msgstr "Checks"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Checksum errors"
 msgstr "Checksum errors"
+
+#: src/components/routes/maintenance.tsx
+msgid "Class"
+msgstr "Class"
+
+#: src/components/routes/checks.tsx
+msgid "Cleanup"
+msgstr "Cleanup"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
@@ -636,6 +684,7 @@ msgstr "Conflicts"
 msgid "Connection is down"
 msgstr "Connection is down"
 
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
@@ -648,6 +697,10 @@ msgstr "Container Health"
 #: src/components/routes/system/charts/container-network.tsx
 msgid "Container network"
 msgstr "Container network"
+
+#: src/components/routes/live.tsx
+msgid "containers"
+msgstr "containers"
 
 #: src/components/routes/system.tsx
 msgid "Containers"
@@ -726,6 +779,10 @@ msgstr "Copy YAML"
 msgctxt "Core system metrics"
 msgid "Core"
 msgstr "Core"
+
+#: src/components/routes/live.tsx
+msgid "cores"
+msgstr "cores"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -868,6 +925,14 @@ msgstr "Delivery"
 msgid "Description"
 msgstr "Description"
 
+#: src/components/routes/registry.tsx
+msgid "destructive"
+msgstr "destructive"
+
+#: src/components/routes/registry.tsx
+msgid "Destructive"
+msgstr "Destructive"
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/routes/health.tsx
 msgid "Detail"
@@ -876,6 +941,10 @@ msgstr "Detail"
 #: src/components/routes/system/smart-table.tsx
 msgid "Device"
 msgstr "Device"
+
+#: src/components/routes/registry.tsx
+msgid "Disabled"
+msgstr "Disabled"
 
 #. Context: Battery state
 #: src/lib/i18n.ts
@@ -886,6 +955,14 @@ msgstr "Discharging"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "Disk"
+
+#: src/components/routes/live.tsx
+msgid "Disk activity"
+msgstr "Disk activity"
+
+#: src/components/routes/live.tsx
+msgid "Disk I/O"
+msgstr "Disk I/O"
 
 #: src/components/routes/settings/general.tsx
 msgid "Disk unit"
@@ -930,6 +1007,10 @@ msgstr "Docker Network I/O"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Documentation"
 msgstr "Documentation"
+
+#: src/components/routes/registry.tsx
+msgid "Does not validate"
+msgstr "Does not validate"
 
 #. Context: System is down
 #: src/components/alerts-history-columns.tsx
@@ -985,6 +1066,10 @@ msgstr "Email notifications"
 msgid "Empty"
 msgstr "Empty"
 
+#: src/components/routes/registry.tsx
+msgid "enabled"
+msgstr "enabled"
+
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "End Time"
@@ -1035,9 +1120,26 @@ msgstr "Ephemeral"
 msgid "Error"
 msgstr "Error"
 
+#: src/components/routes/live.tsx
+msgid "errors"
+msgstr "errors"
+
+#: src/components/routes/registry.tsx
+msgid "evaluated in 24 h"
+msgstr "evaluated in 24 h"
+
 #: src/components/routes/checks.tsx
 msgid "Every maintenance check, problems first."
 msgstr "Every maintenance check, problems first."
+
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "Every rule the script runs under, read-only."
+msgstr "Every rule the script runs under, read-only."
+
+#: src/components/routes/maintenance.tsx
+msgid "Everything that runs"
+msgstr "Everything that runs"
 
 #: src/components/routes/alerts.tsx
 msgid "Everything the maintenance engine reported, newest first."
@@ -1195,6 +1297,10 @@ msgstr "FreeBSD command"
 msgid "Freed"
 msgstr "Freed"
 
+#: src/components/routes/capacity.tsx
+msgid "Freed · 30 days"
+msgstr "Freed · 30 days"
+
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
 #: src/lib/i18n.ts
@@ -1244,6 +1350,10 @@ msgstr "GPU Usage"
 #: src/components/systems-table/systems-table.tsx
 msgid "Grid"
 msgstr "Grid"
+
+#: src/components/routes/maintenance.tsx
+msgid "Halted:"
+msgstr "Halted:"
 
 #: src/components/routes/reports.tsx
 msgid "Headline"
@@ -1356,6 +1466,7 @@ msgid "Invalid email address."
 msgstr "Invalid email address."
 
 #: src/components/routes/alerts.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
@@ -1365,10 +1476,22 @@ msgstr "Kind"
 msgid "Language"
 msgstr "Language"
 
+#: src/components/routes/live.tsx
+msgid "Largest by memory"
+msgstr "Largest by memory"
+
+#: src/components/routes/checks.tsx
+msgid "last"
+msgstr "last"
+
 #: src/components/routes/system/charts/network-totals.tsx
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "Last 24 hours"
 msgstr "Last 24 hours"
+
+#: src/components/routes/capacity.tsx
+msgid "last 30 days"
+msgstr "last 30 days"
 
 #: src/components/routes/system/charts/network-totals.tsx
 #: src/components/routes/system/charts/network-totals.tsx
@@ -1376,6 +1499,8 @@ msgid "Last 7 days"
 msgstr "Last 7 days"
 
 #: src/components/routes/checks.tsx
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
 msgid "Last run"
 msgstr "Last run"
 
@@ -1408,6 +1533,15 @@ msgstr "Lifecycle"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "limit"
 msgstr "limit"
+
+#: src/components/navbar.tsx
+#: src/components/routes/live.tsx
+msgid "Live"
+msgstr "Live"
+
+#: src/components/routes/live.tsx
+msgid "Live monitor"
+msgstr "Live monitor"
 
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "Load Average"
@@ -1494,6 +1628,10 @@ msgstr "Main PID"
 msgid "Maintenance"
 msgstr "Maintenance"
 
+#: src/components/routes/checks.tsx
+msgid "Maintenance is paused (kill switch on): no cleanup actions run."
+msgstr "Maintenance is paused (kill switch on): no cleanup actions run."
+
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Major"
@@ -1519,6 +1657,7 @@ msgid "Max 1h"
 msgstr "Max 1h"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1543,6 +1682,10 @@ msgstr "Memory Usage"
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Memory usage of containers"
 msgstr "Memory usage of containers"
+
+#: src/components/routes/capacity.tsx
+msgid "Memory, load & thermals — last 7 days"
+msgstr "Memory, load & thermals — last 7 days"
 
 #: src/components/navbar.tsx
 #: src/components/routes/migration.tsx
@@ -1594,11 +1737,16 @@ msgstr "Mountpoint"
 msgid "Name"
 msgstr "Name"
 
+#: src/components/routes/checks.tsx
+msgid "need attention"
+msgstr "need attention"
+
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Net"
 msgstr "Net"
 
+#: src/components/routes/live.tsx
 #: src/components/routes/system.tsx
 msgid "Network"
 msgstr "Network"
@@ -1640,6 +1788,15 @@ msgstr "Network traffic of public interfaces"
 #: src/components/routes/settings/general.tsx
 msgid "Network unit"
 msgstr "Network unit"
+
+#: src/components/routes/checks.tsx
+msgid "next"
+msgstr "next"
+
+#: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
+msgid "Next run"
+msgstr "Next run"
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1699,6 +1856,10 @@ msgstr "No results found."
 msgid "No results."
 msgstr "No results."
 
+#: src/components/routes/registry.tsx
+msgid "No rule matches."
+msgstr "No rule matches."
+
 #: src/components/routes/system/smart-table.tsx
 msgid "No S.M.A.R.T. attributes available for this device."
 msgstr "No S.M.A.R.T. attributes available for this device."
@@ -1717,7 +1878,16 @@ msgstr "No targets found."
 msgid "None"
 msgstr "None"
 
+#: src/components/routes/checks.tsx
+msgid "not run yet"
+msgstr "not run yet"
+
+#: src/components/routes/checks.tsx
+msgid "not scheduled"
+msgstr "not scheduled"
+
 #: src/components/command-palette.tsx
+#: src/components/routes/maintenance.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Notifications"
@@ -1739,6 +1909,10 @@ msgstr "Now ↓ / ↑"
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "OAuth 2 / OIDC support"
+
+#: src/components/routes/registry.tsx
+msgid "of"
+msgstr "of"
 
 #: src/components/routes/settings/config-yaml.tsx
 msgid "On each restart, systems in the database will be updated to match the systems defined in the file."
@@ -1990,9 +2164,17 @@ msgstr "Precise utilization at the recorded time"
 msgid "Preferred Language"
 msgstr "Preferred Language"
 
+#: src/components/routes/live.tsx
+msgid "Pressure"
+msgstr "Pressure"
+
 #: src/components/routes/spikes.tsx
 msgid "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
 msgstr "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
+
+#: src/components/routes/live.tsx
+msgid "Process"
+msgstr "Process"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Process started"
@@ -2036,6 +2218,7 @@ msgstr "Raw usage of storage pool {displayName}"
 
 #. Disk read
 #. Disk read
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
@@ -2065,6 +2248,12 @@ msgstr "Recent actions"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Refresh"
 msgstr "Refresh"
+
+#: src/components/navbar.tsx
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "Registry"
+msgstr "Registry"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
@@ -2103,6 +2292,10 @@ msgstr "Requires"
 msgid "Reset Password"
 msgstr "Reset Password"
 
+#: src/components/routes/live.tsx
+msgid "Resident"
+msgstr "Resident"
+
 #: src/components/alerts-history-columns.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -2134,6 +2327,10 @@ msgstr "Resume"
 msgid "Revision"
 msgstr "Revision"
 
+#: src/components/routes/checks.tsx
+msgid "Right now"
+msgstr "Right now"
+
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -2154,6 +2351,19 @@ msgstr "Routine"
 msgid "Rows per page"
 msgstr "Rows per page"
 
+#: src/components/routes/registry.tsx
+#: src/components/routes/registry.tsx
+msgid "rules"
+msgstr "rules"
+
+#: src/components/routes/registry.tsx
+msgid "rules match"
+msgstr "rules match"
+
+#: src/components/routes/maintenance.tsx
+msgid "Run by"
+msgstr "Run by"
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Runtime Metrics"
 msgstr "Runtime Metrics"
@@ -2165,6 +2375,14 @@ msgstr "S.M.A.R.T. Details"
 #: src/components/routes/system/smart-table.tsx
 msgid "S.M.A.R.T. Self-Test"
 msgstr "S.M.A.R.T. Self-Test"
+
+#: src/components/routes/registry.tsx
+msgid "Safety proof"
+msgstr "Safety proof"
+
+#: src/components/routes/live.tsx
+msgid "samples"
+msgstr "samples"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Save {foo}"
@@ -2187,6 +2405,7 @@ msgstr "Save System"
 msgid "Saved in the database and does not expire until you disable it."
 msgstr "Saved in the database and does not expire until you disable it."
 
+#: src/components/routes/maintenance.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "Schedule"
@@ -2198,6 +2417,10 @@ msgstr "Schedule quiet hours where notifications will not be sent, such as durin
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "Schedule quiet hours where notifications will not be sent."
+
+#: src/components/routes/maintenance.tsx
+msgid "Scheduler:"
+msgstr "Scheduler:"
 
 #: src/components/navbar.tsx
 msgid "Search"
@@ -2301,6 +2524,7 @@ msgid "Service objectives are still collecting data."
 msgstr "Service objectives are still collecting data."
 
 #: src/components/navbar.tsx
+#: src/components/routes/live.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2332,6 +2556,11 @@ msgstr "Settings saved"
 msgid "Severity"
 msgstr "Severity"
 
+#. placeholder {0}: Math.min(40, filtered.length - limit)
+#: src/components/routes/registry.tsx
+msgid "Show {0} more"
+msgstr "Show {0} more"
+
 #: src/components/logs-display.tsx
 #: src/components/logs-display.tsx
 msgid "Show timestamps"
@@ -2362,6 +2591,10 @@ msgstr "SMTP settings"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "Sort By"
+
+#: src/components/routes/capacity.tsx
+msgid "Space freed per day"
+msgstr "Space freed per day"
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2401,6 +2634,14 @@ msgstr "Sub State"
 msgid "Summary"
 msgstr "Summary"
 
+#: src/components/routes/live.tsx
+msgid "Swap"
+msgstr "Swap"
+
+#: src/components/routes/live.tsx
+msgid "Swap held by"
+msgstr "Swap held by"
+
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Swap space used by the system"
 msgstr "Swap space used by the system"
@@ -2413,6 +2654,10 @@ msgstr "Swap Usage"
 #: src/components/mode-toggle.tsx
 msgid "Switch theme"
 msgstr "Switch theme"
+
+#: src/components/routes/registry.tsx
+msgid "synced"
+msgstr "synced"
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/containers-table/containers-table-columns.tsx
@@ -2502,6 +2747,10 @@ msgstr "Temperature"
 msgid "Temperature unit"
 msgstr "Temperature unit"
 
+#: src/components/routes/live.tsx
+msgid "Temperatures & fans"
+msgstr "Temperatures & fans"
+
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Temperatures of system sensors"
 msgstr "Temperatures of system sensors"
@@ -2518,6 +2767,10 @@ msgstr "Test heartbeat"
 msgid "Test notification sent"
 msgstr "Test notification sent"
 
+#: src/components/routes/live.tsx
+msgid "The live monitor has not published yet."
+msgstr "The live monitor has not published yet."
+
 #: src/components/routes/health.tsx
 msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
 msgstr "The monitoring pipeline's own verdict — whether the checks are actually running."
@@ -2525,6 +2778,14 @@ msgstr "The monitoring pipeline's own verdict — whether the checks are actuall
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
+
+#: src/components/routes/maintenance.tsx
+msgid "The routine file is not valid — the scheduler is not running it."
+msgstr "The routine file is not valid — the scheduler is not running it."
+
+#: src/components/routes/registry.tsx
+msgid "The rules have not been published yet."
+msgstr "The rules have not been published yet."
 
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
@@ -2550,6 +2811,14 @@ msgstr "Throughput of storage pool {displayName}"
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
 msgstr "Time format"
+
+#: src/components/routes/maintenance.tsx
+msgid "Timer"
+msgstr "Timer"
+
+#: src/components/routes/maintenance.tsx
+msgid "Timers"
+msgstr "Timers"
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/incidents.tsx
@@ -2607,6 +2876,10 @@ msgstr "Total: {0}"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggered by"
 msgstr "Triggered by"
+
+#: src/components/routes/registry.tsx
+msgid "triggered in 30 days"
+msgstr "triggered in 30 days"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggers"
@@ -2691,6 +2964,7 @@ msgstr "Type"
 msgid "Un-acknowledge"
 msgstr "Un-acknowledge"
 
+#: src/components/routes/live.tsx
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "Unhealthy"
@@ -2807,6 +3081,10 @@ msgctxt "Disk I/O utilization"
 msgid "Utilization"
 msgstr "Utilization"
 
+#: src/components/routes/registry.tsx
+msgid "Valid"
+msgstr "Valid"
+
 #: src/components/alerts-history-columns.tsx
 msgid "Value"
 msgstr "Value"
@@ -2864,8 +3142,20 @@ msgid "Webhook / Push notifications"
 msgstr "Webhook / Push notifications"
 
 #: src/components/routes/maintenance.tsx
-msgid "What the engine did, and what the routine is doing."
-msgstr "What the engine did, and what the routine is doing."
+msgid "What"
+msgstr "What"
+
+#: src/components/routes/maintenance.tsx
+#~ msgid "What the engine did, and what the routine is doing."
+#~ msgstr "What the engine did, and what the routine is doing."
+
+#: src/components/routes/maintenance.tsx
+msgid "What the engine did, what runs when, and what it told you."
+msgstr "What the engine did, what runs when, and what it told you."
+
+#: src/components/routes/registry.tsx
+msgid "What the script does"
+msgstr "What the script does"
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/maintenance.tsx
@@ -2880,6 +3170,10 @@ msgstr "When enabled, this token allows agents to self-register without prior sy
 #: src/components/routes/settings/heartbeat.tsx
 msgid "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
 msgstr "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
+
+#: src/components/routes/live.tsx
+msgid "Who"
+msgstr "Who"
 
 #: src/components/routes/health.tsx
 msgid "Why"
@@ -2897,6 +3191,7 @@ msgstr "Windows command"
 
 #. Disk write
 #. Disk write
+#: src/components/routes/live.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx

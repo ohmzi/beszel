@@ -43,7 +43,7 @@ func isAppRoute(urlPath, basePath string) bool {
 	urlPath = strings.TrimSuffix(urlPath, "/")
 	switch urlPath {
 	case "", "/alerts", "/incidents", "/reports", "/services", "/containers", "/smart", "/monitors", "/settings", "/forgot-password", "/request-otp",
-		"/checks", "/maintenance", "/capacity", "/slo", "/spikes", "/migration", "/health":
+		"/checks", "/live", "/registry", "/maintenance", "/capacity", "/slo", "/spikes", "/migration", "/health":
 		return true
 	}
 	// routes with a single required (/system/:id) or optional (/settings/:name?) param

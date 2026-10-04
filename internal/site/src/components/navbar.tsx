@@ -347,12 +347,14 @@ const Kbd = ({ children }: { children: React.ReactNode }) => (
 
 function MaintenanceDropdownGroup() {
 	const items = [
+		{ route: "live", icon: ActivityIcon, label: <Trans>Live</Trans> },
 		{ route: "checks", icon: ListChecksIcon, label: <Trans>Checks</Trans> },
 		{ route: "maintenance", icon: WrenchIcon, label: <Trans>Maintenance</Trans> },
 		{ route: "capacity", icon: GaugeIcon, label: <Trans>Capacity</Trans> },
 		{ route: "slo", icon: TargetIcon, label: <Trans>Service levels</Trans> },
 		{ route: "spikes", icon: ActivityIcon, label: <Trans>Load spikes</Trans> },
 		{ route: "migration", icon: ArrowRightLeftIcon, label: <Trans>Migration</Trans> },
+		{ route: "registry", icon: FileTextIcon, label: <Trans>Registry</Trans> },
 		{ route: "health", icon: HeartPulseIcon, label: <Trans>Pipeline health</Trans> },
 	] as const
 	return (
