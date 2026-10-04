@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the homelab-maint weekly tier on Wednesday mornings
+
+[Timer]
+OnCalendar=Wed *-*-* 07:45:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,25 @@
+[Unit]
+Description=homelab-maint scheduler tick (starts what is due, reaps finished jobs)
+Documentation=file:///etc/homelab-maint/jobs.toml
+# Ordering only: jobs that need Docker (and the gates) fail closed when it is down, so no Requires=/Wants=.
+After=docker.service local-fs.target
+
+[Service]
+Type=oneshot
+# Every minute, from homelab-maint-tick.timer. A second tick that finds the lock taken exits at once (no overlap).
+ExecStart=/usr/local/sbin/homelab-maint tick
+# Jobs are started DETACHED (their own session and process group, supervised by `python3 -m homelab_maint.jobs supervise`,
+# TERM then KILL of the whole group on timeout) and outlive this one-shot. systemd's default KillMode=control-group would
+# kill them the moment the tick exits, so only the main process is signalled here. Their cgroup is this unit's cgroup:
+# NO MemoryMax=/TasksMax=/CPUQuota= on purpose (a cap here would cap the backups too), and no sandboxing (backups write
+# everywhere and remount their target). Resource properties a legacy unit had (Nice, IOSchedulingClass, OOMScoreAdjust)
+# are applied PER JOB by the supervisor, not here. (Known, harmless side effect: while a job outlives the tick that started it,
+# systemd logs "Found left-over process ... Ignoring" / "Unit process ... remains running after unit stopped" each minute, per
+# process, for this unit. A transient unit per job, `systemd-run --no-block --collect`, would remove that and also allow per-job
+# MemoryMax=; it is the planned launcher upgrade behind scheduler.Env.spawn.)
+KillMode=process
+SendSIGKILL=no
+# The tick itself is a ~tens-of-ms Python process; a hung gate probe is bounded by the scheduler (gate_timeout_s), this is the backstop.
+TimeoutStartSec=3min
+Nice=10
+SyslogIdentifier=homelab-maint-tick

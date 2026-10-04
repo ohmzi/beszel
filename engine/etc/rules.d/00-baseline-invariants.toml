@@ -1,0 +1,203 @@
+# homelab-maint rules registry: baseline invariants. SHIPPED with the release and replaced on upgrade; do not edit. It is read by
+# `homelab-maint rules check|sync`, never compiled into a config file. protected_patterns below = etc/protected.toml at release time.
+
+[meta]
+category = "safety"
+title = "Baseline invariants"
+blurb = "The safety floor the registry cannot go below: protected patterns, hard caps, delete confinement."
+
+[baseline]
+version = 1
+derived_from = "etc/protected.toml (2026-10-02)"
+protected_patterns = [
+  "surreal", "postgres", "mariadb", "mysql", "qdrant", "meilisearch", "redis", "grimmory-db",
+  "tday_db", "immich_postgres", "comfyui", "ollama", "plexmediaserver", "plex media",
+  "plex transcoder", "immich", "open-notebook", "open_notebook", "infinity", "omnivoice",
+  "speaches", "kokoro", "ebook2audiobook", "tunarr", "kometa", "sabnzbd", "radarr", "sonarr",
+  "prowlarr", "bazarr", "buildkitd", "docker build", "buildctl", "dockerd", "containerd",
+  "systemd", "sshd", "cloudflared", "tailscaled", "xorg", "xwayland", "gnome-shell",
+  "networkmanager", "homarr", "uptime-kuma", "glances", "fail2ban", "smartd", "libvirt",
+  "qemu", "claude", "/var/snap/plexmediaserver", "/media/SandiskSSD/plex", "/usr/share/ollama",
+  "/volume1/docker/comfyui/models", "/var/lib/docker/volumes", "surreal_data", "notebook_data",
+  "/mnt/backup", "/media/Immich", "pgdata",
+]
+never_touch = [
+  "^/var/lib/(docker|libvirt|containerd)(/|$)", "^/mnt/backup(/|$)",
+  "^/media/(Immich|nextcloud)(/|$)", "^/var/snap/plexmediaserver", "^/media/SandiskSSD/plex",
+  "/Plex Media Server(/|$)", "^/volume1/docker/plex(/|$)", "^/usr/share/ollama",
+  '/\.ollama(/|$)', "/comfyui/models", "(surreal|notebook)_data|pgdata",
+  '/\.config/Cursor(/|$)', '/\.cursor(/|$)', '^/home/[^/]+/(models|\.ssh|\.gnupg)(/|$)',
+  "(^|/)ai-stack(/|$)",
+  "^/volume1/docker/kavita(/(?!config/(logs|backups|cache)(/|$))|$)",
+  "^/volume1/docker/(radarr|sonarr|prowlarr|bazarr|lidarr|readarr|sabnzbd|seerr|overseerr|jellyseerr)(/(?!config/cache(/|$))|$)",
+  '/\.docker-data(/(?!tunarr/cache/)|$)',
+]
+min_root_depth = 2
+
+[[baseline.limit]]
+file = "maint.toml"
+path = "caps.max_gib_per_run"
+max = 100
+why = "per-run byte cap; the shipped value is 40 GiB, a typo must not lift it to terabytes"
+
+[[baseline.limit]]
+file = "maint.toml"
+path = "caps.max_items_per_run"
+max = 2000
+why = "per-run action cap; shipped 500"
+
+[[baseline.limit]]
+file = "maint.toml"
+path = "tasks.*.max_gib_per_run"
+max = 100
+why = "a task may lower its cap, never lift it past the hard limit"
+
+[[baseline.limit]]
+file = "maint.toml"
+path = "tasks.*.max_items_per_run"
+max = 2000
+why = "same for the item cap"
+
+[[baseline.limit]]
+file = "notify.toml"
+path = "budget.hard_cap_per_day"
+max = 60
+why = "nothing passes this many messages a day (a loop must not flood the phone); shipped 40"
+
+[[baseline.limit]]
+file = "classes.toml"
+path = "ladder.max_restarts_per_6h"
+max = 6
+why = "restarts of proven-stuck containers; shipped 2"
+
+[[baseline.limit]]
+file = "classes.toml"
+path = "ladder.max_per_day.restart"
+max = 12
+why = "shipped 4"
+
+[[baseline.limit]]
+file = "classes.toml"
+path = "ladder.max_per_day.emergency"
+max = 6
+why = "shipped 3"
+
+[[baseline.limit]]
+file = "ack.toml"
+path = "ack.max_days"
+max = 365
+why = "an acknowledgement silences an exact error for at most a year"
+
+[[baseline.unprotect]]
+file = "maint.toml"
+path = "tasks.app_cache_trim.unprotect"
+allow = ['^/home/ohmz/StudioProjects/tunarr/\.docker-data/tunarr/cache/subtitles(/|$)']
+why = "a disposable subtitle cache inside the protected tunarr app dir"
+
+[[baseline.unprotect]]
+file = "maint.toml"
+path = "tasks.caps.unprotect"
+allow = ["^tunarr-host-net$", "^kavita$", "^sabnzbd$", "^omnivoice-studio-gpu$", "^comfyui$"]
+why = "a memory ceiling is not a kill"
+
+[[baseline.unprotect]]
+file = "maint.toml"
+path = "tasks.openwebui_media_prune.unprotect"
+allow = ["^/volume1/docker/comfyui/output/owui_"]
+why = "allow-listed generated media"
+
+[[baseline.unprotect]]
+file = "maint.toml"
+path = "tasks.comfyui_idle_reclaim.unprotect"
+allow = ["^comfyui$"]
+why = "the port of comfyui-idle-vram.sh restarts ComfyUI"
+
+[[baseline.unprotect]]
+file = "maint.toml"
+path = "tasks.immich_recycle.unprotect"
+allow = ["^immich_server$"]
+why = "the port of immich-server-recycle.service restarts the server"
+
+[[baseline.unprotect]]
+file = "maint.toml"
+path = "tasks.c2_candidates.unprotect"
+allow = ["StudioProjects/kometa/backups/config-backup-"]
+why = "one stale tarball inside the protected kometa dir"
+
+[[baseline.unprotect]]
+file = "classes.toml"
+path = "ladder.throttle_unprotect"
+allow = [
+  "^(comfyui|tunarr-host-net|Sabnzbd|Radarr|Sonarr|sonarr-status|prowlarr|bazarr|kometa|immich_machine_learning)$",
+  "^(omnivoice-studio-gpu|ebook2audiobook-ebook2audiobook-gpu-1|kokoro|infinity-rerank|open-notebook-open_notebook-1|open-notebook-speaches-1)$",
+]
+why = "L3 only lowers cpu-shares of batch containers"
+
+[[baseline.unprotect]]
+file = "classes.toml"
+path = "ladder.qos_unprotect"
+allow = [
+  "^(immich_server|homarr|uptime-kuma|immich-public-proxy)$",
+  "^(immich_postgres|immich_redis|nextcloud_postgres|nextcloud_redis|tday_db|tday_ollama|owui-public-ollama)$",
+]
+why = "qos_classes only raises P1 weights"
+
+[[baseline.apply_keys]]
+task = "pressure_response"
+key = "reclaim"
+why = "the ladder rung switches (reclaim ships on)"
+
+[[baseline.apply_keys]]
+task = "pressure_response"
+key = "throttle"
+why = "the ladder rung switches (reclaim ships on)"
+
+[[baseline.apply_keys]]
+task = "pressure_response"
+key = "restart"
+why = "the ladder rung switches (reclaim ships on)"
+
+[[baseline.apply_keys]]
+task = "pressure_response"
+key = "emergency"
+why = "the ladder rung switches (reclaim ships on)"
+
+[[rule]]
+id = "safety.protected-superset"
+title = "Protected patterns can only grow"
+kind = "safety"
+severity = "crit"
+since = "2026-10-02"
+principle = "never kill by size; protect what must not be touched"
+why = "Everything the script may kill, restart or delete is checked against protected.toml first. Losing a pattern would silently expose a database or a media library, so the registry refuses to drop any baseline pattern."
+does = "`rules check` compares the compiled protected.toml with the baseline's protected_patterns (this file AND the copy pinned in the release: the stricter of the two counts, a weaker file is refused). A missing pattern blocks the sync and raises an alert. Every `unprotect` regex (a per-task exemption from protected.toml) must be on the baseline allow-list. Only the owner can allow a removal or an extra exemption: [meta] allow_baseline_removal / allow_unprotect in 99-owner-overrides.toml; that is logged loudly and mentioned in the notice."
+
+[[rule]]
+id = "safety.hard-caps"
+title = "Per-run caps stay under hard limits"
+kind = "safety"
+severity = "crit"
+since = "2026-10-02"
+principle = "bounded blast radius"
+why = "A cleaner that deletes too much in one run cannot be undone. Caps bound one run; hard limits bound the caps themselves."
+does = "Every [[baseline.limit]] entry is a numeric ceiling on a compiled config key (caps, per-task caps, the notification hard cap, the restart budgets). A value above its ceiling blocks the sync. A change of the effective baseline itself (a lower ceiling raised, a pattern dropped) is recorded in the history and announced as significant."
+
+[[rule]]
+id = "safety.delete-confinement"
+title = "Deleting rules stay inside allowed_roots"
+kind = "safety"
+severity = "crit"
+since = "2026-10-02"
+principle = "least privilege for deletion"
+why = "A retention or cache-trim rule with a wrong path (or a path that normalises to somewhere else) is how a cleaner eats data."
+does = "For every delete-type task (class C1, or a task the code does not declare) the COMPILED config is checked, whichever rule, kind or flag wrote it: each path (and each glob joined to its path) must be absolute and normalised, lie inside the task's allowed_roots (themselves at least two components deep) and match no never_touch regex; a glob must stay relative. Plan-only (C2) tasks are exempt: a human approves the exact plan."
+
+[[rule]]
+id = "safety.destructive-explicit"
+title = "Apply mode must be explicit"
+kind = "safety"
+severity = "warn"
+since = "2026-10-02"
+principle = "report first, change second"
+why = "Every cleaner ships in report mode. Turning one on is the owner's decision, one task at a time, and must be visible."
+does = "Every \"apply\" the compiled config holds under [tasks.*] must come from a rule's own `mode = \"apply\"` field (or a baseline-listed ladder rung key) on a rule flagged destructive = true; an apply hidden in params or in a nested table is refused, and so is a cleaner's path or exemption written by a rule that is not flagged destructive. A destructive rule without a mode field compiles without one, which the runner reads as report."

@@ -1,0 +1,24 @@
+{
+ "$schema": "homarr-custom-widget-v2",
+ "name": "Ops Jobs",
+ "description": "Cleanup jobs (daily/weekly): last result, report vs apply mode, bytes freed, failing or late timers.",
+ "sources": {
+  "default": {
+   "baseUrl": "http://127.0.0.1:9111",
+   "networkScope": "loopback",
+   "auth": "none"
+  }
+ },
+ "requests": {
+  "state": {
+   "kind": "query",
+   "method": "GET",
+   "path": "/jobs",
+   "source": "default",
+   "trigger": "load",
+   "cacheSeconds": 5
+  }
+ },
+ "options": {},
+ "template": "<Stack gap={7} p={2} style={{opacity:data.state.stale?0.55:1}}>\n<Group justify=\"space-between\" align=\"center\" wrap=\"nowrap\" gap={8}>\n<Group gap={7} wrap=\"nowrap\" align=\"center\">\n<ColorSwatch color={\"var(--mantine-color-\"+(data.state.fail>0?\"orange\":data.state.stale||!data.state.head?\"gray\":\"teal\")+\"-5)\"} size={8} withShadow={false} />\n<Text fz={11} fw={800} tt=\"uppercase\" lts=\"0.18em\">Jobs</Text>\n</Group>\n<Group gap={5} wrap=\"nowrap\">\n{data.state.paused&&<Badge size=\"xs\" radius=\"sm\" variant=\"filled\" color=\"orange.5\" c=\"dark.9\">paused</Badge>}\n{data.state.stale&&<Badge size=\"xs\" radius=\"sm\" variant=\"filled\" color=\"gray\">{data.state.ago&&data.state.ago!==\"never\"?\"stale \"+data.state.ago:\"no data\"}</Badge>}\n{data.state.fail>0&&<Badge size=\"xs\" radius=\"sm\" variant=\"filled\" color=\"orange.5\" c=\"dark.9\">{data.state.fail+\" failing\"}</Badge>}\n<Badge size=\"xs\" radius=\"sm\" variant=\"light\" color=\"gray\">{data.state.head||\"no data\"}</Badge>\n</Group>\n</Group>\n{status.state?.ok===false&&<Text fz={11} c=\"light-dark(color-mix(in srgb,var(--mantine-color-red-9),#000 30%),var(--mantine-color-red-5))\" lineClamp={2}>{\"ops service: \"+(status.state.error||\"no response\")}</Text>}\n{data.state.error&&<Text fz={11} c=\"light-dark(color-mix(in srgb,var(--mantine-color-orange-9),#000 30%),var(--mantine-color-orange-5))\" lineClamp={2}>{data.state.error}</Text>}\n{data.state.level&&data.state.level!==\"none\"&&!data.state.error&&data.state.nt>0&&(data.state.rows||[]).length===0&&<Text fz={12} c=\"dimmed\" ta=\"center\" py={4}>no cleanup jobs have run yet</Text>}\n{(data.state.rows||[]).map((x,i)=>\n<Group key={i} gap={7} wrap=\"nowrap\" align=\"center\">\n<ColorSwatch color={\"var(--mantine-color-\"+x.c+\"-\"+(x.c===\"red\"?6:5)+\")\"} size={8} withShadow={false} />\n<Stack gap={0} style={{flex:1,minWidth:0}}>\n<Group justify=\"space-between\" align=\"center\" wrap=\"nowrap\" gap={6}>\n<Text fz={12} fw={700} lh={1.2} truncate=\"end\" style={{flex:1,minWidth:0}}>{x.n}</Text>\n<Group gap={4} wrap=\"nowrap\">\n{x.f&&<Badge size=\"xs\" radius=\"sm\" variant=\"light\" color=\"teal\" c=\"light-dark(color-mix(in srgb,var(--mantine-color-teal-9),#000 30%),var(--mantine-color-teal-light-color))\">{\"freed \"+x.f}</Badge>}\n<Badge size=\"xs\" radius=\"sm\" variant={x.m===\"apply\"?\"filled\":\"light\"} color={x.m===\"apply\"?\"teal.9\":\"gray\"}>{x.m}</Badge>\n</Group>\n</Group>\n<Text fz={11} c=\"dimmed\" lh={1.25} truncate=\"end\">{x.s}</Text>\n</Stack>\n<Text fz={10} c={x.x?\"light-dark(color-mix(in srgb,var(--mantine-color-orange-9),#000 30%),var(--mantine-color-orange-5))\":\"dimmed\"} ta=\"right\" w={34} miw={34}>{x.a}</Text>\n</Group>\n)}\n<Divider />\n<Group gap={5} wrap=\"nowrap\">\n{(data.state.tiers||[]).map((x,i)=><Badge key={i} size=\"xs\" radius=\"sm\" variant=\"light\" color={x.c} c={\"light-dark(color-mix(in srgb,var(--mantine-color-\"+x.c+\"-9),#000 30%),var(--mantine-color-\"+x.c+\"-light-color))\"}>{x.n+\" \"+x.a+(x.d?\" dry\":\"\")}</Badge>)}\n</Group>\n</Stack>"
+}

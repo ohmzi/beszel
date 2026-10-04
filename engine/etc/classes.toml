@@ -1,0 +1,238 @@
+# homelab-maint service classes and spike-response ladder (read by tasks/pressure.py).
+#
+# Written from `docker ps` (75 running + the stopped `comfyui`) and `systemctl list-units` on 2026-10-01/02.
+# tests/test_pressure.py checks every one of those names (and every running unit) against it.
+# Every pattern is a case-insensitive regex, searched (not fullmatched) against the container name or
+# the systemd unit name, so anchor with ^ and $. A name that matches no pattern is shown as P2 (unknown =>
+# batch, for display only) but is UNCLASSIFIED: no rung that acts (L3 slow, L4 restart, L5 stop, the qos
+# baselines) touches a container that no pattern names, so a new app is never treated as batch by accident.
+# Unclassified containers are listed in pressure_state, pressure.json and the weekly bulkhead_check:
+# add every new container to a class here. When two classes match, the more protective (lower number)
+# wins. A broken pattern disables every destructive rung (fail closed): the ladder then only ever does
+# the non-destructive L1/L2.
+#
+#   P0 platform      never touched: no throttle, no restart, no stop (dockerd, networking, tunnels, ssh, alert path)
+#   P1 interactive   what a person is waiting on: protected, may get a HIGHER weight, never slowed or restarted
+#   P2 batch         scans, downloads, ML jobs, *arr: slowed second, restarted only when proven stuck
+#   P3 best-effort   builds, test stacks, demos, cleanup: slowed first, the only class an emergency list may stop
+#
+# Databases keep the class of the app they serve. Whatever their class, the ladder never throttles or restarts
+# anything that runs as a database or build daemon (tasks/guard.py _NEVER_RESTART looks at image and compose
+# service too, because `afsaane-prod-db` is postgres), and protected.toml still applies to restarts and stops.
+
+[classes]
+P0 = [
+  "^docker-socket-proxy$",          # every dashboard/updater reaches the Docker API through it
+]
+P1 = [
+  # --- media and request front ends
+  "^Seerr$", "^Audiobookshelf$", "^immich_server$", "^immich-public-proxy$",
+  "^immich_postgres$", "^immich_redis$",          # Immich's own stores: the API cannot answer without them
+  # --- files
+  "^nextcloud$", "^nextcloud_postgres$", "^nextcloud_redis$",
+  # --- dashboards and monitoring
+  "^homarr$", "^uptime-kuma$",
+  # --- AI front ends (interactive chat/search); the models themselves are P2 batch below
+  "^open-webui$", "^open-webui-public$",
+  "^owui-public-gate$", "^owui-public-ollama$", "^owui-public-quota$",   # request path of the public Open WebUI
+  "^searxng$",                      # search backend of Open WebUI (interactive)
+  "^tday_backend$", "^tday_db$", "^tday_ollama$",   # Tday app, its Postgres, and its dedicated small Ollama
+  # --- personal sites and production apps
+  "^ohmz-cloud$", "^omar-iqbal$", "^afsaane-prod$", "^afsaane-prod-db$",
+  "^maintenance-web$",              # this maintenance site (SPEC3: P1, so a spike never blanks the page that reports it)
+  "^pa-driving-flashcards$",        # tiny (128 MiB limit) study app a person uses live; costs nothing to protect
+]
+P2 = [
+  # --- *arr automation and downloaders (scans and unpack are the IO spikes)
+  "^Radarr$", "^Sonarr$", "^prowlarr$", "^bazarr$", "^Jackett$", "^sonarr-status$", "^kometa$",
+  "^Sabnzbd$", "^qbittorrent$", "^Deluge$", "^Transmission$",
+  # --- library apps whose scans are the load (the UI shares the container, so the class follows the scan)
+  "^kavita$", "^booklore$", "^grimmory$", "^grimmory-db$", "^shelfmark$", "^hometube$", "^tautulli$",
+  # --- AI and media batch; legitimately large and spiky, so never judged by size
+  "^comfyui$",                      # stopped now; single-worker GPU jobs
+  "^immich_machine_learning$",      # CUDA smart-search/face batches (the API container is P1)
+  "^omnivoice-studio-gpu$", "^ebook2audiobook-ebook2audiobook-gpu-1$", "^kokoro$", "^infinity-rerank$", "^tika$",
+  "^open-notebook-open_notebook-1$", "^open-notebook-speaches-1$", "^open-notebook-surrealdb-1$",
+  "^tunarr-host-net$",              # tunarr + meilisearch indexing: the textbook legitimate memory spike
+  "^qdrant$",                       # vector store; a database, so never throttled whatever the class
+  "^mariadb$",                      # database of a batch-side app; same rule
+  "^searxng-hermes$",               # search backend of the Hermes agent harness, not of a person
+  "^nextcloud_cron$",               # Nextcloud background jobs
+  # --- small apps that are neither serving daily nor disposable
+  "^anchor$",                       # personal app with an embedded Postgres; not on a daily interactive path
+  "^trek$", "^saved-vault$", "^portainer$",
+  "^goodreads$", "^Immaculaterr$", "^ImmaculaterrHttps$", "^friendarr$", "^friendarr-caddy$",
+]
+P3 = [
+  "^afsaane-test$", "^afsaane-test-db$",            # test twin of the production app
+  "^ImmaculaterrDemo$",                             # demo instance
+  "^buildx_buildkit_",                              # buildx builder: a quiet daemon that bursts during builds
+  "^diun$",                                         # image-update notifier, runs on a timer
+  "^maintenance-web-test-\\d+$",                    # throw-away containers used while building the site
+]
+
+# Host units. Only used for the class table on the website and to explain contributors: the ladder never
+# touches a unit (it unloads models over HTTP and updates/restarts/stops containers, nothing else).
+[units]
+P0 = [
+  "^(docker|containerd|ssh|sshd|NetworkManager|wpa_supplicant|tailscaled|cloudflared|dbus|cron|rsyslog|snapd)\\.service$",
+  "^(polkit|rtkit-daemon|nvidia-persistenced|fail2ban|udisks2|upower|accounts-daemon|avahi-daemon)\\.service$",
+  "^(gdm|user@\\d+|systemd-[a-z0-9-]+)\\.service$",    # the owner's desktop session and systemd itself
+  "^(smartmontools|smart-bridge)\\.service$",           # disk health and the SMS/e-mail alert path
+  "^(bluetooth|colord|cups|cups-browsed|fwupd|ModemManager|kerneloops|power-profiles-daemon|switcheroo-control)\\.service$",
+  "^(virtlockd|virtlogd)\\.service$",
+]
+P1 = [
+  "^snap\\.plexmediaserver\\.plexmediaserver\\.service$",   # Plex playback (the scanner/transcoder children are batch, same cgroup)
+  "^ollama\\.service$",             # interactive chat; embedding batches share it, so only idle models are unloaded, over HTTP
+  "^glances\\.service$", "^sensor-exporter\\.service$", "^homelab-maint-(www|live)\\.service$",
+  "^teamviewerd\\.service$",        # remote access: losing it locks the owner out
+  "^notebook-db-alert\\.(service|timer)$",   # alert path for the notebook database
+]
+P2 = [
+  "^(backup-system|backup-immich|stack-backup|immich-server-recycle)\\.(service|timer)$",
+  "^tunarr-autostart\\.service$", "^thermal-log\\.service$",
+]
+P3 = [
+  "^(docker-prune|comfyui-idle-vram|mem-guard|prune-openwebui-media|dpkg-db-backup|fstrim|logrotate|man-db|e2scrub_all|certbot)\\.(service|timer)$",
+  "^(apt-daily|apt-daily-upgrade|unattended-upgrades|sysstat-[a-z]+|lm-sensors)\\.(service|timer)$",
+  "^(anacron|fwupd-refresh|motd-news|nvidia-tdp)\\.(service|timer)$",     # periodic oneshots (nvidia-tdp sets the GPU power limit)
+  "^homelab-maint-(check|daily|weekly|metrics)\\.(service|timer)$",   # cleanup and monitoring runners themselves: best effort
+]
+
+[policy]
+P0 = "Platform. Never throttled, restarted or stopped by the ladder."
+P1 = "Interactive and serving. Protected, gets the highest CPU weight, never slowed, restarted or stopped."
+P2 = "Batch and background. Slowed second, restarted only when proven stuck and unprotected."
+P3 = "Best effort. Slowed first, the only class an emergency list may stop."
+
+# Baseline weights applied by `qos_classes` (daily, report-only until the owner sets mode = "apply").
+# cpu_shares is docker's relative CPU weight. Two facts measured on this host decide the numbers:
+#  * runc 1.2.5 maps shares to the cgroup-v2 cpu.weight LINEARLY: 1024 -> 39, 2048 -> 79, 256 -> 10, while a
+#    container with no setting runs at the default weight 100. runc >= 1.3 uses a quadratic map (1024 -> 100,
+#    2048 -> ~173, 256 -> ~34). So the P1 value must beat 100 under BOTH maps (4096 -> 157 / 303) or "raising" P1
+#    would silently demote it below every untouched container, and P3 must stay below 100 under both
+#    (256 -> 10 / 34). P2 is left unset (weight 100) on purpose. tests/test_pressure.py asserts the invariant.
+#  * the disks run `none` / `mq-deadline` and io.cost is off: io.weight / blkio-weight does nothing here.
+#    blkio_weight is therefore only applied when a block device runs bfq or io.cost.qos is enabled.
+# memory_reservation_mib becomes memory.low, which only protects when the parent slice (system.slice) also
+# has a memory.low; it is 0 there today, so a reservation is skipped unless that changes.
+[defaults.P1]
+cpu_shares = 4096
+blkio_weight = 800
+memory_reservation_mib = 0
+
+[defaults.P2]
+# nothing: P2 stays at docker's default so that P1 above and P3 below are relative to it
+
+[defaults.P3]
+cpu_shares = 256
+blkio_weight = 20
+
+[floors]                     # qos_classes and the throttle rung refuse to set anything below these
+cpu_shares_min = 64
+blkio_weight_min = 10
+
+[ladder]
+enter_runs = 2               # a higher level must hold for this many consecutive runs before it is entered
+leave_runs = 3               # ... and the signals must stay below the (lower) leave thresholds this long to leave
+stale_state_min = 45         # pressure_state older than this counts as unknown: no escalation, throttles are released
+spike_max_hours = 6          # a spike that lasts longer is recorded in slices of this length (reports need closed records)
+# Two levels are published: `level` (max over mem, io, cpu, gpu) for the dashboard and `gate_level` = max(mem, cpu) for
+# the scheduler, the routine pressure gate, the live page and the SLO. io-only and gpu-only pressure is status "info".
+io_max_level = 3             # IO and CPU saturation are answered by slowing batch work, never by reclaim/restart/stop
+cpu_max_level = 3
+gpu_max_level = 2            # VRAM pressure only ever reaches the reclaim rung
+idle_s = 300                 # L2: an Ollama model whose expires_at has not moved for this long is idle
+probe_gap_s = 2              # L2: second probe this long after the first (expires_at must be unchanged)
+comfy_free_cooldown_min = 30
+max_models_per_run = 4
+max_throttled_per_run = 8
+throttle_min_cpu_pct = 10    # L3 only slows containers that actually use CPU (percent of one core)
+restart_min_streak = 2       # L4: stuck-candidate in this many consecutive runs ("proven", not a blip)
+max_restarts_per_6h = 2      # L4 budget across ALL containers; each container also backs off 30 min * 2^(n-1) + jitter
+emergency_after_min = 20     # L5: memory level must have been >= 4 continuously this long
+emergency_stop = []          # L5: explicit container names, stopped one per run, P3 before P2; empty = rung does nothing
+max_stop_min = 60            # L5: no emergency stop lasts longer than this; the container is started back whatever memory does
+stop_cooldown_min = 360      # ... and L5 does not stop that same container again for this long (no stop/start/stop flapping)
+# L3 changes cpu-shares only. protected.toml exists so that nothing is killed, restarted or deleted; slowing a
+# batch container is none of those (the `caps` cleaner has the same exemption for memory ceilings), and almost all
+# the spiky P2 workloads ARE in protected.toml. Names listed here are exempted for L3 weight changes only. P0, P1 and
+# databases/builders are never in scope whatever this says (tests/test_pressure.py checks the list).
+throttle_unprotect = [
+  "^(comfyui|tunarr-host-net|Sabnzbd|Radarr|Sonarr|sonarr-status|prowlarr|bazarr|kometa|immich_machine_learning)$",
+  "^(omnivoice-studio-gpu|ebook2audiobook-ebook2audiobook-gpu-1|kokoro|infinity-rerank|open-notebook-open_notebook-1|open-notebook-speaches-1)$",
+]
+# `qos_classes` only RAISES P1 weights (and lowers P3 ones, never a database's): the same kind of non-destructive
+# change, so the protected P1 names (stores and Ollama front ends included) are exempted for it, and for nothing else.
+qos_unprotect = [
+  "^(immich_server|homarr|uptime-kuma|immich-public-proxy)$",
+  "^(immich_postgres|immich_redis|nextcloud_postgres|nextcloud_redis|tday_db|tday_ollama|owui-public-ollama)$",
+]
+
+[ladder.throttle]            # L3 target cpu-shares per class (cap: >= floors.cpu_shares_min, < docker default 1024)
+P3 = 128
+P2 = 256
+
+[ladder.max_per_day]         # actions that passed the gates (done or would-do) per rung per day
+reclaim = 12
+throttle = 24
+restart = 4
+emergency = 3
+
+# Signal thresholds. Each resource (mem, io, cpu, gpu) is leveled on its own; the host level is the highest.
+# enter = the five values at which levels 1..5 are entered (>= for percentages, <= for mem_avail_gib) and they
+# must hold for `enter_runs` consecutive runs; leave = the less strict values that keep a level once reached,
+# the level drops only after `leave_runs` runs below them (that gap is the hysteresis band). max = the highest
+# level the signal can reach on its own. These are the built-in defaults of tasks/pressure.py (a test keeps the
+# two identical); an invalid override (wrong length, not monotonic, leave stricter than enter) is ignored.
+
+[ladder.signals.mem_full60]            # memory PSI full, avg60 %: every runnable task stalled on memory (the real stall)
+enter = [1, 3, 8, 15, 30]
+leave = [0.5, 2, 5, 10, 20]
+max = 5
+
+[ladder.signals.mem_some60]            # memory PSI some, avg60 %: some task waits on memory (capped at L3: it alone never justifies a restart)
+enter = [10, 20, 35, 50, 70]
+leave = [6, 14, 25, 40, 55]
+max = 3
+
+[ladder.signals.mem_avail_gib]            # MemAvailable in GiB (smaller is worse); cache and swap USED alone are not pressure
+enter = [20, 12, 8, 5, 3]
+leave = [24, 15, 10, 7, 4]
+max = 5
+
+[ladder.signals.swap_in_pps]            # pages swapped IN per second since the previous run (capped at L3 on its own)
+enter = [300, 1000, 2500, 6000, 15000]
+leave = [150, 600, 1500, 4000, 10000]
+max = 3
+
+[ladder.signals.io_full60]            # io PSI full, avg60 %
+enter = [10, 25, 45, 65, 85]
+leave = [6, 15, 30, 45, 65]
+max = 3
+
+[ladder.signals.io_some60]            # io PSI some, avg60 % (capped at L2: waiting on a slow disk is not saturation)
+enter = [30, 50, 70, 85, 95]
+leave = [20, 40, 60, 75, 85]
+max = 2
+
+[ladder.signals.cpu_some60]            # cpu PSI some, avg60 %
+enter = [30, 50, 70, 85, 95]
+leave = [20, 35, 55, 75, 85]
+max = 3
+
+[ladder.signals.gpu_vram_pct]            # GPU memory used, % of total (capped at L2: a full card only ever triggers the reclaim rung)
+enter = [85, 92, 97, 99, 101]
+leave = [80, 88, 94, 97, 99]
+max = 2
+
+# Agreed concurrency limits (admission control / bulkheads) compared by `bulkhead_check`.
+[bulkheads]
+ollama_num_parallel = 2              # unset means auto (up to 4 slots), and each slot multiplies the 32k-token KV cache
+ollama_max_queue = 128               # unset means 512 waiting requests: a bounded queue sheds load instead of adding latency
+ollama_max_loaded_models = 3
+ollama_keep_alive_max_s = 1800       # idle models must not stay resident for hours
+open_notebook_worker_max_tasks = 1
+plex_transcode_limit = 4             # 0 = unlimited; one remote-stream burst should not starve the other P1 services
+comfyui_required_flags = ["--disable-smart-memory"]   # frees VRAM between jobs for Plex NVENC and Immich ML

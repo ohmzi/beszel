@@ -1,0 +1,265 @@
+# homelab-maint maintenance routine and change management (SPEC3 S1). Read by homelab_maint/routine.py.
+#
+# The routine says WHEN each maintenance step may run and in WHAT ORDER; maint.toml says WHAT a task does (report or apply).
+# Nothing here switches a cleaner on: a step whose task is mode = "report" in maint.toml only reports, in any window.
+#
+#   window   wall-clock time in the zone below (DST is handled; a window swallowed by the spring-forward gap does not exist that day)
+#   freeze   no DISRUPTIVE step starts while a freeze is active: apply-mode cleaners and anything marked disruptive = true, and
+#            the check-tier tasks that restart a user-facing service (see [continuous]: they run report-only meanwhile).
+#            Read-only steps (checks, reviews, reports) are never frozen, nor are the spike ladder's protective rungs.
+#            `touch /etc/homelab-maint/FREEZE` starts a freeze now; remove the file to lift it. A manual `run --task` does not
+#            get past a freeze (or a halt) without --force.
+#   catch-up the host was off during a window: disruptive steps are "missed" (never replayed late, never inside a freeze),
+#            read-only steps run once at the next opportunity. Only the latest window is caught up.
+#   canary   the first apply run of each cleaner that really changes something runs with 10 % of its caps; afterwards full caps.
+#            The canary only lowers a cap. A canary run that applied nothing because every action was bigger than the canary's
+#            byte cap is shown as "canary-throttled" and the next one gets the normal byte cap (relax_after), so it cannot starve.
+#   post_check  C0 checks re-run after a change and compared with their state when the window began (recorded at its first step);
+#            a regression marks the change "not verified" and halts further disruptive steps until `routine clear-halt`.
+#            The verify step flags regressions only: a check that was already warn when the window began is not a regression.
+#            A change by a check-tier task (no window) is logged with verified = null (n/a).
+#   closing  verify and report wait for every earlier step of their routine while the window is open, and run once when it ends.
+#   gates    a disruptive step also waits while a busy gate is busy: backup (a backup unit is running), pressure (the spike
+#            manager is at level >= max_pressure_level), or any name tasks/gates.py knows (plex, comfyui, ollama, immich, ...).
+#
+# The routine TICK is a hard dependency: the scheduler job `routine-run` (jobs.toml, every 15 min, via homelab-maint-tick.timer)
+# retries deferred steps, opens the monthly window and closes a routine that had to wait. `routine check` fails without it.
+#
+# Check this file with: homelab-maint routine check     See the plan with: homelab-maint routine plan
+# Step names are task names, or the short names in routine.py BUILTIN_STEPS (verify and report resolve per cadence).
+
+[settings]
+timezone = "America/Toronto"      # IANA zone; falls back to $TZ, then /etc/localtime
+enforce = true                    # false = advisory: the guard only logs what it WOULD have blocked
+max_attempts = 3                  # a step that errors this many times in one window is given up until the next window
+default_gates = ["backup", "pressure"]
+max_pressure_level = 2            # the "pressure" gate is busy at spike level >= 2
+post_check_timeout_s = 120
+# tick_unit = "homelab-maint-tick.timer"   # the timer `routine check` expects to be enabled
+
+[canary]
+runs = 1                          # first N apply runs that really changed something are capped
+fraction = 0.10
+relax_after = 1                   # canary runs that applied nothing because of the caps before the byte cap is normal again (0 = never)
+
+# Check-tier tasks run all day (the spike ladder must be able to act at any hour), but one that RESTARTS a user-facing service
+# waits out a freeze: report-only while the FREEZE file or a freeze window is active. [tasks.X] disruptive = true in maint.toml
+# adds a task. pressure_response is held rung by rung: only the rungs in frozen_rungs (its destructive ones, if they are set to
+# apply) go to report-only; its reclaim and throttle rungs protect people and keep running. At emergency_level and above
+# (a host-wide stall) the freeze no longer holds the ladder.
+[continuous]
+disruptive = ["immich_recycle", "comfyui_idle_reclaim"]
+frozen_rungs = ["restart", "emergency"]
+emergency_level = 4
+
+[windows]
+daily = "07:30-09:30"             # the daily timer fires 07:30 + up to 20 min random delay
+weekly = "Wed 07:45-10:00"
+monthly = "1st Sat 04:30-07:00"   # the 1st Saturday of the month; after the Saturday 01:00 system backup (about 1.5 h)
+
+[freeze]
+evenings = "18:00-23:30"          # peak human use: Plex, Immich, Open WebUI, Nextcloud
+# holidays = "2026-12-24..2026-12-26"   # inclusive local dates; a list of specs is allowed too
+
+# ---------------------------------------------------------------------------------------------------------- daily
+[[routine]]
+name = "daily"
+cadence = "daily"
+window = "daily"
+canary = true
+post_check = ["failed_units", "disk_forecast", "memory_health", "plex_media_mount_check", "backup_freshness"]
+steps = [
+  "spike_review",             # what spiked in the last 24 h and whether the sampler kept up
+  "docker_cache",             # cleaners: report or apply per maint.toml (apply = disruptive: window, gates, canary, post-check)
+  { task = "dangling_images", disruptive = true },   # untagged + unreferenced + older than 24 h; BEFORE docker_images (tagged unused images, 14 d)
+  "docker_images",
+  "apt_clean",
+  "apt_cache",                # the alternative to apt_clean (same `apt-get clean`): ships OFF (maint.toml enabled = false), enable ONE of the two
+  "stale_driver_packages",    # purge apt packages of NVIDIA branches other than the loaded driver (dpkg --verify, dkms, exact `apt-get -s` set)
+  "apt_autoremove_unused",    # purge autoremove candidates no process uses (allow-list policy, keep list, closure, `systemctl --failed` unchanged)
+  "snap_revisions",
+  "retention",
+  { task = "app_cache_trim", disruptive = true },    # container-health safeguarded; aborts the rest of the run if the app turns unhealthy
+  { task = "log_compress", disruptive = true },      # gzip rotated big logs (gzip -t, never an open file)
+  "crash_dumps",              # *.crash older than 2 d, coredump storage older than 7 d
+  "trash",
+  "gradle_reaper",
+  "tool_caches",              # npm / pip / uv / pnpm caches, thumbnails, Gradle daemon logs, closed browsers' caches
+  "openwebui_media_prune",
+  "caps",
+  "qos_classes",
+  "verify",                   # did every step finish, did the post-check stay green, is every change verified
+  "report",                   # the daily report (report_daily)
+]
+
+# ---------------------------------------------------------------------------------------------------------- weekly
+[[routine]]
+name = "weekly"
+cadence = "weekly"
+window = "weekly"
+depends_on = ["daily"]          # on Wednesday the weekly DISRUPTIVE steps wait for the daily window's steps; read-only ones do not
+                                # (the weekly timer can fire before a daily one delayed by RandomizedDelaySec)
+canary = true
+post_check = ["failed_units", "disk_forecast", "memory_health", "plex_media_mount_check", "backup_freshness"]
+steps = [
+  "capacity_review",          # days to full, growth, memory baseline, recommendations
+  "smart_selftest",           # reminder: last SMART self-test per disk, does smartd schedule any
+  { task = "c2_candidates", disruptive = true },     # du over big trees: heavy IO, only in the quiet window; plan only
+  { task = "stale_build_output", disruptive = true },   # walks StudioProjects (~1.3 M entries) and runs git per candidate; apply deletes build output
+  { task = "unused_venvs", disruptive = true },         # reference search over ~175k files; plan only (`homelab-maint approve` archives, then removes)
+  { task = "large_cold_files", disruptive = true },     # one walk of StudioProjects/.config/.android; plan only
+  "flatpak_unused",           # `flatpak uninstall --unused`, runtimes only
+  "docker_containers_prune",
+  "docker_prune_parity",
+  "bulkhead_check",
+  "legacy_audit",             # one place schedules everything: anything the legacy inventory does not account for shows up here
+  "config_drift",
+  "image_updates",            # Diun's announcements: which images have updates (updating stays manual)
+  "updates_review",           # apt + snap pending, reboot required, newer kernel installed
+  "backup_verify",            # backups readable and recent, dumps pass zstd -t, restore tooling present
+  "verify",
+  "report",                   # the weekly report (report_weekly)
+]
+
+# ---------------------------------------------------------------------------------------------------------- monthly
+# The daily and weekly tiers have their own timers; the monthly window has none. It is served by the routine tick
+# (`homelab-maint routine run --apply`, the scheduler job `routine-run`, every 15 minutes), which also retries steps a busy gate
+# deferred and catches up read-only steps after downtime. Without the tick the monthly read-only steps run whenever
+# `routine run` is called by hand and rotate_logs is simply "missed" (it never runs outside its window).
+[[routine]]
+name = "monthly"
+cadence = "monthly"
+window = "monthly"
+canary = true
+post_check = ["failed_units", "disk_forecast", "memory_health", "plex_media_mount_check"]
+steps = [
+  "restore_check",            # restore drill checklist (record the real drill with: routine ack restore_drill "...")
+  "expiry_check",             # certificates, Tailscale node key, dated reminders
+  "trend_review",             # long-term slopes: disk free, memory baseline, noisiest checks, space freed
+  "config_drift",
+  "rotate_logs",              # archive old audit/changes/spike records (report only unless [tasks.routine_rotate] mode = "apply")
+  "verify",
+]
+
+# ---------------------------------------------------------------------------------------------------------- options of the built-in steps
+[steps.spike_review]
+
+[steps.smart_selftest]
+max_age_days = 35             # a disk with no completed self-test for this long is listed as stale
+
+[steps.image_updates]
+diun_container = "diun"       # Diun scans daily at 09:00 and logs "Image update found"; read from `docker logs`
+
+[steps.backup_verify]
+status_glob = "/var/log/backup/*-status.json"
+max_age_hours = { "backup-system" = 200, "backup-immich" = 200 }
+dump_dirs = ["/mnt/backup/system/dbdumps"]
+dump_max_age_days = 10
+integrity_max_mib = 64        # dumps up to this size get a zstd -t test; bigger ones are checked by age and size only
+stack_last_ok = "/media/SandiskSSD/ai-stack-backups/LAST_OK"
+stack_backup_max_hours = 26
+restore_files = ["RESTORE.md", "restore-system.sh"]
+
+[steps.restore_check]
+restore_dir = "/mnt/backup/system"
+sample_files = ["/etc/fstab", "/etc/hostname"]
+max_drill_age_days = 180
+
+[steps.expiry_check]
+warn_days = 30
+crit_days = 7
+cert_globs = ["/etc/letsencrypt/live/*/cert.pem", "/etc/coolercontrol/coolercontrol.crt"]
+# Dated reminders (renewals the system cannot see):
+# [[steps.expiry_check.items]]
+# name = "domain ohmzhomelab.ca renewal"
+# date = "2027-03-01"
+# note = "renew at the registrar"
+
+# ---------------------------------------------------------------------------------------------------------- calendar: known system jobs
+# Shown in the 14-day calendar next to the routine windows. Times are nominal; when `unit` is a live systemd timer the first
+# upcoming run shows systemd's real time (random delays included). managed: os = distro/OS timer (observed, never changed),
+# legacy = script scheduled outside homelab-maint (to be adopted), app = runs inside an application.
+[[system]]
+name = "backup-system"
+title = "System backup (rsync mirror)"
+kind = "backup"
+at = "Sat 01:00"
+unit = "backup-system.timer"
+managed = "legacy"
+
+[[system]]
+name = "backup-immich"
+title = "Immich backup"
+kind = "backup"
+at = "Sun 01:00"
+unit = "backup-immich.timer"
+managed = "legacy"
+
+[[system]]
+name = "stack-backup"
+title = "AI-stack backup"
+kind = "backup"
+at = "03:30"                  # a user timer: nominal time only
+managed = "legacy"
+
+[[system]]
+name = "plex-butler"
+title = "Plex maintenance (butler, until about 05:00)"
+kind = "system"
+at = "02:00"
+managed = "app"
+
+[[system]]
+name = "docker-prune"
+title = "Docker prune (legacy script)"
+kind = "system"
+at = "Sun 04:00"
+unit = "docker-prune.timer"
+managed = "legacy"
+
+[[system]]
+name = "prune-openwebui-media"
+title = "Open WebUI media prune"
+kind = "system"
+at = "04:00"
+unit = "prune-openwebui-media.timer"
+managed = "legacy"
+
+[[system]]
+name = "fstrim"
+title = "SSD trim"
+kind = "system"
+at = "Mon 00:47"
+unit = "fstrim.timer"
+managed = "os"
+
+[[system]]
+name = "logrotate"
+title = "Log rotation"
+kind = "system"
+at = "00:00"
+unit = "logrotate.timer"
+managed = "os"
+
+[[system]]
+name = "apt-daily-upgrade"
+title = "Unattended upgrades"
+kind = "system"
+at = "06:00"
+unit = "apt-daily-upgrade.timer"
+managed = "os"
+
+[[system]]
+name = "e2scrub"
+title = "Filesystem scrub"
+kind = "system"
+at = "Sun 03:10"
+unit = "e2scrub_all.timer"
+managed = "os"
+
+[[system]]
+name = "diun"
+title = "Diun image update scan"
+kind = "system"
+at = "09:00"
+managed = "app"

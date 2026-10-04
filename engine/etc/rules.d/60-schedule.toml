@@ -1,0 +1,1360 @@
+# homelab-maint rules registry: Schedule and routine. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync).
+# task.* rules compile into maint.toml, routine.* rules into routine.toml (windows, freeze, steps, calendar). A step rule only says WHEN a task runs and in what order; what the task deletes is described by the task's own rule (30-cleanup.toml). `severity` is the worst colour the step's task can report; only routine_rotate is a cleaner here (flagged destructive).
+
+[meta]
+category = "schedule"
+title = "Schedule and routine"
+blurb = "When each maintenance step may run."
+
+[[rule]]
+id = "task.report_daily"
+title = "Daily report: yesterday's health score and what maintenance did"
+kind = "schedule"
+principle = "one umbrella"
+why = "The owner wants one readable page per day instead of 15-minute noise: what was wrong, what the script did and how healthy the host was. It is generated from the script's own records, so it is also the audit trail a human can skim in a minute."
+does = "Last step of the daily routine (C0, daily tier). Builds the report for yesterday (local 00:00 to 24:00) from status, history, the audit log, incidents, spikes, changes and SLOs, computes the 0-100 health score (formula version 2, rounded down), and writes STATE_DIR/public/reports/<date>.json plus the shared index, keeping the newest keep = 60 entries. timezone empty = the host zone. ignore_tasks = [] means every check counts towards the score. It only writes its own public files and never touches the host. The digest email is sent by the cli glue only when the day was notable or on Mondays."
+applies_to = ["report_daily"]
+file = "maint.toml"
+target = "tasks.report_daily"
+params = { timezone = "", keep = 60, ignore_tasks = [] }
+since = "2026-10-03"
+
+[[rule]]
+id = "task.report_weekly"
+title = "Weekly report: the seven complete days ending yesterday"
+kind = "schedule"
+principle = "one umbrella"
+why = "A weekly view shows slow trends (capacity, noisy checks, spikes) that a daily page hides, and it is the report the owner reads on Wednesday morning with the weekly maintenance. Like the daily report it only reads the script's own records and writes its own public files."
+does = "Last step of the weekly routine (C0, weekly tier). Same generator as the daily report over the 7 complete days ending yesterday (id = ISO week, for example 2026-W40); keeps the newest keep = 60 index entries; ignore_tasks = []. The weekly digest email is sent once per report id. Writes only STATE_DIR/public/reports/."
+applies_to = ["report_weekly"]
+file = "maint.toml"
+target = "tasks.report_weekly"
+params = { keep = 60, ignore_tasks = [] }
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_spike_review"
+title = "Review of the last 24 hours of load spikes"
+kind = "check"
+severity = "warn"
+principle = "detect by saturation, not size"
+why = "A spike that restarted or killed something, or a sampler that stopped taking samples, should be looked at by a person even when the host recovered. This is the daily look-back that the 15-minute checks do not give."
+does = "C0 daily task with no options. Reads spikes.jsonl for the last 24 h and the spike sampler's samples. Reports the number of spikes, the worst level, whether anything was restarted, stopped or OOM-killed, the top contributors and the sampler coverage (samples against the 96 expected a day). Status warn if something was harmed, coverage is under 60 percent or there are no samples, info if there were spikes, ok otherwise. It reviews and never pages."
+applies_to = ["routine_spike_review"]
+file = "maint.toml"
+target = "tasks.routine_spike_review"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_verify_daily"
+title = "Verify the daily routine finished and nothing regressed"
+kind = "check"
+severity = "warn"
+principle = "verify after every change"
+why = "Cleanups are only safe if someone checks afterwards. The verify task is that someone: it compares the health checks after the routine with how they were when it began."
+does = "Registered C0 task behind the daily `verify` step. Counts the daily routine's steps by state (done, failed, halted, blocked, missed, pending), re-runs the post_check checks (failed_units, disk_forecast, memory_health, plex_media_mount_check, backup_freshness) and compares them with the statuses recorded when the occurrence began, and lists changes not verified. Only REGRESSIONS count: a check already warn at the start is compared with itself. Warn and alert on a regression, a failed, halted or blocked step, or an unverified change."
+applies_to = ["routine_verify_daily"]
+file = "maint.toml"
+target = "tasks.routine_verify_daily"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_capacity"
+title = "Weekly capacity review: days to full, growth, memory baseline"
+kind = "check"
+severity = "warn"
+principle = "capacity planning"
+why = "Capacity planning means looking ahead before a disk is a page. The weekly review turns what the checks already measured into a short list of things to plan for."
+does = "C0 weekly task. From the latest disk_forecast it lists up to 12 mounts ordered by days to full, flags those with 60 days or less, 85 percent used or more, or a warn or crit level; adds runaway growth from growth_watch, Docker images reclaimable at 20 GiB or more, and a container memory baseline that rose by at least 2 GiB and 20 percent over 14 days (a leak hint). Warn when there is a recommendation, never pages."
+applies_to = ["routine_capacity"]
+file = "maint.toml"
+target = "tasks.routine_capacity"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_smart_selftest"
+title = "SMART self-test reminder per disk"
+kind = "check"
+severity = "crit"
+principle = "protect before you clean"
+why = "A SMART self-test is the only thing that finds some failing sectors before data is lost, and nothing on this host was scheduling one reliably. This task reminds; it never starts a test."
+does = "C0 weekly task, needs root. For up to 24 disks from `smartctl --scan` it reads the self-test log without waking a sleeping disk (smartctl -n standby), finds the last completed test and its age, and checks /etc/smartd.conf for a -s schedule and whether smartd runs. warn when a disk was never tested or its last pass is older than 35 days; crit and a page when a self-test FAILED. The reminder text is `smartctl -t short DEV`; the task starts nothing."
+applies_to = ["routine_smart_selftest"]
+file = "maint.toml"
+target = "tasks.routine_smart_selftest"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_updates"
+title = "Pending apt and snap updates, reboot and kernel review"
+kind = "check"
+severity = "warn"
+principle = "dry-run first"
+why = "Security updates and a pending reboot are things a homelab owner forgets. The weekly review shows them with ages so they can be done at a chosen time, not by surprise."
+does = "C0 weekly task, read-only: `apt list --upgradable`, `apt-mark showhold`, `snap refresh --list`, the age of /var/run/reboot-required and whether a newer kernel is installed than the one running. Warn if any security update is pending or a reboot has waited more than 14 days, info for other pending updates. Installs nothing."
+applies_to = ["routine_updates"]
+file = "maint.toml"
+target = "tasks.routine_updates"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_image_updates"
+title = "Container image updates announced by Diun in the last 7 days"
+kind = "check"
+severity = "warn"
+principle = "dry-run first"
+why = "Updating containers is a decision for the owner, but they need to know what is out of date. Diun already watches registries; this task only reads what it announced."
+does = "C0 weekly task. Reads `docker logs --since 168h diun` (container name from the step options), collects images named in 'Image update found' or 'New image found' lines and the time of the last 'Jobs completed' scan. Warn if the last scan is missing or older than 36 h, info when there are updates, ok otherwise. It never pulls or restarts anything."
+applies_to = ["routine_image_updates"]
+file = "maint.toml"
+target = "tasks.routine_image_updates"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_backup_verify"
+title = "Backups verified beyond 'did it run'"
+kind = "check"
+severity = "warn"
+principle = "protect before you clean"
+why = "A backup that ran but cannot be restored is not a backup. Each week the script checks that the status files, the target disk, the database dumps and the restore tooling are really there and readable."
+does = "C0 weekly task. For every /var/log/backup/*-status.json: result ok with no errors, finished within the limit (200 h for the system and Immich backups), target mounted with its warn_free_gb, snapshots kept at least the retention, and for the system backup RESTORE.md and restore-system.sh next to it. Newest database dump per prefix: present, not empty, not older than 10 days, and up to 64 MiB tested with `zstd -t`. The ai-stack LAST_OK file must be newer than 26 h. Warn and alert on any problem."
+applies_to = ["routine_backup_verify"]
+file = "maint.toml"
+target = "tasks.routine_backup_verify"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_verify_weekly"
+title = "Verify the weekly routine finished and nothing regressed"
+kind = "check"
+severity = "warn"
+principle = "verify after every change"
+why = "Same safety net as the daily verify, for the weekly steps (C2 plans, audits, backup verification). It is a registered task so the routine can run it as a step and the dashboard can show its result."
+does = "Registered C0 task behind the weekly `verify` step: counts the weekly routine's steps by state, re-runs the post_check checks against the statuses recorded at the start of the occurrence and lists unverified changes. Warn and alert only for regressions, failed, halted or blocked steps and unverified changes."
+applies_to = ["routine_verify_weekly"]
+file = "maint.toml"
+target = "tasks.routine_verify_weekly"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_restore_check"
+title = "Monthly restore drill checklist"
+kind = "check"
+severity = "warn"
+principle = "protect before you clean"
+why = "Only a real test restore proves a backup. The script checks what it can (the backup is readable and complete) and keeps the owner honest about the part only a human can do."
+does = "C0 monthly task. Automatic items: restore tooling present next to the backup (/mnt/backup/system), newest snapshot has files, sample files (/etc/fstab, /etc/hostname) read back from the mirror, the smallest database dump passes `zstd -t`. Manual item: a test restore by the owner, recorded with `homelab-maint routine ack restore_drill \"what I restored\"`; DUE when never recorded or older than 180 days. Warn when anything fails or is due; a FAIL pages."
+applies_to = ["routine_restore_check"]
+file = "maint.toml"
+target = "tasks.routine_restore_check"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_expiry"
+title = "Monthly expiry review: certificates, Tailscale key, dated reminders"
+kind = "check"
+severity = "crit"
+principle = "capacity planning"
+why = "Things that stop working on a date (a TLS certificate, a Tailscale node key, a domain renewal) fail without warning unless someone looks ahead. A monthly look gives 30 days of notice."
+does = "C0 monthly task. Checks the Tailscale node key expiry, each certificate matching the configured globs (/etc/letsencrypt/live/*/cert.pem, /etc/coolercontrol/coolercontrol.crt) with `openssl x509 -enddate`, and dated reminders from routine.toml [[steps.expiry_check.items]] (none shipped). Warn within 30 days, crit within 7 days or expired; only crit pages."
+applies_to = ["routine_expiry"]
+file = "maint.toml"
+target = "tasks.routine_expiry"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_trends"
+title = "Monthly long-term trends: disk slopes, memory baseline, noisy checks"
+kind = "check"
+severity = "warn"
+principle = "capacity planning"
+why = "Slow problems only show over weeks. The monthly review fits slopes over the history the runner kept and says honestly how many days it could actually see."
+does = "C0 monthly task. Reads up to 90 days of history: least-squares disk free per mount (GiB/day, needs 2 days and 6 samples), warns when a mount has under 90 days left at its slope; the container memory baseline over 30 days; the 3 noisiest checks; the bytes freed by maintenance in 30 days from the audit log. Warn on a concern, never pages."
+applies_to = ["routine_trends"]
+file = "maint.toml"
+target = "tasks.routine_trends"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_verify_monthly"
+title = "Verify the monthly routine finished and nothing regressed"
+kind = "check"
+severity = "warn"
+principle = "verify after every change"
+why = "Same safety net as the daily and weekly verify, for the monthly window. It is a registered task so the routine can run it as a step and the dashboard can show its result."
+does = "Registered C0 task behind the monthly `verify` step: step states of the monthly routine, post_check checks (failed_units, disk_forecast, memory_health, plex_media_mount_check) against the start of the occurrence, unverified changes. Warn and alert on regressions only."
+applies_to = ["routine_verify_monthly"]
+file = "maint.toml"
+target = "tasks.routine_verify_monthly"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "task.routine_rotate"
+title = "Archive old records of the tool's own journals (monthly)"
+kind = "cleanup"
+severity = "warn"
+destructive = true
+principle = "dry-run first; protect before you clean"
+why = "The tool's own logs (audit, changes, spikes, pressure log) grow forever. Rotating them keeps reports fast while keeping the history, because old records are archived, not discarded."
+does = "C1 monthly task. For each target (audit.jsonl keep 90 days, changes.jsonl 365, spikes.jsonl 365, pressure-log.jsonl 180) it moves records older than the cutoff into <dir>/archive/<name>-YYYY-MM.jsonl.gz (gzip members appended) and rewrites the file with the recent records through a temp file and os.replace. Report mode (shipped) only counts the files that have old records. The owner's maintenance journal is never rotated."
+proof = "Only .jsonl files directly inside STATE_DIR or LOG_DIR; symlinks, other directories and maintenance-journal.jsonl are refused; keep_days under 7 is refused; archive is written before the file is replaced; every rotation goes through ctx.act (caps, audit, PAUSE). Ships mode = report and the registry rule is flagged destructive so an apply switch is visible."
+applies_to = ["routine_rotate"]
+file = "maint.toml"
+target = "tasks.routine_rotate"
+params = {}
+mode = "report"
+since = "2026-10-03"
+
+[[rule]]
+id = "routine.daily"
+title = "Daily routine: 21 steps in the 07:30-09:30 window"
+kind = "schedule"
+principle = "dry-run first; protect before you clean"
+why = "Cleaning is safe when it happens at a known quiet time, in a known order, with a check afterwards. The daily routine is that plan for everything that grows a little every day."
+does = "Runs inside window `daily` (07:30-09:30 host local time) in the listed order: spike review, Docker cache and images, package caches, snap revisions, retention, app caches, log compression, crash dumps, trash, Gradle daemons, tool caches, Open WebUI media, memory ceilings, QoS classes, then verify and the daily report. canary = true: the first apply run of each cleaner that really changes something uses 10 percent caps. The statuses of failed_units, disk_forecast, memory_health, plex_media_mount_check and backup_freshness are recorded at the first step and compared by the verify step; a regression halts further disruptive steps of the occurrence. The daily tier timer (07:30 plus up to 20 min) and the routine tick (every 15 min) run the steps; each step runs once per occurrence. Every cleaner ships in report mode."
+file = "routine.toml"
+target = "routine[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "daily"
+cadence = "daily"
+window = "daily"
+canary = true
+post_check = ["failed_units", "disk_forecast", "memory_health", "plex_media_mount_check", "backup_freshness"]
+
+[[rule]]
+id = "routine.daily.step.spike_review"
+title = "Daily step 1: review last 24 hours of spikes"
+kind = "schedule"
+severity = "warn"
+principle = "detect by saturation, not size"
+why = "Starts the day with the one question the 15-minute checks cannot answer: what happened overnight and did the sampler keep up. It only reads the spike ledger, so it can run any time and never waits for the window."
+does = "Runs routine_spike_review (C0). Read-only, never waits for the window; reports spikes, harm and sampler coverage (see task.routine_spike_review)."
+applies_to = ["routine_spike_review"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["spike_review"] }
+since = "2026-10-03"
+order = 1
+
+[[rule]]
+id = "routine.daily.step.docker_cache"
+title = "Daily step 2: trim the Docker build cache"
+kind = "schedule"
+principle = "dry-run first; protect before you clean"
+why = "Build cache is regenerable and grows silently; keeping it under a ceiling stops it eating the root disk without ever touching images or volumes. A size ceiling is acceptable here only because the cache is regenerable; nothing is killed and no volume is touched."
+does = "Runs docker_cache (C1). When the cache is over its high mark it would prune least-recently-used entries down to the low mark. Shipped mode report: lists the plan, removes nothing. An apply step waits for the window, the backup and pressure gates, and the canary."
+applies_to = ["docker_cache"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["docker_cache"] }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "routine.daily.step.dangling_images"
+title = "Daily step 3: remove dangling images (before tagged unused ones)"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Untagged, unreferenced images are leftovers of builds and pulls. They go first because tagged unused images have a longer grace period."
+does = "Runs dangling_images (C1) with disruptive = true, so even in report mode the step waits for the quiet window and the backup and pressure gates. Selects untagged images no container references (running or exited), older than 24 h, needing a fresh image ledger; one `docker image rm ID` each. Report mode ships."
+applies_to = ["dangling_images"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = [{ task = "dangling_images", disruptive = true }] }
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "routine.daily.step.docker_images"
+title = "Daily step 4: remove tagged images unused for 14 days"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Old image versions pile up after every update. Only images that no container has used for two weeks, by the ledger, are candidates."
+does = "Runs docker_images (C1): images not used by any container, not seen in the image ledger within 14 days, not protected; `docker image rm` without force, at most 12 items and 15 GiB per run. Report mode ships."
+applies_to = ["docker_images"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["docker_images"] }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "routine.daily.step.apt_clean"
+title = "Daily step 5: empty the apt package cache"
+kind = "schedule"
+principle = "dry-run first"
+why = "Downloaded .deb files are never needed again once installed and can be re-downloaded. The cache sits on the root filesystem, which disk_forecast watches first."
+does = "Runs apt_clean (C1): `apt-get clean`, only when no apt or dpkg lock is held; reports the cache size. Never runs autoremove. Report mode ships."
+applies_to = ["apt_clean"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["apt_clean"] }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "routine.daily.step.apt_cache"
+title = "Daily step 6: alternative apt cache cleaner (shipped off)"
+kind = "schedule"
+principle = "dry-run first"
+why = "A second version of the same cleaner with a size floor and a measured freed figure; only one of the pair should ever run. Both write to the same cache, so shipping both on would only double the work."
+does = "Runs apt_cache (C1), which is disabled in maint.toml (enabled = false), so the step shows 'disabled' and does not hold up verify or report. To use it, enable it and disable apt_clean. Same `apt-get clean`, skipped below 10 MiB."
+applies_to = ["apt_cache"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["apt_cache"] }
+since = "2026-10-03"
+order = 6
+
+[[rule]]
+id = "routine.daily.step.stale_driver_packages"
+title = "Daily step 7: purge NVIDIA driver packages of other branches"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Old NVIDIA driver branches stay installed after upgrades and take gigabytes; the loaded driver must never be touched. Removing the loaded branch would break the GPU, so the loaded driver is always kept and the simulation must match the purge exactly."
+does = "Runs stale_driver_packages (C1): proposes purging apt packages of NVIDIA driver branches other than the loaded one, after dpkg --verify, dkms and an exact `apt-get -s` simulation; max 10 GiB. Report mode ships."
+applies_to = ["stale_driver_packages"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["stale_driver_packages"] }
+since = "2026-10-03"
+order = 7
+
+[[rule]]
+id = "routine.daily.step.apt_autoremove_unused"
+title = "Daily step 8: purge unused autoremove candidates"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "apt autoremove is unsafe to run blindly on a GPU workstation; only libraries and plugins that no process uses are candidates. The allow-list and the proofs keep the GPU driver, kernels, dkms and anything a process uses out of reach (protect before you clean)."
+does = "Runs apt_autoremove_unused (C1): examines up to 80 autoremove candidates (one `apt-get -s` each), applies an allow-list policy, the owner keep list (tree, inxi) and built-in never-purge globs, and requires `systemctl --failed` to stay unchanged; 5 GiB per run. Report mode ships."
+applies_to = ["apt_autoremove_unused"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["apt_autoremove_unused"] }
+since = "2026-10-03"
+order = 8
+
+[[rule]]
+id = "routine.daily.step.snap_revisions"
+title = "Daily step 9: keep two snap revisions"
+kind = "schedule"
+principle = "dry-run first"
+why = "Snap keeps old revisions of every snap; two are enough to roll back and the rest are wasted disk. Plex is a snap, so the setting also decides how many old Plex versions stay on disk."
+does = "Runs snap_revisions (C1): sets `snap set system refresh.retain=2` if different and removes disabled revisions, skipping while `snap changes` shows a change in progress; never removes the active revision. Report mode ships."
+applies_to = ["snap_revisions"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["snap_revisions"] }
+since = "2026-10-03"
+order = 9
+
+[[rule]]
+id = "routine.daily.step.retention"
+title = "Daily step 10: age-based retention of log and backup files"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "A few apps write files nobody cleans (Kavita logs and backup zips). Retention by age or count keeps them bounded."
+does = "Runs retention (C1): rules kavita-logs (kavita*.log older than 3 days) and kavita-backups (keep newest 3 .zip) inside the allowed roots /volume1/docker/kavita/config and /var/log; mtime based, symlinks never followed, files modified in the last 10 minutes skipped. Report mode ships."
+applies_to = ["retention"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["retention"] }
+since = "2026-10-03"
+order = 10
+
+[[rule]]
+id = "routine.daily.step.app_cache_trim"
+title = "Daily step 11: trim the Tunarr subtitle cache"
+kind = "schedule"
+principle = "in-use proof before deletion; protect before you clean"
+why = "Tunarr's subtitle cache grows by many small files. It is trimmed by modification time because access times were reset, and only while the app stays healthy."
+does = "Runs app_cache_trim (C1) with disruptive = true, so it always waits for the window and gates. Rule tunarr-subtitles: files older than 30 days in the Tunarr cache dir, in batches of 2000 files with a canary batch of 200, re-checking the container health (running plus the health URL) and aborting the rest of the run if it turns unhealthy. Every unlinked file is listed in a manifest. Report mode ships."
+applies_to = ["app_cache_trim"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = [{ task = "app_cache_trim", disruptive = true }] }
+since = "2026-10-03"
+order = 11
+owner_notes = "The Tunarr cache is trimmed by modification time because its access times were reset (atime cannot be trusted). The Tunarr protection is lifted for this task only, and only inside the cache/subtitles directory."
+
+[[rule]]
+id = "routine.daily.step.log_compress"
+title = "Daily step 12: compress large rotated logs"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Rotated logs over 50 MiB are mostly text and compress well; compressing keeps the evidence and frees the space. Compressing instead of deleting keeps the evidence while freeing the space."
+does = "Runs log_compress (C1) with disruptive = true: gzip of rotated logs in /var/log (not journal) of 50 MiB or more at least a day old, verified with `gzip -t` and a length check, never a file a process has open or logrotate is rotating; 5 GiB per run. Report mode ships."
+applies_to = ["log_compress"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = [{ task = "log_compress", disruptive = true }] }
+since = "2026-10-03"
+order = 12
+
+[[rule]]
+id = "routine.daily.step.crash_dumps"
+title = "Daily step 13: remove old crash dumps"
+kind = "schedule"
+principle = "dry-run first"
+why = "Crash dumps are large and rarely read after a couple of days. Short retention keeps a dump available for a debugging session without letting it sit on the root disk for months."
+does = "Runs crash_dumps (C1): apport *.crash files older than 2 days in /var/crash and systemd-coredump files older than 7 days in /var/lib/systemd/coredump, inside those two directories only. Report mode ships."
+applies_to = ["crash_dumps"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["crash_dumps"] }
+since = "2026-10-03"
+order = 13
+
+[[rule]]
+id = "routine.daily.step.trash"
+title = "Daily step 14: empty old items from the trash"
+kind = "schedule"
+principle = "dry-run first"
+why = "Items deleted long ago and still in the trash take space nobody notices. Anything younger than 30 days is still recoverable, which is why the limit is that long."
+does = "Runs trash (C1): entries in ~ohmz/.local/share/Trash older than 30 days by deletion date. Report mode ships."
+applies_to = ["trash"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["trash"] }
+since = "2026-10-03"
+order = 14
+
+[[rule]]
+id = "routine.daily.step.gradle_reaper"
+title = "Daily step 15: stop idle Gradle and Kotlin daemons"
+kind = "schedule"
+principle = "never kill by size; in-use proof before deletion"
+why = "Idle build daemons hold gigabytes of RAM for days. They are only stopped when provably idle, never during a build."
+does = "Runs gradle_reaper (C1): sends SIGTERM to Gradle or Kotlin compile daemons with no CPU progress for 120 minutes across 2 samples at least that far apart, with no test executor or worker children and no attached gradle client. Report mode ships."
+applies_to = ["gradle_reaper"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["gradle_reaper"] }
+since = "2026-10-03"
+order = 15
+
+[[rule]]
+id = "routine.daily.step.tool_caches"
+title = "Daily step 16: trim regenerable developer caches"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "npm, pip, uv, pnpm, thumbnails and browser caches rebuild themselves, so trimming them is low risk and they grow constantly. Each cache rebuilds on demand; nothing under profiles or ~/.gradle/caches is touched."
+does = "Runs tool_caches (C1): npm, pip, uv and pnpm caches of 64 MiB or more, thumbnails older than 30 days, Gradle daemon logs older than 14 days whose daemon is gone, browser cache files older than 7 days while that browser is not running (never profiles); 10 GiB per run. Report mode ships."
+applies_to = ["tool_caches"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["tool_caches"] }
+since = "2026-10-03"
+order = 16
+
+[[rule]]
+id = "routine.daily.step.openwebui_media_prune"
+title = "Daily step 17: prune generated Open WebUI media"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Open WebUI saves every generated image and audio; a week is enough, and this replaces the legacy script that did the same. Only generated media is a candidate, never user uploads (in-use proof before deletion)."
+does = "Runs openwebui_media_prune (C1), the port of prune-openwebui-media.sh: allow-listed generated media older than 7 days. Report mode ships; the legacy timer keeps doing the real work until its cutover."
+applies_to = ["openwebui_media_prune"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["openwebui_media_prune"] }
+since = "2026-10-03"
+order = 17
+
+[[rule]]
+id = "routine.daily.step.caps"
+title = "Daily step 18: memory ceilings for runaway containers"
+kind = "schedule"
+principle = "never kill by size; throttle before kill"
+why = "A ceiling bounds the damage of a leaking app without killing it: the app is throttled by the kernel instead of being stopped by size. A memory ceiling is a throttle, not a kill, which follows the throttle-before-kill principle."
+does = "Runs caps (C1): `docker update --memory C --memory-swap C*1.25` for the containers in its ceilings table (tunarr-host-net 40 GiB, kavita 20, sabnzbd 32, omnivoice-studio-gpu 16, comfyui 48), only when the sampler history is long enough and C is at least 1.25 times the highest memory seen. Idempotent; a stricter existing limit is kept. Report mode ships."
+applies_to = ["caps"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["caps"] }
+since = "2026-10-03"
+order = 18
+
+[[rule]]
+id = "routine.daily.step.qos_classes"
+title = "Daily step 19: baseline CPU shares per service class"
+kind = "schedule"
+principle = "classes of service P0-P3"
+why = "Classes of service only help if the kernel enforces them: interactive services get more CPU shares than batch work. The shares are the kernel-level half of classes of service (P0 to P3): they decide who yields when the CPU is contended."
+does = "Runs qos_classes (C1): applies the baseline cpu-shares per class from classes.toml with `docker update`, idempotent, never lowering a database or touching P0, never fighting an active L3 throttle. Report mode ships."
+applies_to = ["qos_classes"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["qos_classes"] }
+since = "2026-10-03"
+order = 19
+
+[[rule]]
+id = "routine.daily.step.verify"
+title = "Daily step 20: verify the daily routine"
+kind = "schedule"
+severity = "warn"
+principle = "verify after every change"
+why = "Closing step: did every step finish and is the host as healthy as it was when the window opened. It is a closing step: without it nobody would know a cleanup made something worse."
+does = "Runs routine_verify_daily. A closing step: it waits for every earlier step of the routine while the window is open and runs once when the window ends with whatever is left."
+applies_to = ["routine_verify_daily"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["verify"] }
+since = "2026-10-03"
+order = 20
+
+[[rule]]
+id = "routine.daily.step.report"
+title = "Daily step 21: write the daily report"
+kind = "schedule"
+principle = "one umbrella"
+why = "The report is the human record of the day. It runs last so it can include what the earlier steps did."
+does = "Runs report_daily after verify (see task.report_daily). A closing step."
+applies_to = ["report_daily"]
+file = "routine.toml"
+target = "@routine.daily:"
+merge = "append"
+params = { steps = ["report"] }
+since = "2026-10-03"
+order = 21
+
+[[rule]]
+id = "routine.weekly"
+title = "Weekly routine: 17 steps in the Wednesday 07:45-10:00 window"
+kind = "schedule"
+principle = "dry-run first; protect before you clean"
+why = "Weekly tasks are the slow, heavy ones: walks over millions of files, plans needing approval, backup verification and audits. They run once a week in a quiet window after the daily routine."
+does = "Window `weekly` (Wed 07:45-10:00 host local). depends_on = [daily]: on Wednesday the disruptive weekly steps wait for the daily window's steps, read-only ones do not. Steps in order: capacity review, SMART reminder, three C2 plans and one C1 walk, Flatpak runtimes, stopped containers, Docker prune parity, bulkhead check, legacy audit, config drift, image updates, update review, backup verification, verify, weekly report. canary = true and the same five post_check checks as the daily routine."
+file = "routine.toml"
+target = "routine[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "weekly"
+cadence = "weekly"
+window = "weekly"
+depends_on = ["daily"]
+canary = true
+post_check = ["failed_units", "disk_forecast", "memory_health", "plex_media_mount_check", "backup_freshness"]
+
+[[rule]]
+id = "routine.weekly.step.capacity_review"
+title = "Weekly step 1: capacity review"
+kind = "schedule"
+severity = "warn"
+principle = "capacity planning"
+why = "Planning ahead: which mount fills first and what grows. It uses what the checks already measured, so it costs almost nothing (capacity planning)."
+does = "Runs routine_capacity (C0): days to full per mount, runaway growth, reclaimable Docker images, memory baseline drift. Read-only."
+applies_to = ["routine_capacity"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["capacity_review"] }
+since = "2026-10-03"
+order = 1
+
+[[rule]]
+id = "routine.weekly.step.smart_selftest"
+title = "Weekly step 2: SMART self-test reminder"
+kind = "schedule"
+severity = "crit"
+principle = "protect before you clean"
+why = "Reminds the owner which disks have not completed a SMART self-test recently. Nothing starts a self-test automatically; the step only reminds."
+does = "Runs routine_smart_selftest (C0). Reads the self-test logs of every disk without waking sleeping ones; a failed test pages."
+applies_to = ["routine_smart_selftest"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["smart_selftest"] }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "routine.weekly.step.c2_candidates"
+title = "Weekly step 3: plan for large old leftovers (needs approval)"
+kind = "schedule"
+principle = "in-use proof before deletion; dry-run first"
+why = "A few big leftovers (old venvs, stale backups, an unused Plex config) are worth reclaiming, but only a human may approve deleting or archiving them. C2 means plan only: the script shows what it would do and a human approves one hash at a time (protect before you clean)."
+does = "Runs c2_candidates (C2) with disruptive = true because it runs `du` over big trees (heavy IO) and so waits for the window. It never deletes by itself: it produces a plan with a stable hash (size, last change, in-use check, the exact manual command); applying needs `homelab-maint approve c2_candidates HASH`."
+applies_to = ["c2_candidates"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = [{ task = "c2_candidates", disruptive = true }] }
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "routine.weekly.step.stale_build_output"
+title = "Weekly step 4: stale build output of idle projects"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Build folders of projects nobody has touched for months are regenerable and large. Only git-ignored output of projects idle for 90 days is considered, and projects matching the protected patterns are skipped (in-use proof before deletion)."
+does = "Runs stale_build_output (C1), disruptive = true: walks StudioProjects (about 1.3 million entries) and runs git per candidate; selects git-ignored build output (target, .next, .turbo, __pycache__ ...) of projects idle for 90 days whose output is itself 30 days old and which nothing references. dist/ and build/ stay report-only. Report mode ships."
+applies_to = ["stale_build_output"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = [{ task = "stale_build_output", disruptive = true }] }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "routine.weekly.step.unused_venvs"
+title = "Weekly step 5: plan for unused Python virtualenvs"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Virtualenvs with torch or vllm are many gigabytes and easy to recreate, but only if nothing uses them. A venv is removed only after a reference search over the home directory finds no user (in-use proof before deletion)."
+does = "Runs unused_venvs (C2), disruptive = true: searches about 175k files for references; produces a plan only. Approving archives pip freeze, pyvenv.cfg and the bin listing first, reads them back, then removes the venv."
+applies_to = ["unused_venvs"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = [{ task = "unused_venvs", disruptive = true }] }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "routine.weekly.step.large_cold_files"
+title = "Weekly step 6: plan for large cold files"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Big files nobody has opened for a quarter are candidates for the cold archive disk. Archiving goes to the cold disk and is verified before anything is removed."
+does = "Runs large_cold_files (C2), disruptive = true: one walk of StudioProjects, ~/.config and ~/.android for files or directories over 2 GiB whose newest file is older than 90 days; plan only. Approving archives, verifies, then removes."
+applies_to = ["large_cold_files"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = [{ task = "large_cold_files", disruptive = true }] }
+since = "2026-10-03"
+order = 6
+
+[[rule]]
+id = "routine.weekly.step.flatpak_unused"
+title = "Weekly step 7: remove unused Flatpak runtimes"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Flatpak leaves runtimes behind after apps are removed. Only runtimes no running sandbox uses are candidates, never an app."
+does = "Runs flatpak_unused (C1): `flatpak uninstall --unused` per installation, runtimes only (never an app), none used by a running sandbox; 10 GiB per run. Report mode ships."
+applies_to = ["flatpak_unused"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["flatpak_unused"] }
+since = "2026-10-03"
+order = 7
+
+[[rule]]
+id = "routine.weekly.step.docker_containers_prune"
+title = "Weekly step 8: remove long-stopped containers"
+kind = "schedule"
+principle = "in-use proof before deletion"
+why = "Exited containers keep their writable layer. Anything deliberately stopped (ComfyUI) must stay."
+does = "Runs docker_containers_prune (C1): stopped containers older than 7 days; the expected-stopped list of failed_units (comfyui) is never removed. Report mode ships; this is the part of the legacy docker-prune script that the cache and image cleaners do not cover."
+applies_to = ["docker_containers_prune"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["docker_containers_prune"] }
+since = "2026-10-03"
+order = 8
+owner_notes = "docker-prune.timer was disabled by the owner on 2026-10-02 because the legacy script would delete ComfyUI's stopped container and its 14.9 GiB image; this task keeps both."
+
+[[rule]]
+id = "routine.weekly.step.docker_prune_parity"
+title = "Weekly step 9: does the native cleanup replace the legacy Docker prune"
+kind = "schedule"
+severity = "warn"
+principle = "one umbrella"
+why = "The legacy weekly Docker prune can only be retired when the native cleaners cover everything it does safely. This is the gate."
+does = "Runs docker_prune_parity (C0): compares docker_cache, docker_images and docker_containers_prune with docker-prune.sh, verdict per behaviour (same, differs, gap, exposed). Status reflects gaps only; info when the legacy timer is on and would delete something the natives keep."
+applies_to = ["docker_prune_parity"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["docker_prune_parity"] }
+since = "2026-10-03"
+order = 9
+
+[[rule]]
+id = "routine.weekly.step.bulkhead_check"
+title = "Weekly step 10: check agreed concurrency limits"
+kind = "schedule"
+principle = "classes of service P0-P3"
+why = "Bulkheads (how many jobs Ollama, ComfyUI, Open Notebook or Plex may run at once) keep one app from starving the others, and drift when an app is reconfigured. It is information only: it tells the owner a limit drifted, it never changes one."
+does = "Runs bulkhead_check (C0): compares the agreed per-app concurrency limits in classes.toml with what is configured. Read-only, information only."
+applies_to = ["bulkhead_check"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["bulkhead_check"] }
+since = "2026-10-03"
+order = 10
+
+[[rule]]
+id = "routine.weekly.step.legacy_audit"
+title = "Weekly step 11: find schedulers nobody accounts for"
+kind = "schedule"
+principle = "one umbrella"
+why = "One umbrella: every timer, cron line and cron.d file on the host should be accounted for in one inventory. Anything else is found here."
+does = "Runs legacy_audit (C0, information only): lists a timer, cron line or /etc/cron.* file that no item of legacy-retirement.toml accounts for."
+applies_to = ["legacy_audit"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["legacy_audit"] }
+since = "2026-10-03"
+order = 11
+
+[[rule]]
+id = "routine.weekly.step.config_drift"
+title = "Weekly step 12: compare host settings with the agreed policy"
+kind = "schedule"
+principle = "capacity planning"
+why = "Settings changed by hand (journald size, snap retention, tmp age, ext4 reserved blocks) quietly undo earlier cleanup decisions. It never fixes anything; it names the setting and the command that would."
+does = "Runs config_drift (C0, never pages): journald SystemMaxUse 1G, root crontab leftovers, snap refresh.retain, docker daemon log options, tmpfiles age 30 days, ext4 reserved blocks 1 percent (tune2fs, root only). Each drift names its fix."
+applies_to = ["config_drift"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["config_drift"] }
+since = "2026-10-03"
+order = 12
+owner_notes = "ext4 reserved blocks were set to 1 percent with tune2fs (owner decision); this step reports a larger value and prints the `tune2fs -m 1 DEVICE` fix, it never runs it."
+
+[[rule]]
+id = "routine.weekly.step.image_updates"
+title = "Weekly step 13: image updates announced by Diun"
+kind = "schedule"
+severity = "warn"
+principle = "dry-run first"
+why = "Shows which containers have newer images; updating stays manual. Updating an image restarts a service, so the decision stays with the owner."
+does = "Runs routine_image_updates (C0) reading Diun's log of the last 7 days."
+applies_to = ["routine_image_updates"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["image_updates"] }
+since = "2026-10-03"
+order = 13
+
+[[rule]]
+id = "routine.weekly.step.updates_review"
+title = "Weekly step 14: pending apt and snap updates"
+kind = "schedule"
+severity = "warn"
+principle = "dry-run first"
+why = "Security updates and pending reboots should be seen weekly. A pending security update or a long-pending reboot is a common reason a patched host is not actually patched."
+does = "Runs routine_updates (C0): pending apt and snap updates, held packages, reboot age, newer kernel installed."
+applies_to = ["routine_updates"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["updates_review"] }
+since = "2026-10-03"
+order = 14
+
+[[rule]]
+id = "routine.weekly.step.backup_verify"
+title = "Weekly step 15: verify backups are readable and recent"
+kind = "schedule"
+severity = "warn"
+principle = "protect before you clean"
+why = "Backups are verified every week, not only when they fail. A backup status of ok proves it ran, not that it can be read, so the dumps and restore files are checked too."
+does = "Runs routine_backup_verify (C0): status files, target space, dumps with `zstd -t`, restore tooling, ai-stack LAST_OK freshness."
+applies_to = ["routine_backup_verify"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["backup_verify"] }
+since = "2026-10-03"
+order = 15
+
+[[rule]]
+id = "routine.weekly.step.verify"
+title = "Weekly step 16: verify the weekly routine"
+kind = "schedule"
+severity = "warn"
+principle = "verify after every change"
+why = "Closing check of the weekly window. It runs after the heavy weekly steps so a regression from any of them is caught the same morning."
+does = "Runs routine_verify_weekly after every earlier weekly step has reached a terminal state, or once when the window ends."
+applies_to = ["routine_verify_weekly"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["verify"] }
+since = "2026-10-03"
+order = 16
+
+[[rule]]
+id = "routine.weekly.step.report"
+title = "Weekly step 17: write the weekly report"
+kind = "schedule"
+principle = "one umbrella"
+why = "The weekly human record. It runs last so the report covers the whole week."
+does = "Runs report_weekly after verify (see task.report_weekly)."
+applies_to = ["report_weekly"]
+file = "routine.toml"
+target = "@routine.weekly:"
+merge = "append"
+params = { steps = ["report"] }
+since = "2026-10-03"
+order = 17
+
+[[rule]]
+id = "routine.monthly"
+title = "Monthly routine: 6 steps in the first Saturday window"
+kind = "schedule"
+principle = "dry-run first"
+why = "A few reviews only make sense monthly (restore drill, expiry, long trends, log rotation). The window follows the Saturday 01:00 system backup (about 1.5 hours) so it never overlaps."
+does = "Window `monthly` (1st Saturday 04:30-07:00 host local). No timer of its own: it is served by the routine tick (`routine run --apply`, every 15 minutes), which also catches up read-only steps after downtime. Steps: restore check, expiry check, trend review, config drift, log rotation, verify. canary = true; post_check: failed_units, disk_forecast, memory_health, plex_media_mount_check."
+file = "routine.toml"
+target = "routine[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "monthly"
+cadence = "monthly"
+window = "monthly"
+canary = true
+post_check = ["failed_units", "disk_forecast", "memory_health", "plex_media_mount_check"]
+
+[[rule]]
+id = "routine.monthly.step.restore_check"
+title = "Monthly step 1: restore drill checklist"
+kind = "schedule"
+severity = "warn"
+principle = "protect before you clean"
+why = "Prompts the monthly proof that a backup can be restored. Without a recorded drill the checklist keeps asking, because an untested backup is a hope, not a backup (protect before you clean)."
+does = "Runs routine_restore_check (C0): automatic readability checks and the owner's recorded test restore (due after 180 days)."
+applies_to = ["routine_restore_check"]
+file = "routine.toml"
+target = "@routine.monthly:"
+merge = "append"
+params = { steps = ["restore_check"] }
+since = "2026-10-03"
+order = 1
+
+[[rule]]
+id = "routine.monthly.step.expiry_check"
+title = "Monthly step 2: certificates and key expiry"
+kind = "schedule"
+severity = "crit"
+principle = "capacity planning"
+why = "Things that expire on a date are looked at once a month. A monthly look gives 30 days of notice before a certificate or key lapses."
+does = "Runs routine_expiry (C0): warn within 30 days, crit within 7 days."
+applies_to = ["routine_expiry"]
+file = "routine.toml"
+target = "@routine.monthly:"
+merge = "append"
+params = { steps = ["expiry_check"] }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "routine.monthly.step.trend_review"
+title = "Monthly step 3: long-term trend review"
+kind = "schedule"
+severity = "warn"
+principle = "capacity planning"
+why = "Slow movers need a long look. Capacity planning needs slopes, and slopes need weeks of history."
+does = "Runs routine_trends (C0): disk slopes, memory baseline, noisy checks, bytes freed."
+applies_to = ["routine_trends"]
+file = "routine.toml"
+target = "@routine.monthly:"
+merge = "append"
+params = { steps = ["trend_review"] }
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "routine.monthly.step.config_drift"
+title = "Monthly step 4: configuration drift again"
+kind = "schedule"
+principle = "capacity planning"
+why = "The weekly drift check also runs monthly so a drift is seen even if the weekly window was missed. It is read-only and never pages."
+does = "Runs config_drift (C0, never pages) again inside the monthly window."
+applies_to = ["config_drift"]
+file = "routine.toml"
+target = "@routine.monthly:"
+merge = "append"
+params = { steps = ["config_drift"] }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "routine.monthly.step.rotate_logs"
+title = "Monthly step 5: archive old tool logs"
+kind = "schedule"
+principle = "dry-run first"
+why = "Keeps the tool's own journals bounded. Reports keep working because only records older than their keep period move to the gzip archive."
+does = "Runs routine_rotate (C1, report mode ships). In report mode it is treated like a read-only step (due once per occurrence); once switched to apply it needs the monthly window, and a window the host missed is reported as missed and never replayed late."
+applies_to = ["routine_rotate"]
+file = "routine.toml"
+target = "@routine.monthly:"
+merge = "append"
+params = { steps = ["rotate_logs"] }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "routine.monthly.step.verify"
+title = "Monthly step 6: verify the monthly routine"
+kind = "schedule"
+severity = "warn"
+principle = "verify after every change"
+why = "Closing check of the monthly window. Without it a monthly change would end unchecked."
+does = "Runs routine_verify_monthly once every earlier monthly step is terminal, or once when the window ends."
+applies_to = ["routine_verify_monthly"]
+file = "routine.toml"
+target = "@routine.monthly:"
+merge = "append"
+params = { steps = ["verify"] }
+since = "2026-10-03"
+order = 6
+
+[[rule]]
+id = "routine.system.backup-system"
+title = "Calendar: Saturday 01:00 system backup"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "The routine windows must not collide with the biggest IO job of the week, so the backup is shown in the 14-day calendar. It runs before the Saturday monthly window, which therefore starts at 04:30."
+does = "Display only. Shows the rsync mirror of the system drive at Sat 01:00 (timer backup-system.timer, still driven by the legacy timer). It runs nothing; the monthly window starts at 04:30 to leave about 1.5 hours for it."
+applies_to = ["backup-system"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "backup-system"
+title = "System backup (rsync mirror)"
+kind = "backup"
+at = "Sat 01:00"
+unit = "backup-system.timer"
+managed = "legacy"
+
+[[rule]]
+id = "routine.system.backup-immich"
+title = "Calendar: Sunday 01:00 Immich backup"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "Shows the second big backup so cleanup windows stay clear of it. Both weekly backups are long finished before the Wednesday audits."
+does = "Display only. Immich backup at Sun 01:00 (timer backup-immich.timer, legacy driver). Runs nothing."
+applies_to = ["backup-immich"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "backup-immich"
+title = "Immich backup"
+kind = "backup"
+at = "Sun 01:00"
+unit = "backup-immich.timer"
+managed = "legacy"
+
+[[rule]]
+id = "routine.system.stack-backup"
+title = "Calendar: nightly 03:30 ai-stack backup"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "The ai-stack backup (to the SanDisk SSD) is the nightly protection for the Hermes and AI stack config. Showing it keeps heavy cleanup from running on top of it."
+does = "Display only. Nominal 03:30 time of the user timer; real time can differ. Runs nothing."
+applies_to = ["stack-backup"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "stack-backup"
+title = "AI-stack backup"
+kind = "backup"
+at = "03:30"
+managed = "legacy"
+
+[[rule]]
+id = "routine.system.plex-butler"
+title = "Calendar: Plex butler maintenance until about 05:00"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "Plex does its own database optimisation and scans in the night; the script's heavy jobs should not fight it. Plex's Media directory is bind-mounted from the SanDisk SSD, so butler work shares that disk with the ai-stack backup (03:30) and the Tunarr sync (Monday 04:15), which are both marked heavy."
+does = "Display only. Plex's own scheduled tasks from 02:00 (managed = app: runs inside Plex). Nothing here controls it."
+applies_to = ["plex-butler"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "plex-butler"
+title = "Plex maintenance (butler, until about 05:00)"
+kind = "system"
+at = "02:00"
+managed = "app"
+
+[[rule]]
+id = "routine.system.docker-prune"
+title = "Calendar: Sunday 04:00 legacy Docker prune (timer disabled)"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "The legacy weekly prune is still part of the host's history, and it is shown so the calendar is honest about what could run. Showing a disabled timer in the calendar is deliberate: the calendar must never claim less than the host could do."
+does = "Display only. Legacy docker-prune.sh at Sun 04:00 via docker-prune.timer. The owner disabled that timer on 2026-10-02; it is listed so the calendar and the docker_prune_exposure check agree on what the legacy path would do."
+applies_to = ["docker-prune"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+owner_notes = "docker-prune.timer disabled 2026-10-02 because it would remove the stopped ComfyUI container and its 14.9 GiB image."
+
+[rule.params]
+name = "docker-prune"
+title = "Docker prune (legacy script)"
+kind = "system"
+at = "Sun 04:00"
+unit = "docker-prune.timer"
+managed = "legacy"
+
+[[rule]]
+id = "routine.system.prune-openwebui-media"
+title = "Calendar: daily 04:00 Open WebUI media prune"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "Shows the legacy media prune that the openwebui_media_prune task is replacing. Its native replacement runs in the daily routine window (from 07:30) and is report-only for now."
+does = "Display only. Legacy prune-openwebui-media.sh at 04:00 daily via its timer; media older than 7 days."
+applies_to = ["prune-openwebui-media"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "prune-openwebui-media"
+title = "Open WebUI media prune"
+kind = "system"
+at = "04:00"
+unit = "prune-openwebui-media.timer"
+managed = "legacy"
+
+[[rule]]
+id = "routine.system.fstrim"
+title = "Calendar: Monday SSD trim (OS timer)"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "OS maintenance the script never changes, shown so a trim is not mistaken for a stall. It can be IO-heavy for a while, so it is shown with the other background work."
+does = "Display only. fstrim.timer is weekly (Monday from 00:00, then a random delay of up to 100 minutes, so the calendar's Mon 00:47 is nominal). managed = os: observed, never changed."
+applies_to = ["fstrim"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "fstrim"
+title = "SSD trim"
+kind = "system"
+at = "Mon 00:47"
+unit = "fstrim.timer"
+managed = "os"
+
+[[rule]]
+id = "routine.system.logrotate"
+title = "Calendar: midnight log rotation (OS timer)"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "The OS rotates logs at midnight; the daily log_compress step works on what it leaves. The daily log compression only sees what rotation leaves behind, so the two must not be confused."
+does = "Display only. logrotate.timer at 00:00 (managed = os)."
+applies_to = ["logrotate"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+
+[rule.params]
+name = "logrotate"
+title = "Log rotation"
+kind = "system"
+at = "00:00"
+unit = "logrotate.timer"
+managed = "os"
+
+[[rule]]
+id = "routine.system.apt-daily-upgrade"
+title = "Calendar: 06:00 unattended upgrades (OS timer)"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "Security updates keep running on their own and finish before the 07:30 daily window. Showing it keeps the daily window from being scheduled on top of an upgrade."
+does = "Display only. apt-daily-upgrade.timer at 06:00 plus a random delay of up to 60 minutes (managed = os: observed, never changed)."
+applies_to = ["apt-daily-upgrade"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 9
+
+[rule.params]
+name = "apt-daily-upgrade"
+title = "Unattended upgrades"
+kind = "system"
+at = "06:00"
+unit = "apt-daily-upgrade.timer"
+managed = "os"
+
+[[rule]]
+id = "routine.system.e2scrub"
+title = "Calendar: Sunday filesystem scrub (OS timer)"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "The ext4 online scrub is a distro job that causes IO; shown so it is accounted for. Heavy IO from the scrub is one more reason heavy cleanup waits for its own window."
+does = "Display only. e2scrub_all.timer at Sun 03:10 (managed = os)."
+applies_to = ["e2scrub"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+since = "2026-10-03"
+order = 10
+
+[rule.params]
+name = "e2scrub"
+title = "Filesystem scrub"
+kind = "system"
+at = "Sun 03:10"
+unit = "e2scrub_all.timer"
+managed = "os"
+
+[[rule]]
+id = "routine.system.diun"
+title = "Calendar: 09:00 Diun image update scan"
+kind = "schedule"
+principle = "one umbrella; capacity planning"
+why = "Diun scans registries daily; the weekly image-update review reads its log. The weekly image review reads what Diun found, so its run time is part of the picture."
+does = "Display only. Diun's own daily scan at 09:00 (managed = app). routine_image_updates reads the result."
+applies_to = ["diun"]
+file = "routine.toml"
+target = "system[]"
+merge = "append"
+params = { name = "diun", title = "Diun image update scan", kind = "system", at = "09:00", managed = "app" }
+since = "2026-10-03"
+order = 11
+
+[[rule]]
+id = "routine.settings"
+title = "Routine settings: zone, enforcement, attempts, gates, post-check"
+kind = "policy"
+principle = "classes of service P0-P3; protect before you clean"
+why = "The routine only works if its rules are enforced and its limits are bounded: a step that keeps failing must stop, and a heavy step must wait for a quiet host. Enforcement is on by default, so a rule written down here is a rule the guard actually applies."
+does = "timezone = America/Toronto (DST-correct windows). enforce = true: the guard really blocks steps outside their window, inside a freeze, behind a busy gate or after a halt (false would only log what it would have blocked). max_attempts = 3: a step that errors three times in one window is given up until the next window. default_gates = [backup, pressure]: a step that needs a quiet window also waits while a backup is running or the spike manager's gate level is 2 or higher (max_pressure_level = 2). post_check_timeout_s = 120 bounds the re-run of the post-check checks."
+file = "routine.toml"
+target = "settings"
+since = "2026-10-03"
+
+[rule.params]
+timezone = "America/Toronto"
+enforce = true
+max_attempts = 3
+default_gates = ["backup", "pressure"]
+max_pressure_level = 2
+post_check_timeout_s = 120
+
+[[rule]]
+id = "routine.canary"
+title = "Canary: the first apply of each cleaner runs with 10 percent caps"
+kind = "safety"
+principle = "dry-run first"
+why = "The first time a cleaner really changes something is the riskiest. A small first run limits the damage of a wrong assumption."
+does = "runs = 1: the first apply run that really changed something is capped to 10 percent (fraction = 0.10) of the items and bytes the task would use. The canary only lowers limits. relax_after = 1: a canary run that applied nothing because every action exceeded the small byte cap is shown as canary-throttled and the next run gets the normal byte cap (still with the small item count), so it cannot starve."
+file = "routine.toml"
+target = "canary"
+params = { runs = 1, fraction = 0.1, relax_after = 1 }
+since = "2026-10-03"
+
+[[rule]]
+id = "routine.continuous"
+title = "Check-tier tasks that restart things wait out a freeze"
+kind = "safety"
+principle = "throttle before kill; classes of service P0-P3"
+why = "Some tasks run every 15 minutes and must be able to act at any hour (the spike ladder), but a restart of a service the family is using is not allowed during peak hours. The rule is enforced per task and per rung, so the protective rungs keep working while only the destructive ones wait."
+does = "disruptive = [immich_recycle, comfyui_idle_reclaim]: these check-tier tasks run report-only while the FREEZE file or a freeze window is active. frozen_rungs = [restart, emergency]: the spike ladder's destructive rungs go report-only in a freeze, while its reclaim and throttle rungs (which protect people) keep running. emergency_level = 4: at pressure level 4 or higher the freeze no longer holds the ladder."
+file = "routine.toml"
+target = "continuous"
+since = "2026-10-03"
+
+[rule.params]
+disruptive = ["immich_recycle", "comfyui_idle_reclaim"]
+frozen_rungs = ["restart", "emergency"]
+emergency_level = 4
+
+[[rule]]
+id = "routine.windows"
+title = "Maintenance windows: daily 07:30, weekly Wednesday 07:45, monthly first Saturday 04:30"
+kind = "schedule"
+principle = "capacity planning"
+why = "Windows are chosen around people and backups: after the nightly backups and Plex maintenance, before the evening peak. The weekly window starts 15 minutes after the daily one so the weekly steps follow the daily cleanup of the same morning."
+does = "daily = 07:30-09:30 (the daily timer fires at 07:30 plus up to 20 min of random delay), weekly = Wed 07:45-10:00 (after the daily steps), monthly = 1st Sat 04:30-07:00 (after the Saturday 01:00 system backup, about 1.5 hours). Host local time. Steps that need a quiet window run only inside the window; a missed window is reported as missed and never replayed."
+file = "routine.toml"
+target = "windows"
+params = { daily = "07:30-09:30", weekly = "Wed 07:45-10:00", monthly = "1st Sat 04:30-07:00" }
+since = "2026-10-03"
+
+[[rule]]
+id = "routine.freeze"
+title = "Freeze: no disruptive step in the evening 18:00-23:30"
+kind = "safety"
+principle = "protect before you clean"
+why = "Evenings are peak human use of Plex, Immich, Open WebUI and Nextcloud. Nothing that restarts or deletes should run then."
+does = "evenings = 18:00-23:30 host time: no disruptive step starts and the freeze-held check-tier restarts are report-only. Read-only steps and the spike ladder's protective rungs are not frozen. `touch /etc/homelab-maint/FREEZE` starts a freeze at once; removing it lifts it. A manual `run --task` does not get past a freeze without --force. jobs.toml [scheduler] freeze (the same window) is used only when this table is missing."
+file = "routine.toml"
+target = "freeze"
+params = { evenings = "18:00-23:30" }
+since = "2026-10-03"
+
+[[rule]]
+id = "routine.stepopts.spike_review"
+title = "Options of the spike review step (none)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Documents that the step takes no options. It is listed so that every step has a place in the registry, even one with nothing to tune."
+does = "Empty table: routine_spike_review has nothing to configure."
+applies_to = ["routine_spike_review"]
+file = "routine.toml"
+target = "steps.spike_review"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "routine.stepopts.smart_selftest"
+title = "SMART self-test staleness: 35 days"
+kind = "schedule"
+severity = "warn"
+principle = "capacity planning"
+why = "A monthly self-test cadence is the aim; 35 days leaves a few days of slack. Thirty-five days is a monthly cadence with a few days of slack."
+does = "max_age_days = 35: a disk with no completed self-test for longer is listed as stale (warn). Read by routine_smart_selftest."
+applies_to = ["routine_smart_selftest"]
+file = "routine.toml"
+target = "steps.smart_selftest"
+params = { max_age_days = 35 }
+since = "2026-10-03"
+
+[[rule]]
+id = "routine.stepopts.image_updates"
+title = "Image update review: Diun container name"
+kind = "schedule"
+principle = "dry-run first"
+why = "The review needs to know which container to read. Diun logs 'Image update found' when it sees a newer image, which is all this step reads."
+does = "diun_container = diun: the container whose `docker logs --since 168h` the step reads for 'Image update found' lines. Read by routine_image_updates."
+applies_to = ["routine_image_updates"]
+file = "routine.toml"
+target = "steps.image_updates"
+params = { diun_container = "diun" }
+since = "2026-10-03"
+
+[[rule]]
+id = "routine.stepopts.backup_verify"
+title = "Backup verification limits"
+kind = "schedule"
+severity = "warn"
+principle = "protect before you clean"
+why = "Verification needs explicit limits: how old a backup may be, where the dumps are and what restore files must exist. The 200 hour limit is a weekly backup plus slack, and 26 hours is a nightly one plus slack."
+does = "status_glob /var/log/backup/*-status.json; max_age_hours 200 for backup-system and backup-immich; dump_dirs /mnt/backup/system/dbdumps with dumps up to 10 days old (dump_max_age_days) and up to 64 MiB tested with zstd -t (integrity_max_mib); stack_last_ok the ai-stack LAST_OK file no older than 26 hours; restore_files RESTORE.md and restore-system.sh must sit next to the system backup. Read by routine_backup_verify."
+applies_to = ["routine_backup_verify"]
+file = "routine.toml"
+target = "steps.backup_verify"
+since = "2026-10-03"
+
+[rule.params]
+status_glob = "/var/log/backup/*-status.json"
+max_age_hours = { backup-system = 200, backup-immich = 200 }
+dump_dirs = ["/mnt/backup/system/dbdumps"]
+dump_max_age_days = 10
+integrity_max_mib = 64
+stack_last_ok = "/media/SandiskSSD/ai-stack-backups/LAST_OK"
+stack_backup_max_hours = 26
+restore_files = ["RESTORE.md", "restore-system.sh"]
+
+[[rule]]
+id = "routine.stepopts.restore_check"
+title = "Restore drill settings"
+kind = "schedule"
+severity = "warn"
+principle = "protect before you clean"
+why = "Defines what the restore drill compares and how often the owner must do a real restore. Half a year is the longest gap allowed between real restore tests."
+does = "restore_dir /mnt/backup/system; sample_files /etc/fstab and /etc/hostname are hashed and compared with the copy under the mirror's root/ directory; max_drill_age_days = 180: the owner's recorded test restore is DUE after that long. Read by routine_restore_check."
+applies_to = ["routine_restore_check"]
+file = "routine.toml"
+target = "steps.restore_check"
+since = "2026-10-03"
+
+[rule.params]
+restore_dir = "/mnt/backup/system"
+sample_files = ["/etc/fstab", "/etc/hostname"]
+max_drill_age_days = 180
+
+[[rule]]
+id = "routine.stepopts.expiry_check"
+title = "Expiry review limits: 30 days warn, 7 days crit"
+kind = "schedule"
+severity = "crit"
+principle = "capacity planning"
+why = "A certificate should be renewed long before it expires; 30 days warns and 7 days is an emergency. Thirty days is enough to renew a certificate calmly, seven days means it can no longer wait."
+does = "warn_days = 30, crit_days = 7; cert_globs /etc/letsencrypt/live/*/cert.pem and /etc/coolercontrol/coolercontrol.crt. Dated reminders ([[steps.expiry_check.items]]) are not configured. Read by routine_expiry."
+applies_to = ["routine_expiry"]
+file = "routine.toml"
+target = "steps.expiry_check"
+since = "2026-10-03"
+
+[rule.params]
+warn_days = 30
+crit_days = 7
+cert_globs = ["/etc/letsencrypt/live/*/cert.pem", "/etc/coolercontrol/coolercontrol.crt"]

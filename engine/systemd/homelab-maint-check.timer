@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the homelab-maint check tier every 15 minutes
+
+[Timer]
+# One early run after boot so the dashboard has data before the first quarter hour.
+OnBootSec=3min
+OnCalendar=*:0/15
+RandomizedDelaySec=60
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

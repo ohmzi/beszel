@@ -1,0 +1,32 @@
+# Workloads that homelab-maint must never kill, restart or delete from, automatically.
+# `patterns` are case-insensitive regexes matched against container names, process names/cmdlines,
+# systemd unit names AND file paths handed to Ctx.act(). A malformed pattern protects everything
+# (fail closed). Add to this list; do not remove entries without a reason.
+patterns = [
+  # databases / stateful stores
+  "surreal", "postgres", "mariadb", "mysql", "qdrant", "meilisearch", "redis", "grimmory-db", "tday_db", "immich_postgres",
+  # AI / media processing that legitimately spikes
+  "comfyui", "ollama", "plexmediaserver", "plex media", "plex transcoder", "immich", "open-notebook", "open_notebook",
+  "infinity", "omnivoice", "speaches", "kokoro", "ebook2audiobook", "tunarr", "kometa", "sabnzbd", "radarr", "sonarr", "prowlarr", "bazarr",
+  # build tooling while a build may be running (reaper decides separately via idle checks)
+  "buildkitd", "docker build", "buildctl",
+  # infrastructure
+  "dockerd", "containerd", "systemd", "sshd", "cloudflared", "tailscaled", "xorg", "xwayland", "gnome-shell", "networkmanager",
+  "homarr", "uptime-kuma", "glances", "fail2ban", "smartd", "libvirt", "qemu", "claude",
+  # data paths that must never be cleaned automatically
+  "/var/snap/plexmediaserver", "/media/SandiskSSD/plex", "/usr/share/ollama", "/volume1/docker/comfyui/models",
+  "/var/lib/docker/volumes", "surreal_data", "notebook_data", "/mnt/backup", "/media/Immich", "pgdata",
+]
+
+# Busy probes consulted by gates (see tasks/gates.py). Any probe error counts as BUSY.
+[busy]
+comfyui_queue_url = "http://127.0.0.1:8188/queue"
+ollama_ps_url = "http://127.0.0.1:11434/api/ps"
+# stack-backup.service is a USER unit that the system manager cannot see, so that entry never fires; the scheduler covers a tick-run
+# stack-backup through its own running set. Until it is cut over, the Immich recycle interlock does not see it (stack_backup.sh takes no lock).
+backup_units = ["backup-system.service", "backup-immich.service", "stack-backup.service", "docker-prune.service"]
+build_process_patterns = ["docker build", "buildctl", "buildkitd.*--", "GradleDaemon", "Gradle Test Executor", "kotlin-compiler"]
+plex_process_patterns = ["Plex Media Scanner", "Plex Transcoder", "Plex Script Host"]
+immich_containers = ["immich_server", "immich_machine_learning"]
+immich_cpu_busy_pct = 15      # of one core, sampled over 10 s
+max_defer_hours = { "immich-recycle" = 12 }   # after this long deferring, proceed anyway

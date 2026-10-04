@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the homelab-maint scheduler tick every minute
+
+[Timer]
+# On the minute, with 1 s accuracy (systemd's default AccuracySec=1min would coalesce ticks and defeat per-minute scheduling).
+OnCalendar=minutely
+AccuracySec=1s
+RandomizedDelaySec=0
+# No Persistent=: a tick missed while the host was off is pointless; the scheduler catches up missed JOBS itself (catchup_hours).
+OnBootSec=1min
+
+[Install]
+WantedBy=timers.target

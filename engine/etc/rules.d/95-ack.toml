@@ -1,0 +1,349 @@
+# homelab-maint rules registry: Acknowledgements. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync).
+# Every rule here compiles into ack.toml. An acknowledgement only stops one exact error from paging, it never changes a status; the policy keys are also copied in notify.toml [ack] (50-alerts.toml) and must stay equal.
+
+[meta]
+category = "ack"
+title = "Acknowledgements"
+blurb = "Acknowledged known issues: how an error is recognised again."
+
+[[rule]]
+id = "ack.ack"
+title = "Acknowledgement policy: 90 days, escalation breaks, limits"
+kind = "policy"
+principle = "fail closed"
+why = "An acknowledgement is a promise that stops one exact, understood error from paging for a while. It must never hide something different, so it is bounded: by fingerprint, by severity, by time, and by how many can exist at once. Fail towards alerting."
+does = "Default length days = 90 (an acknowledgement may be 1 to 365 days, never more: baseline hard limit). It silences that fingerprint at the acknowledged severity or lower; with escalation_breaks = true a worse severity (warn to crit) alerts again. severities = [warn]: only a warning may be acknowledged at all; a critical issue (and a check whose own status is 'error') always alerts and gets no button, no id, no token and no CLI/website acknowledgement (add 'crit' to restore). At most max_acks_per_day = 50 requests are accepted per rolling 24 h and max_active = 500 can be active (un-acknowledging is never limited); token_ttl_days = 30 and max_tokens = 500 bound the email links; an expired acknowledgement stays listed expired_keep_days = 30 days; the single 'acknowledgement expired' notice is handed to notify up to notice_attempts = 5 times; suppress_log_s = 3600 writes at most one audit line per fingerprint per hour. require_rule = true: only tasks with an exact-error key can be acknowledged; allow_tasks is empty; deny_tasks = [smart_event] and deny_prefixes = [job:] are never acknowledgeable. A bad value in ack.toml is ignored on its own."
+proof = "max_days above 365 is a hard limit in the release floor. The status keeps its true colour, incidents stay open and SLOs are untouched: an acknowledgement only stops the alert, and a status of 'error' (the check itself failed) is never covered."
+file = "ack.toml"
+target = "ack"
+since = "2026-10-03"
+owner_notes = "require_rule, allow_tasks, deny_tasks and deny_prefixes are duplicated in notify.toml [ack] (see notify.ack); keep them equal."
+
+[rule.params]
+days = 90
+min_days = 1
+max_days = 365
+severities = ["warn"]
+escalation_breaks = true
+max_acks_per_day = 50
+max_active = 500
+token_ttl_days = 30
+max_tokens = 500
+expired_keep_days = 30
+notice_attempts = 5
+suppress_log_s = 3600
+require_rule = true
+allow_tasks = []
+deny_tasks = ["smart_event"]
+deny_prefixes = ["job:"]
+
+[[rule]]
+id = "ack.inbox"
+title = "Acknowledge requests from the website: signed, small, rate-limited"
+kind = "policy"
+principle = "fail closed"
+why = "The website container can only drop request files into one inbox directory. The runner must treat every file as hostile: it authenticates, bounds and validates it, and refuses anything that is not exactly right."
+does = "Each minute the runner reads at most max_files_per_run = 100 files from STATE_DIR/ack/inbox. A file over max_bytes = 2048 is removed unread; its timestamp must be within skew_s = 600 s of now; with require_signature = true it needs an HMAC-SHA256 made with ack/web.key over the canonical request, for both sources (email link and website); unsigned_sources is empty, because the token hashes are public and an unsigned email request would let anyone who can write the inbox acknowledge any outstanding link. Refused files go to inbox/rejected (the newest rejected_keep = 200 are kept)."
+file = "ack.toml"
+target = "inbox"
+since = "2026-10-03"
+
+[rule.params]
+max_bytes = 2048
+skew_s = 600
+max_files_per_run = 100
+rejected_keep = 200
+require_signature = true
+unsigned_sources = []
+
+[[rule]]
+id = "ack.key.disk_forecast"
+title = "Acknowledge key for disk space: the mount"
+kind = "policy"
+principle = "fail closed"
+why = "Acknowledging 'this disk is nearly full' must not also silence a different disk that fills up later. The key is the mount and not the size: a disk acknowledged at 4 percent free keeps getting fuller, and only a worse severity brings the alert back."
+does = "Regex mode on the disk_forecast summary: every mount path before '% free' (for example /mnt/x, /home) joins the key, as do the counts of what the task cut off ('+2 more'). The percent, size and days-to-full are ignored, so a different mount alerts, the same mount getting fuller does not."
+applies_to = ["disk_forecast"]
+file = "ack.toml"
+target = "key.disk_forecast"
+params = { mode = "regex", regex = ['(?:^|; )(/[^;]*?) \d+% free'] }
+since = "2026-10-03"
+owner_notes = "Number-blind about how full the disk is: only a worse severity (warn to crit) alerts again."
+
+[[rule]]
+id = "ack.key.failed_units"
+title = "Acknowledge key for failed units: names and counts"
+kind = "policy"
+principle = "fail closed"
+why = "A known broken unit must not hide a second one that breaks tomorrow. The task shows only a few names, so the counts are in the key too and a fifth failure cannot hide behind four acknowledged ones."
+does = "Regex mode on the failed_units summary: the count and the names of failed units, unexpected exited containers, unhealthy containers and restarting containers. The task shows at most a few names, so the counts are part of the key: a fifth failure changes the count and alerts. If one of two failing units recovers the key changes and the remaining one alerts once more."
+applies_to = ["failed_units"]
+file = "ack.toml"
+target = "key.failed_units"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = [
+  '(\d+) failed unit\(s\)', 'failed unit\(s\): ([^;]*)', '(\d+) unexpected exited',
+  "unexpected exited: ([^;]*)", '(\d+) unhealthy', "unhealthy: ([^;]*)", '(\d+) restarting',
+  "restarting: ([^;]*)",
+]
+
+[[rule]]
+id = "ack.key.backup_freshness"
+title = "Acknowledge key for backups: backup, result word, age decade"
+kind = "policy"
+principle = "fail closed"
+why = "A backup that is late by a night and one that is late by a month are both 'warn', but they are not the same error. A day-late backup is a nuisance and a month-late one means there is no recovery point, which is why the age decade is part of the key."
+does = "Regex mode on the backup_freshness summary: the backup name with its result word (FAILED) for failed ones, and for late ones the backup name plus the decade of its age in hours (28 h is one bucket, 100 h the next, 1000 h another). A later decade alerts again."
+applies_to = ["backup_freshness"]
+file = "ack.toml"
+target = "key.backup_freshness"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = ['(?:^|; )([\w.-]+ [A-Z_]+) \(\S+ ago\)', '(?:^|; )([\w.-]+) (?P<mag>\S+) old \(limit']
+
+[[rule]]
+id = "ack.key.docker_df"
+title = "Acknowledge key for Docker disk use: the whole task"
+kind = "policy"
+principle = "fail closed"
+why = "docker_df is housekeeping information made of sizes only; any problem it reports is 'the same error' as far as an acknowledgement goes. The check is housekeeping information that does not page, so a key for the whole task is enough."
+does = "Mode task: the key is the task name alone, so one acknowledgement covers any docker_df problem at the same or a lower severity; an escalation still alerts."
+applies_to = ["docker_df"]
+file = "ack.toml"
+target = "key.docker_df"
+params = { mode = "task" }
+since = "2026-10-03"
+
+[[rule]]
+id = "ack.key.memory_health"
+title = "Acknowledge key for memory: condition and magnitude decade"
+kind = "policy"
+principle = "detect by saturation, not size"
+why = "A swap-in rate or an OOM count only ever warns however large, so the size decade must be part of the key or one 1-kill acknowledgement would silence fifty kills. The key lists which conditions are present, so a memory stall acknowledged alone does not cover swapping or OOM kills that start later."
+does = "Regex mode on the memory_health summary: which conditions are present (memory stall, available, swap-in rate with its decade, OOM kills with the decade of their count). One OOM kill and fifty are different errors."
+applies_to = ["memory_health"]
+file = "ack.toml"
+target = "key.memory_health"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = ["(memory stall)", '\b(available)\b', '(swap-in) (?P<mag>\d+) pages', '(?P<mag>\d+) (oom kill)']
+
+[[rule]]
+id = "ack.key.plex_media_mount_check"
+title = "Acknowledge key for the Plex Media mount"
+kind = "policy"
+principle = "protect before you clean"
+why = "The source device name moves between boots, so the stable parts are what identify the problem. A missing mount is the one case where Plex would silently fill the root disk, so it is its own error."
+does = "Regex mode on the plex_media_mount_check summary: 'is not mounted', or the expected source prefix of the 'mounted from X, expected under Y' message. The device name is not in the key."
+applies_to = ["plex_media_mount_check"]
+file = "ack.toml"
+target = "key.plex_media_mount_check"
+params = { mode = "regex", regex = ["(is not mounted)", 'mounted from [^,]+, (expected under \S+)'] }
+since = "2026-10-03"
+owner_notes = "Plex's Media directory is bind-mounted from the SanDisk SSD (/media/SandiskSSD/plex). If that mount is missing Plex would regenerate Media on the root disk, which is why 'is not mounted' is its own error."
+
+[[rule]]
+id = "ack.key.smart_trend"
+title = "Acknowledge key for SMART: disk identity and attribute decade"
+kind = "policy"
+principle = "fail closed"
+why = "SMART warnings are per disk and the kernel name (sda) changes between boots; an acknowledgement for one disk must not transfer to another. A disk's pre-failure signs only ever grow, so the decade of growth is in the key: +2 reallocated sectors is watched, +8000 means replace the disk."
+does = "Regex mode with split '; ' on the smart_trend summary: each segment is tagged with the disk, renamed through the status metrics from the kernel name to model plus serial tail. The attribute with the decade of its growth (+2 reallocated sectors is not +8000), the hot or stale-data notes and unreadable markers join the key; temperatures do not."
+applies_to = ["smart_trend"]
+file = "ack.toml"
+target = "key.smart_trend"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+split = "; "
+alias = ["devices", "dev", "model"]
+regex = ['([A-Za-z][\w-]*) \+(?P<mag>\d+)', '\d+(C)\b', '(smartd data) \d+h old', "(unreadable)", "(no parsable rows)"]
+
+[[rule]]
+id = "ack.key.alert_path_health"
+title = "Acknowledge key for the alert path health check"
+kind = "policy"
+principle = "fail closed"
+why = "A known broken hook should not hide a different part of the alert path failing. If the alert path itself is broken the owner may be told nothing else, so one acknowledged break must never cover a second one."
+does = "Regex mode on the alert_path_health summary: 'bridge missing' or 'smartd hook broken', the kind of failed sends (smart hook or notifier), and unreadable-log notes. The failure count and the error text are not in the key."
+applies_to = ["alert_path_health"]
+file = "ack.toml"
+target = "key.alert_path_health"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = [
+  "(bridge missing|smartd hook broken)", '\d+ (smart hook|notifier) sends failed',
+  "(smart hook|notifier) log unreadable",
+]
+
+[[rule]]
+id = "ack.key.growth_watch"
+title = "Acknowledge key for growth: path and rate decade"
+kind = "policy"
+principle = "capacity planning"
+why = "A path growing 1 GiB a day and one growing 300 GiB a day are different emergencies although both are 'warn'. A path growing 1 GiB a day is a nuisance and one growing 300 GiB a day fills a disk in a day, so capacity planning needs the rate decade in the key."
+does = "Regex mode on the growth_watch summary: whether it is 'growth over limit' or 'growth blind', each growing path with the decade of its GiB/day rate, the unmeasured paths and how many paths are blind."
+applies_to = ["growth_watch"]
+file = "ack.toml"
+target = "key.growth_watch"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = [
+  "^(growth over limit|growth blind)", '([^\s,;:]+) (?P<mag>[+-]?\d+(?:\.\d+)?) GiB/d',
+  'cut off\): ([^;]*)', 'blind >\S+: (\d+)/',
+]
+
+[[rule]]
+id = "ack.key.stuck_detector"
+title = "Acknowledge key for the stuck detector: count and top container decade"
+kind = "policy"
+principle = "never kill by size"
+why = "The detector only warns for containers that are actionable; the acknowledgement should name which and how large. The detector is the gate for restarting containers, so the key names the container and its size decade (never kill by size alone)."
+does = "Regex mode on the stuck_detector summary: the number of actionable candidates, and the top container with the decade of its memory size (4 GiB is not 40 GiB)."
+applies_to = ["stuck_detector"]
+file = "ack.toml"
+target = "key.stuck_detector"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = ['(\d+) actionable', 'actionable(?:, restarted \S+)?: (\S+) (?P<mag>\d[\d.]* ?[KMGT]?i?B)']
+
+[[rule]]
+id = "ack.key.orphan_report"
+title = "Acknowledge key for orphan processes: kinds with count and memory decade"
+kind = "policy"
+principle = "fail closed"
+why = "Three zombies and three thousand zombies are different problems. The memory they hold counts too: three small zombies are housekeeping, a gigabyte of idle daemons is not."
+does = "Regex mode on the orphan_report summary: each orphan kind (idle gradle daemon, orphan emulator, stray server, orphan crashpad handler, zombie, long-running emulator) with the decade of its count, and the decade of the anonymous memory they hold."
+applies_to = ["orphan_report"]
+file = "ack.toml"
+target = "key.orphan_report"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = [
+  '(?P<mag>\d+) (idle gradle daemon|orphan emulator|stray server|orphan crashpad handler|zombie|long-running emulator)',
+  '\((?P<mag>\d[\d.]* ?[KMGT]?i?B) anon\)',
+]
+
+[[rule]]
+id = "ack.key.pressure_state"
+title = "Acknowledge key for host pressure: level and signals"
+kind = "policy"
+principle = "detect by saturation, not size"
+why = "The level and the cause matter: a memory stall at L3 is a different issue from an IO stall at L2. Moving from a memory stall at L2 to an IO stall at L3 is a new problem and alerts again."
+does = "Regex mode on the pressure_state summary: the level word (L0-L5) and which signals drive it (memory stall, memory wait, available memory, swap-in, io stall, io wait, cpu wait, vram). 'Cannot read /proc/pressure' is status error and is never covered."
+applies_to = ["pressure_state"]
+file = "ack.toml"
+target = "key.pressure_state"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = ['^(L\d)\b', '\b(memory stall|memory wait|avail|swap-in|io stall|io wait|cpu wait|vram)\b']
+
+[[rule]]
+id = "ack.key.pressure_response"
+title = "Acknowledge key for the pressure ladder: failed, not restored, alert-only"
+kind = "policy"
+principle = "throttle before kill"
+why = "The ladder acts on its own, so what is acknowledged must be the specific outcome, not the fact that it ran. A throttle that is never put back leaves a container slowed down for good, so that outcome is named in the key."
+does = "Regex mode on the pressure_response summary: 'N failed' actions, 'throttle(s) not restored', and the 'ALERT ONLY' notice for protected or unclassified runaways."
+applies_to = ["pressure_response"]
+file = "ack.toml"
+target = "key.pressure_response"
+params = { mode = "regex", regex = ['\d+ (failed)\b', '(throttle\(s\) not restored)', "(ALERT ONLY)"] }
+since = "2026-10-03"
+
+[[rule]]
+id = "ack.key.probes"
+title = "Acknowledge key for probes: names and counts of down, degraded, flapping"
+kind = "policy"
+principle = "classes of service P0-P3"
+why = "The probes summary lists at most three names; a new outage lands behind the cut, so the counts are part of the key. A new outage therefore changes a count and alerts even when the visible names stay the same."
+does = "Regex mode on the probes summary: the count and names after 'down:', 'degraded:' and 'flapping:', and the count of invalid probe definitions. A new down probe changes a count and alerts."
+applies_to = ["probes"]
+file = "ack.toml"
+target = "key.probes"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = [
+  '(\d+) down:', "down: ([^;]*)", '(\d+) degraded:', "degraded: ([^;]*)", '(\d+) flapping:',
+  "flapping: ([^;]*)", '(\d+ bad probe defs)',
+]
+
+[[rule]]
+id = "ack.key.os_jobs"
+title = "Acknowledge key for OS timers: job and state"
+kind = "policy"
+principle = "fail closed"
+why = "Which OS timer is overdue or failed is the error; how many are listed changes the key too. Each overdue or failed timer is its own error, so acknowledging a late logrotate does not hide a failed security update."
+does = "Regex mode on the os_jobs summary: each '<job> overdue|failed|inactive|unknown' and the 'N of M need attention' count."
+applies_to = ["os_jobs"]
+file = "ack.toml"
+target = "key.os_jobs"
+since = "2026-10-03"
+
+[rule.params]
+mode = "regex"
+regex = ['(?:attention: |; )([\w.@-]+ (?:overdue|failed|inactive|unknown))', '(\d+) of \d+ need attention']
+
+[[rule]]
+id = "ack.key.docker_prune_exposure"
+title = "Acknowledge key for the legacy Docker prune exposure: what it would delete"
+kind = "policy"
+principle = "in-use proof before deletion"
+why = "The alert says which stopped container and image the legacy weekly prune would delete; the owner may acknowledge exactly that knowledge and still hear about a new exposure. The countdown to the timer's next run is left out of the key on purpose, so a shrinking number of hours never makes an old exposure look new."
+does = "Regex mode on the docker_prune_exposure summary: the container names after 'deletes container' and the image after '+ image', never the countdown to the timer's next run."
+applies_to = ["docker_prune_exposure"]
+file = "ack.toml"
+target = "key.docker_prune_exposure"
+since = "2026-10-03"
+owner_notes = "docker-prune.timer was disabled by the owner on 2026-10-02 (it would have removed the stopped ComfyUI container and its 14.9 GiB image); while it is disabled this check says so and does not page."
+
+[rule.params]
+mode = "regex"
+regex = ['deletes container (.+?)(?= \+ image|;|$)', '\+ image (.+?)(?= \(|;|$)']
+
+[[rule]]
+id = "ack.key.immich_recycle"
+title = "Acknowledge key for the Immich recycle: failed restart or unhealthy after"
+kind = "policy"
+principle = "fail closed"
+why = "A failed restart of the Immich server is specific; the owner may acknowledge a known cause without hiding a different failure. This task restarts a service people use, so a new kind of failure should always be heard."
+does = "Regex mode on the immich_recycle summary: 'restart of <container> failed' and '<container> restarted but is <state>'. The error text is not part of the key."
+applies_to = ["immich_recycle"]
+file = "ack.toml"
+target = "key.immich_recycle"
+params = { mode = "regex", regex = ['(restart of \S+ failed)', '(\S+ restarted but is \S+)'] }
+since = "2026-10-03"
+
+[[rule]]
+id = "ack.key.comfyui_idle_reclaim"
+title = "Acknowledge key for the ComfyUI idle reclaim: failed restart"
+kind = "policy"
+principle = "fail closed"
+why = "Same idea as the Immich recycle: acknowledge the specific failure, not the task. The key is only the failed restart, so any other failure of the task is a different error and alerts."
+does = "Regex mode on the comfyui_idle_reclaim summary: 'restart of <container> failed'."
+applies_to = ["comfyui_idle_reclaim"]
+file = "ack.toml"
+target = "key.comfyui_idle_reclaim"
+params = { mode = "regex", regex = ['(restart of \S+ failed)'] }
+since = "2026-10-03"

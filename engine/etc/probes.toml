@@ -1,0 +1,392 @@
+# homelab-maint: the ONE monitoring plane (read by homelab_maint/probes.py; SPEC4 S10).
+#
+# Installed to /etc/homelab-maint/probes.toml (install-if-absent). Owner-written extras go in /etc/homelab-maint/probes.d/*.toml.
+# Both must be root-owned and not group/world-writable, because a probe can name a command: an untrusted file is ignored and
+# reported by `python3 -m homelab_maint.probes validate`.
+#
+# Adding a thing = adding a table; never a new timer or cron line:
+#     [[probe]]
+#     name = "myapp"  title = "My app"  type = "http"  target = "http://127.0.0.1:1234/health"  class = "P2"
+#     expect = { status = [200], json = [{ path = "status", equals = "ok" }] }
+# (one key per line in the real file). Families of probes that share settings go in a [[group]] (members win over the group).
+#
+# Types and `expect` keys (full reference in the probes.py docstring):
+#   http     status=[200,"200-299"] regex not_regex json=[rules] max_ms      GET (or method="HEAD"), redirects NOT followed
+#   tcp      connect only                       docker   state health="ignore" except=[regex]  (target "@daemon" | "*" | name)
+#                                                         fleet ("*") also: names=[must exist] baseline=true forget_after_s=259200 -- a container
+#                                                         seen running for >= 1 h that vanishes from `docker ps -a` (docker rm, compose down) is
+#                                                         "missing" for 3 days; `python3 -m homelab_maint.probes forget NAME` ends it at once
+#   systemd  active=["active"]                  command  ok_codes regex not_regex show_output  (argv list, no shell, run as the runner)
+#   file_age max_age_s warn_age_s min_size epoch_content ({STATE} {LOG} {RUN} {CONF} expand)     json  json=[rules] max_age_s detail_path
+#   json rule: {path="a.*.b", equals | in + warn_in | not_in | exists | regex | min | max | age_max_s | age_warn_s}
+# Per probe: class P0-P3 (P0 pages as crit, P1/P2 as warn, P3 never pages; override with severity), slo (%), interval_s,
+# timeout_s, confirm/recover (consecutive RUNS), optional=true (never seen up = "skipped", not an alert), when_running="container"
+# (skipped while that container is stopped by design), kuma = "<Kuma monitor name>", kuma_push_key, external=true (public address).
+#
+# Kuma push heartbeats (GET only, a no-op until /etc/homelab-maint/kuma.toml [push] holds a token for the key): the owner creates one
+# "Push" monitor in Kuma per key, copies its token into kuma.toml (0600), and Kuma then shows the umbrella's own view of that thing:
+#   umbrella-probes (the dead-man's switch: set its Kuma heartbeat interval to ~3 min; it alarms when the pushes STOP),
+#   cloudflared, docker, containers, umbrella-status, hermes-watchdog (up/down follows the probe).
+#
+# Safety: GET/HEAD only, no bodies/headers/credentials, targets only from this file, loopback unless external=true, nothing here
+# ever restarts or changes anything. A search canary query is NOT used for SearXNG (it would hammer the engines): /healthz only.
+#
+# Provenance (all verified read-only on 2026-10-02): Uptime Kuma monitors from a COPY of kuma.db (14 rows), endpoints with one GET
+# each, containers from `docker ps -a`, units from `systemctl show`, Hermes files from ~/.hermes (state schema from
+# health_alert.py). Kuma reaches apps by docker DNS names (radarr:7878); the umbrella runs on the host, so the same targets are
+# the published loopback ports below.
+
+[defaults]
+workers = 8            # bounded thread pool
+budget_s = 45          # hard limit for one run; a probe still running then is a failure of that probe
+timeout_s = 5
+interval_s = 300       # per probe cadence; the scheduler tick (1 min) calls the engine, each probe runs when its own interval elapsed
+confirm = 2            # consecutive bad RUNS before a probe is down ("2 bad runs to go down, 2 good to recover")
+recover = 2
+attempts = 2           # looks per run (stop at the first clean one): a blip that clears inside the run never counts
+retry_s = 5
+flap_window_s = 3600
+flap_max = 4           # this many confirmed changes inside the window = "flapping" (counted as warn, no per-change messages)
+storm_max = 8          # more changes than this in one run = ONE summary event (a host stall fails everything at once)
+history_every_s = 300  # compact kind:"probe" records in history.jsonl (SLO inputs)
+keep_days = 30
+deadman_key = "umbrella-probes"   # Kuma push key of the dead-man's switch; a no-op until /etc/homelab-maint/kuma.toml has a token
+
+[kuma]
+# Kuma group monitors carried by a probe `group`; every other Kuma monitor must be named by a probe's `kuma` key
+# (`python3 -m homelab_maint.probes kuma-diff <COPY of kuma.db>` lists anything unmapped; Kuma itself is never written to).
+groups = { "Media Stack" = "Media Stack" }
+ignore = []
+
+# =====================================================================================================================
+# 1. The umbrella itself: staleness of everything it writes, its own services, the maintenance site.
+#    These run on the scheduler tick, a different process from the check tier, so a dead check tier IS detected here.
+#    The check tier also calls the engine, so the probe plane is watched from two sides; the Kuma push monitor
+#    `umbrella-probes` (deadman_key above) is the third, external side: it alarms when the pushes STOP.
+# =====================================================================================================================
+[[group]]
+group = "Umbrella"
+class = "P1"
+slo = 99.5
+interval_s = 60
+tags = ["umbrella"]
+probes = [
+  { name = "umbrella-status", title = "Runner status fresh", type = "file_age", target = "{STATE}/status.json", expect = { max_age_s = 2700, warn_age_s = 1800 }, kuma_push_key = "umbrella-status" },
+  { name = "umbrella-probe-plane", title = "Probe plane running", type = "file_age", target = "{STATE}/probes.json", expect = { max_age_s = 2700, warn_age_s = 1500 } },
+  # The scheduler tick runs the backups, the cleaners and this very engine every minute. scheduler._heartbeat() rewrites
+  # {RUN}/tick.json ({"t": epoch, ...}) at the end of each tick, on tmpfs. The timer unit can stay "active (waiting)" while every tick
+  # fails (bad jobs.toml, import error), so liveness of the unit (svc-hm-tick) proves nothing: the beat itself is what is judged. `jobs` is
+  # how many jobs the tick loaded: a jobs.toml typo leaves the beat fresh but schedules nothing, so 0 is down too. `config_problems` is how
+  # many entries of jobs.toml the tick refused: one bad job is skipped (a backup that silently never runs), so any problem at all is down.
+  # P0 = crit when confirmed down; optional until the first tick has been seen (a fresh install has no tick yet).
+  { name = "umbrella-tick", title = "Scheduler tick beating", type = "json", target = "{RUN}/tick.json", class = "P0", expect = { json = [{ path = "t", age_max_s = 300, age_warn_s = 150 }, { path = "jobs", min = 1 }, { path = "config_problems", max = 0 }] }, optional = true },
+  { name = "umbrella-public-export", title = "Public export fresh", type = "file_age", target = "{STATE}/public/overview.json", expect = { max_age_s = 2700, warn_age_s = 1800 }, optional = true },
+  { name = "umbrella-live", title = "Live monitor (live.json)", type = "json", target = "{STATE}/public/live.json", expect = { json = [{ path = "generated_at", age_max_s = 300, age_warn_s = 60 }] }, optional = true },
+  { name = "umbrella-metrics-ring", title = "Metrics ring sampler", type = "file_age", target = "{STATE}/metrics-ring.json", expect = { max_age_s = 900, warn_age_s = 300 }, optional = true },
+  { name = "umbrella-www", title = "Status server (:9111)", type = "http", target = "http://127.0.0.1:9111/overview", expect = { json = [{ path = "stale", equals = false }] } },
+  { name = "maintenance-site", title = "Maintenance site (:8098)", type = "http", target = "http://127.0.0.1:8098/healthz", optional = true },
+  { name = "ct-maintenance-web", title = "Maintenance site container", type = "docker", target = "maintenance-web", optional = true },
+  { name = "svc-hm-www", title = "homelab-maint-www", type = "systemd", target = "homelab-maint-www.service" },
+  { name = "svc-hm-live", title = "homelab-maint-live", type = "systemd", target = "homelab-maint-live.service", optional = true },
+  { name = "svc-hm-check", title = "Check tier timer", type = "systemd", target = "homelab-maint-check.timer" },
+  { name = "svc-hm-daily", title = "Daily tier timer", type = "systemd", target = "homelab-maint-daily.timer" },
+  { name = "svc-hm-weekly", title = "Weekly tier timer", type = "systemd", target = "homelab-maint-weekly.timer" },
+  { name = "svc-hm-metrics", title = "Metrics sampler timer", type = "systemd", target = "homelab-maint-metrics.timer", optional = true },
+  { name = "svc-hm-tick", title = "Scheduler tick timer", type = "systemd", target = "homelab-maint-tick.timer", optional = true },
+  { name = "svc-hm-selfhealth", title = "Pipeline self-health timer", type = "systemd", target = "homelab-maint-selfhealth.timer", optional = true },
+]
+
+# =====================================================================================================================
+# 2. Platform: the things everything else stands on. P0 = crit when confirmed down.
+# =====================================================================================================================
+[[group]]
+group = "Platform"
+class = "P0"
+slo = 99.9
+interval_s = 60
+tags = ["platform"]
+probes = [
+  { name = "docker-daemon", title = "Docker daemon answers", type = "docker", target = "@daemon", kuma_push_key = "docker" },
+  { name = "svc-docker", title = "docker.service", type = "systemd", target = "docker.service" },
+  { name = "svc-cloudflared", title = "cloudflared.service", type = "systemd", target = "cloudflared.service" },
+  { name = "cloudflared-tunnel", title = "Cloudflare tunnel connected", type = "http", target = "http://127.0.0.1:20241/ready", expect = { json = [{ path = "readyConnections", min = 1 }] }, kuma_push_key = "cloudflared" },
+  { name = "svc-ssh", title = "ssh.service", type = "systemd", target = "ssh.service" },
+]
+
+# Secondary platform pieces: a problem is worth an email, not a text.
+[[group]]
+group = "Platform"
+class = "P0"
+severity = "warn"
+slo = 99.9
+interval_s = 120
+tags = ["platform"]
+probes = [
+  { name = "svc-containerd", title = "containerd.service", type = "systemd", target = "containerd.service" },
+  { name = "svc-tailscaled", title = "tailscaled.service", type = "systemd", target = "tailscaled.service" },
+  { name = "tailscale", title = "Tailscale connected", type = "command", target = ["tailscale", "status", "--json", "--peers=false"], expect = { regex = '"BackendState":\s*"Running"' } },
+  { name = "svc-fail2ban", title = "fail2ban.service", type = "systemd", target = "fail2ban.service" },
+  # fail2ban.log only moves when something is banned or rotated (108 bytes, 5 days old today), so log age would false-alarm:
+  # ask the daemon instead (the runner is root).
+  { name = "fail2ban", title = "fail2ban answers", type = "command", target = ["fail2ban-client", "ping"], needs_root = true, expect = { regex = "pong" } },
+  { name = "svc-networkmanager", title = "NetworkManager.service", type = "systemd", target = "NetworkManager.service" },
+  { name = "svc-resolved", title = "systemd-resolved.service", type = "systemd", target = "systemd-resolved.service" },
+  { name = "svc-timesyncd", title = "systemd-timesyncd.service", type = "systemd", target = "systemd-timesyncd.service" },
+  { name = "svc-cron", title = "cron.service", type = "systemd", target = "cron.service" },
+  { name = "svc-rsyslog", title = "rsyslog.service", type = "systemd", target = "rsyslog.service" },
+  { name = "svc-snapd", title = "snapd.service", type = "systemd", target = "snapd.service" },
+  { name = "svc-smartd", title = "smartd (smartmontools.service)", type = "systemd", target = "smartmontools.service" },   # canonical unit name; smartd.service is an alias and `systemctl show` reports the canonical Id
+  { name = "svc-smart-bridge", title = "smart-bridge.service (alert path)", type = "systemd", target = "smart-bridge.service" },
+  { name = "svc-nvidia-persistenced", title = "nvidia-persistenced.service", type = "systemd", target = "nvidia-persistenced.service" },
+  { name = "gpu-driver", title = "GPU driver answers (nvidia-smi)", type = "command", target = ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], timeout_s = 10, interval_s = 300, class = "P1" },
+  { name = "internet", title = "Internet reachable", type = "http", target = "https://1.1.1.1/cdn-cgi/trace", external = true, interval_s = 900, confirm = 1, source = "kuma", kuma = "Internet", class = "P1", severity = "warn" },
+]
+
+# =====================================================================================================================
+# 3. Media Stack: Uptime Kuma parity. Every Kuma monitor (14 rows read from a copy of kuma.db) is carried by a probe with
+#    `kuma = "<name>"`; the "Media Stack" group monitor is carried by the `group` field. Kuma keeps running for Homarr's
+#    uptime widget; this plane is the source of truth and shows what Kuma is paused on.
+#    Differences from Kuma, all deliberate: (1) loopback ports instead of docker DNS names; (2) Kuma's Immich monitor POSTs
+#    /api/auth/validateToken, which a GET-only plane must not do, so GET /api/server/ping stands in; (3) Plex is PAUSED in
+#    Kuma (host.docker.internal cannot reach the snap) but is probed natively here, flagged kuma_paused so the site says so;
+#    (4) Bazarr answers 401 on / when auth is on (Kuma accepts 400-499), so 401 is the only extra accepted code.
+# =====================================================================================================================
+[[group]]
+group = "Media Stack"
+class = "P2"
+source = "kuma"
+interval_s = 60
+tags = ["media"]
+probes = [
+  { name = "plex", title = "Plex Media Server", type = "http", target = "http://127.0.0.1:32400/identity", class = "P1", slo = 99.5, kuma = "Plex", kuma_paused = true, expect = { regex = "MediaContainer" } },
+  { name = "radarr", title = "Radarr", type = "http", target = "http://127.0.0.1:7878/ping", kuma = "Radarr", expect = { json = [{ path = "status", equals = "OK" }] } },
+  { name = "sonarr", title = "Sonarr", type = "http", target = "http://127.0.0.1:8989/ping", kuma = "Sonarr", expect = { json = [{ path = "status", equals = "OK" }] } },
+  { name = "prowlarr", title = "Prowlarr", type = "http", target = "http://127.0.0.1:9696/ping", kuma = "Prowlarr", expect = { json = [{ path = "status", equals = "OK" }] } },
+  { name = "sabnzbd", title = "SABnzbd", type = "http", target = "http://127.0.0.1:8080/", kuma = "SABnzbd", expect = { status = ["200-299", "300-399"] } },
+  { name = "deluge", title = "Deluge", type = "http", target = "http://127.0.0.1:8112/", kuma = "Deluge" },
+  { name = "transmission", title = "Transmission", type = "http", target = "http://127.0.0.1:9091/transmission/web/", kuma = "Transmission" },
+  { name = "bazarr", title = "Bazarr", type = "http", target = "http://127.0.0.1:6767/", kuma = "Bazarr", expect = { status = ["200-299", 401] } },
+  { name = "tautulli", title = "Tautulli", type = "http", target = "http://127.0.0.1:8181/status", kuma = "Tautulli", expect = { regex = "success" } },
+  { name = "seerr", title = "Seerr", type = "http", target = "http://127.0.0.1:5056/api/v1/status", class = "P1", slo = 99.5, kuma = "Seerr", expect = { json = [{ path = "version", exists = true }] } },
+  { name = "immich", title = "Immich", type = "http", target = "http://127.0.0.1:2283/api/server/ping", class = "P1", slo = 99.5, kuma = "Immich", expect = { json = [{ path = "res", equals = "pong" }] } },
+  { name = "ct-kometa", title = "Kometa (container)", type = "docker", target = "kometa", interval_s = 300, kuma = "Kometa" },
+]
+
+# =====================================================================================================================
+# 4. Apps with a real health endpoint (class from etc/classes.toml). P1 = what a person is waiting on.
+# =====================================================================================================================
+[[group]]
+group = "Apps"
+class = "P1"
+slo = 99.5
+interval_s = 60
+tags = ["app"]
+probes = [
+  { name = "homarr", title = "Homarr dashboard", type = "http", method = "HEAD", target = "http://127.0.0.1:7575/" },
+  { name = "uptime-kuma", title = "Uptime Kuma", type = "http", target = "http://127.0.0.1:3011/api/entry-page", expect = { json = [{ path = "type", equals = "entryPage" }] } },
+  { name = "immich-public-proxy", title = "Immich public proxy", type = "http", target = "http://127.0.0.1:2284/healthcheck", expect = { regex = "ok" } },
+  { name = "nextcloud", title = "Nextcloud", type = "http", target = "http://127.0.0.1:8090/status.php", expect = { json = [{ path = "installed", equals = true }, { path = "maintenance", equals = false }, { path = "needsDbUpgrade", equals = false }] } },
+  { name = "openwebui", title = "Open WebUI", type = "http", target = "http://127.0.0.1:4567/health", expect = { json = [{ path = "status", equals = true }] } },
+  { name = "owui-public-gate", title = "Open WebUI public gate", type = "http", target = "http://127.0.0.1:4568/api/config" },
+  { name = "audiobookshelf", title = "Audiobookshelf", type = "http", target = "http://127.0.0.1:80/healthcheck", expect = { regex = "OK" } },
+  { name = "searxng", title = "SearXNG (chat search)", type = "http", target = "http://127.0.0.1:8888/healthz", expect = { regex = "OK" } },
+  { name = "tday", title = "Tday", type = "http", target = "http://127.0.0.1:2525/health" },
+  { name = "ohmz-cloud", title = "ohmz-cloud site", type = "http", target = "http://127.0.0.1:8095/" },
+  { name = "omar-iqbal", title = "omar-iqbal site", type = "http", target = "http://127.0.0.1:8097/" },
+  { name = "afsaane-prod", title = "Afsaane (production)", type = "http", target = "http://127.0.0.1:4141/" },
+  { name = "pa-driving-flashcards", title = "Driving flashcards", type = "http", target = "http://127.0.0.1:8377/", interval_s = 300 },
+]
+
+[[group]]
+group = "Apps"
+class = "P2"
+interval_s = 300
+tags = ["app"]
+probes = [
+  { name = "kavita", title = "Kavita", type = "http", target = "http://127.0.0.1:5000/api/health", expect = { regex = "(?i)^ok" } },
+  { name = "tunarr", title = "Tunarr", type = "http", target = "http://127.0.0.1:8000/api/version", expect = { json = [{ path = "tunarr", exists = true }] } },
+  { name = "booklore", title = "BookLore", type = "http", target = "http://127.0.0.1:6060/api/v1/healthcheck", expect = { json = [{ path = "data.status", equals = "UP" }] } },
+  { name = "grimmory", title = "Grimmory", type = "http", target = "http://127.0.0.1:6061/api/v1/healthcheck", expect = { json = [{ path = "data.status", equals = "UP" }] } },
+  { name = "shelfmark", title = "Shelfmark", type = "http", target = "http://127.0.0.1:8084/api/health", expect = { json = [{ path = "status", equals = "ok" }] } },
+  { name = "hometube", title = "HomeTube", type = "http", target = "http://127.0.0.1:8501/_stcore/health", expect = { regex = "ok" } },
+  { name = "trek", title = "Trek", type = "http", target = "http://127.0.0.1:3100/api/health", expect = { json = [{ path = "status", equals = "ok" }] } },
+  { name = "anchor", title = "Anchor", type = "http", target = "http://127.0.0.1:3010/" },
+  { name = "saved-vault", title = "Saved Vault", type = "http", target = "http://127.0.0.1:8187/" },
+  { name = "friendarr", title = "Friendarr", type = "http", target = "http://127.0.0.1:5474/" },
+  { name = "qbittorrent", title = "qBittorrent", type = "http", target = "http://127.0.0.1:8093/" },
+  { name = "jackett", title = "Jackett", type = "http", target = "http://127.0.0.1:9117/", expect = { status = ["200-299", "300-399"] } },
+  { name = "portainer", title = "Portainer", type = "http", target = "http://127.0.0.1:9000/" },
+  { name = "searxng-hermes", title = "SearXNG (agent search)", type = "http", target = "http://127.0.0.1:8889/healthz", expect = { regex = "OK" } },
+  { name = "cancel-service", title = "Alert cancel/pause page", type = "http", target = "http://127.0.0.1:8096/", class = "P1", interval_s = 120 },
+]
+
+# =====================================================================================================================
+# 5. Sensors, host daemons and AI services.
+# =====================================================================================================================
+[[group]]
+group = "Host services"
+class = "P1"
+slo = 99.5
+interval_s = 60
+tags = ["host"]
+probes = [
+  { name = "svc-plex", title = "Plex (snap service)", type = "systemd", target = "snap.plexmediaserver.plexmediaserver.service" },
+  { name = "svc-ollama", title = "ollama.service", type = "systemd", target = "ollama.service" },
+  { name = "ollama", title = "Ollama API", type = "http", target = "http://127.0.0.1:11434/api/version", expect = { json = [{ path = "version", exists = true }] } },
+  { name = "svc-glances", title = "glances.service", type = "systemd", target = "glances.service" },
+  { name = "glances", title = "Glances API (:61208)", type = "http", target = "http://127.0.0.1:61208/api/4/status", interval_s = 300, expect = { json = [{ path = "version", exists = true }] } },
+  { name = "svc-sensor-exporter", title = "sensor-exporter.service (fan supervisor)", type = "systemd", target = "sensor-exporter.service" },
+  # sensor-exporter makes a ~0.2 s subprocess round per GET, so it is asked every 5 minutes; hardware control itself is never touched.
+  { name = "sensor-exporter", title = "sensor-exporter API (:9110)", type = "http", target = "http://127.0.0.1:9110/", interval_s = 300, timeout_s = 8, expect = { json = [{ path = "cpu_temp", exists = true }] } },
+  { name = "svc-teamviewerd", title = "teamviewerd.service (remote access)", type = "systemd", target = "teamviewerd.service", interval_s = 300 },
+  { name = "svc-thermal-log", title = "thermal-log.service (legacy)", type = "systemd", target = "thermal-log.service", class = "P2", interval_s = 300, tags = ["legacy"] },
+]
+
+[[group]]
+group = "AI"
+class = "P2"
+interval_s = 300
+tags = ["ai"]
+probes = [
+  { name = "comfyui", title = "ComfyUI", type = "http", target = "http://127.0.0.1:8188/system_stats", when_running = "comfyui", expect = { json = [{ path = "system", exists = true }] } },
+  { name = "open-notebook", title = "Open Notebook API", type = "http", target = "http://127.0.0.1:5055/health", expect = { json = [{ path = "status", equals = "healthy" }] } },
+  { name = "surrealdb", title = "SurrealDB", type = "http", target = "http://127.0.0.1:8002/health" },
+  { name = "kokoro", title = "Kokoro TTS", type = "http", target = "http://127.0.0.1:8081/health", expect = { json = [{ path = "status", equals = "healthy" }] } },
+  { name = "infinity-rerank", title = "Infinity rerank", type = "http", target = "http://127.0.0.1:7997/health", expect = { json = [{ path = "unix", exists = true }] } },
+  { name = "omnivoice", title = "OmniVoice Studio", type = "http", target = "http://127.0.0.1:3900/health", expect = { json = [{ path = "status", equals = "ok" }] } },
+  { name = "speaches", title = "Speaches", type = "http", target = "http://127.0.0.1:8969/health" },
+  { name = "qdrant", title = "Qdrant", type = "http", target = "http://127.0.0.1:6333/healthz" },
+  { name = "tika", title = "Apache Tika", type = "http", target = "http://127.0.0.1:9998/tika" },
+]
+
+# =====================================================================================================================
+# 6. Containers. The fleet probe judges EVERY container's state and Docker healthcheck in one row (details name the offenders);
+#    per-container probes below give the stateful stores and key apps their own availability history.
+#    Stopped by design: comfyui (expected_stopped_containers in maint.toml), the throw-away maintenance-web-test-N containers.
+# =====================================================================================================================
+[[probe]]
+name = "ct-fleet"
+title = "All containers running and healthy"
+type = "docker"
+target = "*"
+class = "P2"
+group = "Containers"
+interval_s = 120
+tags = ["containers"]
+expect = { except = ['^comfyui$', '^maintenance-web-test-\d+$'] }
+kuma_push_key = "containers"
+
+[[group]]
+group = "Containers"
+type = "docker"
+class = "P1"
+interval_s = 120
+tags = ["containers", "db"]
+probes = [
+  { name = "ct-immich-postgres", title = "immich_postgres", target = "immich_postgres" },
+  { name = "ct-immich-redis", title = "immich_redis", target = "immich_redis" },
+  { name = "ct-nextcloud-postgres", title = "nextcloud_postgres", target = "nextcloud_postgres" },
+  { name = "ct-nextcloud-redis", title = "nextcloud_redis", target = "nextcloud_redis" },
+  { name = "ct-tday-db", title = "tday_db", target = "tday_db" },
+  { name = "ct-afsaane-prod-db", title = "afsaane-prod-db", target = "afsaane-prod-db" },
+  { name = "ct-open-webui-public", title = "open-webui-public", target = "open-webui-public" },
+  { name = "ct-owui-public-quota", title = "owui-public-quota (guest quota)", target = "owui-public-quota" },
+]
+
+[[group]]
+group = "Containers"
+type = "docker"
+class = "P2"
+interval_s = 300
+tags = ["containers", "db"]
+probes = [
+  { name = "ct-grimmory-db", title = "grimmory-db", target = "grimmory-db" },
+  { name = "ct-mariadb", title = "mariadb", target = "mariadb" },
+  { name = "ct-surrealdb", title = "open-notebook-surrealdb-1", target = "open-notebook-surrealdb-1" },
+  { name = "ct-qdrant", title = "qdrant", target = "qdrant" },
+  { name = "ct-immich-ml", title = "immich_machine_learning", target = "immich_machine_learning" },
+  { name = "ct-docker-socket-proxy", title = "docker-socket-proxy", target = "docker-socket-proxy", class = "P0", severity = "warn", interval_s = 120 },
+]
+
+# =====================================================================================================================
+# 7. Hermes (the agent harness, an app): its liveness comes from its OWN state files, never by importing Hermes.
+#    stack_watchdog.py and search_canary.py keep running (as scheduler jobs, S8) and keep writing ~/.hermes/*_state.json in
+#    health_alert's v2 format; each of their checks is mirrored here as a probe so it shows up in the inventory, the SLOs and the
+#    incident ledger with availability history. While those scripts still text/email on their own the mirrors are severity=info
+#    (never page, so nothing is sent twice); at the cutover of stack-watchdog / search-canary (see legacy-retirement.toml) flip
+#    the two `severity = "info"` lines below to "warn" and stop the legacy notification. The meta probes (is the watchdog itself
+#    still running? is the ticker beating?) page as warn now: nothing else watches them.
+# =====================================================================================================================
+[[group]]
+group = "Hermes"
+source = "hermes"
+class = "P1"
+slo = 99.0
+interval_s = 120
+tags = ["hermes"]
+probes = [
+  { name = "hermes-api", title = "Hermes API (:8642)", type = "http", target = "http://127.0.0.1:8642/health", expect = { json = [{ path = "status", equals = "ok" }] } },
+  { name = "hermes-gateway", title = "Hermes gateway state", type = "json", target = "/home/ohmz/.hermes/gateway_state.json", expect = { json = [{ path = "gateway_state", equals = "running" }, { path = "updated_at", age_max_s = 300, age_warn_s = 180 }] } },
+  # ticker_heartbeat / ticker_last_success hold one float epoch (written every 60 s); the watchdog's own limit is 300 s.
+  { name = "hermes-ticker", title = "Hermes cron ticker beating", type = "file_age", target = "/home/ohmz/.hermes/cron/ticker_heartbeat", expect = { max_age_s = 300, warn_age_s = 180, epoch_content = true } },
+  { name = "hermes-ticker-ok", title = "Hermes cron ticker succeeding", type = "file_age", target = "/home/ohmz/.hermes/cron/ticker_last_success", expect = { max_age_s = 300, warn_age_s = 180, epoch_content = true } },
+  { name = "hermes-flightclaw", title = "Flightclaw MCP (:8765)", type = "http", target = "http://127.0.0.1:8765/mcp", interval_s = 300, class = "P2", expect = { status = [200, 406] } },   # a bare GET gets 406 from a live MCP server
+  { name = "hermes-watchdog-alive", title = "stack-watchdog still running", type = "json", target = "/home/ohmz/.hermes/watchdog_state.json", kuma_push_key = "hermes-watchdog", expect = { max_age_s = 1200, json = [{ path = "run.last_run_at", age_max_s = 1200, age_warn_s = 600 }, { path = "run.killed_streak", max = 1 }] } },
+  { name = "hermes-canary-alive", title = "search-canary still running", type = "json", target = "/home/ohmz/.hermes/search_canary_state.json", interval_s = 600, expect = { max_age_s = 5400, json = [{ path = "run.last_run_at", age_max_s = 5400, age_warn_s = 3600 }, { path = "run.killed_streak", max = 1 }] } },
+]
+
+# Mirrors of the watchdog's 11 checks (key = the checks.<key> in watchdog_state.json; label/detail are Hermes's own words).
+[[group]]
+group = "Hermes watchdog"
+source = "hermes"
+type = "json"
+class = "P2"
+severity = "info"
+interval_s = 300
+tags = ["hermes", "mirror"]
+expect = { max_age_s = 1200 }
+probes = [
+  { name = "hermes-wd-gateway", title = "Hermes gateway (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.gateway.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.gateway.last_detail" } },
+  { name = "hermes-wd-api", title = "Hermes API (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.api.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.api.last_detail" } },
+  { name = "hermes-wd-delivery", title = "Delivery timer (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.delivery.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.delivery.last_detail" } },
+  { name = "hermes-wd-backup", title = "Stack backup freshness (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.backup.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.backup.last_detail" } },
+  { name = "hermes-wd-flightclaw", title = "Flightclaw (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.flightclaw.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.flightclaw.last_detail" } },
+  { name = "hermes-wd-pubgate", title = "Public gate (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.pubgate.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.pubgate.last_detail" } },
+  { name = "hermes-wd-pubquota", title = "Guest quota (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.pubquota.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.pubquota.last_detail" } },
+  { name = "hermes-wd-ticker", title = "Cron ticker (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.ticker.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.ticker.last_detail" } },
+  { name = "hermes-wd-gwrestarts", title = "Gateway restarts (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.gwrestarts.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.gwrestarts.last_detail" } },
+  { name = "hermes-wd-backlog", title = "Delivery backlog (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.backlog.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.backlog.last_detail" } },
+  { name = "hermes-wd-version", title = "Hermes version pin (watchdog)", target = "/home/ohmz/.hermes/watchdog_state.json", expect = { json = [{ path = "checks.hermesver.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.hermesver.last_detail" } },
+]
+
+[[group]]
+group = "Hermes watchdog"
+source = "hermes"
+type = "json"
+class = "P2"
+severity = "info"
+interval_s = 600
+tags = ["hermes", "mirror", "search"]
+expect = { max_age_s = 5400 }
+probes = [
+  { name = "hermes-sc-chat", title = "Web search, chat (canary)", target = "/home/ohmz/.hermes/search_canary_state.json", expect = { json = [{ path = "checks.search_chat.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.search_chat.last_detail" } },
+  { name = "hermes-sc-agent", title = "Web search, agent jobs (canary)", target = "/home/ohmz/.hermes/search_canary_state.json", expect = { json = [{ path = "checks.search_hermes.status", in = ["ok"], warn_in = ["degraded"] }], detail_path = "checks.search_hermes.last_detail" } },
+]
+
+# =====================================================================================================================
+# 8. Public reachability (end to end through the Cloudflare tunnel). external = true is the ONLY way a probe may leave the
+#    host; GET only, nothing sent. seerr.ohmzhomelab.ca answered 200 on 2026-10-02. The maintenance hostname is added in the
+#    Cloudflare dashboard by the owner (web/README.md), so it is optional until it has been seen up once; when Cloudflare
+#    Access fronts it, an unauthenticated GET gets the Access login (302/401/403), which still proves tunnel + DNS.
+# =====================================================================================================================
+[[group]]
+group = "Public"
+type = "http"
+external = true
+class = "P1"
+interval_s = 300
+tags = ["public"]
+probes = [
+  { name = "public-seerr", title = "Public hostname: Seerr", target = "https://seerr.ohmzhomelab.ca/" },
+  { name = "public-maintenance", title = "Public hostname: maintenance site", target = "https://maintenance.ohmzhomelab.ca/healthz", optional = true, expect = { status = ["200-299", "300-399", 401, 403] } },
+]

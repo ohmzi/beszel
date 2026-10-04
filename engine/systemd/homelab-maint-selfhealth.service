@@ -1,0 +1,44 @@
+[Unit]
+Description=homelab-maint pipeline self-health (rewrites public/self.json every minute)
+Documentation=file:///usr/local/lib/homelab-maint/homelab_maint/tasks/self_health.py
+# Ordering only: the website probe fails closed when Docker is down, so no Requires=/Wants=.
+After=docker.service local-fs.target
+
+[Service]
+Type=oneshot
+# Root, like the other runner units: /var/lib/homelab-maint is root-owned and the sandbox below stops the unit writing anywhere else.
+User=root
+Environment=PYTHONPATH=/usr/local/lib/homelab-maint
+# The docker CLI would try to read $HOME/.docker (ProtectHome hides /root); point it at nothing, quietly.
+Environment=DOCKER_CONFIG=/nonexistent
+# A dedicated unit on purpose (not the metrics sampler, not the tick): it is the dead-man for the check tier, so it must not depend on
+# either. It reads ~10 small files, a 6 MiB history tail (cached 30 min), `systemctl is-active docker.service`, `docker inspect` and one
+# loopback GET /healthz, the last two bounded at 3 s. Typical 0.2 s; the limits below are for a hung docker/website, not for the work.
+ExecStart=/usr/bin/python3 -B -m homelab_maint.tasks.self_health --refresh
+Nice=10
+IOSchedulingClass=idle
+OOMScoreAdjust=500
+MemoryMax=512M
+TasksMax=128
+TimeoutStartSec=30
+TimeoutStopSec=5
+SyslogIdentifier=homelab-maint-selfhealth
+
+# Read-only everywhere except the state dir (tasks/self_health.json, public/self.json). NOT ProtectProc=/ProcSubset=pid: the docker gate
+# reads /proc/<pid>/comm of dockerd. Unix sockets (docker.sock, the systemd bus) are not affected by the IP filter.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/homelab-maint
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+IPAddressDeny=any
+IPAddressAllow=localhost
+# public/self.json is read by the web container as another user.
+UMask=0022

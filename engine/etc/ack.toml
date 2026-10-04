@@ -1,0 +1,163 @@
+# homelab-maint: acknowledged known issues (SPEC5), read by homelab_maint/acks.py.
+#
+# Installed to /etc/homelab-maint/ack.toml ONLY IF ABSENT. The BASELINE of everything below lives in homelab_maint/acks.py (versioned with the
+# code; tests/test_acks.py keeps it equal to this file), and this file overrides it per [ack]/[inbox] key and per [key.<task>] table. So a
+# missing file, or a rule a later release adds that your copy lacks, is the baseline. A file that is not valid TOML is ignored AS A WHOLE, and
+# a value out of range or a rule that does not compile is ignored on its own (`homelab-maint ack validate` lists them): the ack path must
+# fail towards ALERTING, never towards silence.
+#
+# What an acknowledgement means: "I understand this error and I'm okay with it". It silences THAT EXACT error, identified by a fingerprint
+#   fp = sha1(task + "|" + issue_key)[:16],
+# at the severity that was acknowledged or lower, for [ack] days. It never hides anything else: a different error of the same task has a
+# different fingerprint, an escalation (warn -> crit) is not covered, a MAGNITUDE that grows by a decade (see `mag` below) is not covered, and
+# "the check itself failed" (status error) is never covered by an acknowledgement of a condition the check reports. The status keeps its true
+# colour in status.json; only the red alert, the e-mail/SMS and the open-incident count stop. Unacknowledging (CLI or website) restores
+# alerting at once.
+#
+# issue_key = Result.issue_key when the task sets one, else the per-task rule below, else normalize(summary):
+#   lowercase; the "warn:"/"crit:" status prefix, ids >= 8 hex digits, dates, clock times, sizes (GiB, MB ...), durations (6d10h, 28h),
+#   percentages, fractions (25/27) and every other STANDALONE number become "#"; digits that belong to a name (nvme0, immich-1, foo@2.service,
+#   /mnt/2tb, 10.0.0.5) and numbers that name a port, error or exit code stay; whitespace is collapsed; cut at 160 characters. A "(+N more)"
+#   tail is kept as " +N": a longer hidden list is a different error.
+# The rules were derived from the REAL summary formats of every task (homelab_maint/tasks/*.py) and from a live check run on this host
+# (e.g. "crit: docker-prune.timer ON (next in 35.2 h): deletes container comfyui + image comfyui-local:tier2-gcc (14.9 GiB); natives keep").
+# `homelab-maint ack explain TASK` prints the rule, the key and the id of a task's current error.
+#
+# [ack] policy: WHICH TASKS may be acknowledged at all (one rule for the buttons, the inbox, the CLI, notify and status.json),
+# and `severities` narrows that to WHICH SEVERITIES (warn only by default: crit always alerts).
+#   require_rule = true   only a task whose fingerprint names THE ERROR: a Result.issue_key, a [key.<task>] table below, or allow_tasks.
+#                         Every other task falls back to the number-blind text of its summary, which keeps the same fingerprint while a
+#                         failure count grows tenfold: it gets no id, no button, no acknowledgement. false lifts that for every task.
+#   allow_tasks           tasks you accept the number-blind fallback for, one by one
+#   deny_tasks / deny_prefixes   never acknowledgeable (they beat rules and allow_tasks): the smartd hook's text carries its severity in its
+#                         numbers; the scheduler's job:* keys are only an exit code
+#
+# [key.<task>]  mode = "text"   (default) normalize(summary); `sort = true` sorts the "; "-separated segments first, so a list
+#                               whose order moves is still the same error
+#               mode = "task"   the task name alone: ANY problem of that task is "the same error" (only for tasks whose summary
+#                               is all volatile numbers; the severity ceiling still stops an escalation)
+#               mode = "regex"  `regex = [...]`: every match of every pattern (case-insensitive, searched in the summary without its
+#                               status prefix and "(+N more)" tails) contributes to the key:
+#                                 * a pattern with ONE group lists names: a comma list ("a.service, b.service") is split, parts are
+#                                   lowercased and tagged with the pattern's index; "Radarr +1" is the name radarr plus the count 1
+#                                 * a pattern with several groups yields ONE joined part per match ("backup-x/b2")
+#                                 * a group named (?P<mag>...) is a MAGNITUDE: durations count in hours, sizes in GiB, and the DECADE
+#                                   becomes the part: b1 = 1..9, b2 = 10..99, b3 = 100..999 ... so "+2 reallocated sectors" and "+8000" are
+#                                   different errors although both are "warn", while +2 and +7 are the same
+#                               The counts of what a task cut off ("4 failed unit(s)", "+3 more") are part of the key, so a 5th failed
+#                               unit behind the visible four alerts. A set of failing things is ONE error: if one of two failing units
+#                               recovers, the key changes and the remaining unit alerts once more. No match at all falls back to "text":
+#                               more specific, so it can only alert MORE, never less.
+#                 split = "; "  (regex mode) the summary is cut into segments "<entity> <detail>"; every part is tagged with the entity
+#                 alias = [list, from, to]   (with split) the entity is renamed through status metrics: metrics[list] is a list of dicts
+#                               and the entity whose `from` field equals the name becomes its `to` field. smart_trend: sda -> model + serial
+#                               tail, so a kernel name that swaps between boots cannot hand an acknowledgement to another disk
+# Patterns are TOML literal strings ('...'), so backslashes are written as they are. At most 10 patterns of 240 characters.
+
+[ack]
+days = 90                        # default length of an acknowledgement
+min_days = 1                     # per-ack override range (CLI / website / e-mail link)
+max_days = 365
+severities = ["warn"]            # which severities may be acknowledged AT ALL. The shipped policy is warn only: a critical issue (and a check
+                                 # whose own status is "error") must keep alerting, so it gets no button, no id, no token and no CLI/website
+                                 # acknowledgement. Add "crit" to allow acknowledging critical issues again (not recommended: it silences the
+                                 # loudest alert for the whole period; escalation_breaks still stops a warn ack from covering a later crit).
+escalation_breaks = true         # warn acknowledged, then crit: NOT suppressed, alerts once more
+max_acks_per_day = 50            # accepted ack requests from the inbox per rolling 24 h (un-acknowledge is never limited)
+max_active = 500                 # most acknowledgements active at once (a runaway client cannot grow the state without bound)
+token_ttl_days = 30              # e-mail button lifetime (single use); notify.toml [ack] token_ttl_days asks for it, 1..90
+max_tokens = 500                 # outstanding tokens kept (spent and expired ones are dropped first, then the oldest)
+expired_keep_days = 30           # an expired ack stays listed (and counted in stats.expired_30d) this long; its notice reads the record
+notice_attempts = 5              # tries to hand the single "acknowledgement expired" notice to notify before giving up
+suppress_log_s = 3600            # at most one audit line per fingerprint per hour for "suppressed" (the count still counts)
+require_rule = true              # see the policy above: false would let EVERY task be acknowledged by the number-blind text (not recommended)
+allow_tasks = []                 # these four policy keys are THE policy: the pager (notify.py, via acks.ackable) reads this copy too. etc/notify.toml [ack]
+deny_tasks = ["smart_event"]      # still carries a deprecated equal copy (a test compares the shipped files); it only applies if the acks module is missing
+deny_prefixes = ["job:"]
+
+[inbox]                          # STATE_DIR/ack/inbox, written by the web container, read by the runner (never trusted)
+max_bytes = 2048                 # a request file larger than this is removed without being read
+skew_s = 600                     # |request ts - now| must be within this
+max_files_per_run = 100          # the rest waits for the next minute
+rejected_keep = 200              # files kept in inbox/rejected/ (oldest dropped first); 0 keeps none
+require_signature = true         # HMAC-SHA256 with ack/web.key over the canonical request, for BOTH sources: fail closed
+unsigned_sources = []            # ["email"] would accept token-hash requests without an HMAC (SPEC5 section 8's literal wording). Hashes
+                                 # are public (ack/tokens.json), so anyone who can write the inbox could then ack any outstanding link:
+                                 # leave empty unless the inbox directory is writable by the web container ONLY.
+
+# ---------------------------------------------------------------------------------------------------------------- key rules
+# Tasks not listed here (cleaners, routine steps, external jobs, anything added later) use mode "text" and, with require_rule = true,
+# cannot be acknowledged unless they set Result.issue_key or are listed in allow_tasks.
+
+[key.disk_forecast]              # "warn: /mnt/x 4% free (210.0 GiB), full in 5d; /home 9% free (1.0 TiB); +2 more"  -> the mounts (+ the +2)
+mode = "regex"
+regex = ['(?:^|; )(/[^;]*?) \d+% free']
+
+[key.failed_units]               # "warn: 2 failed unit(s): a.service, b.service; 1 unhealthy: kavita; 2 restarting: x, y"  -> the names AND the
+mode = "regex"                   # counts (the task shows at most 3-4 names: a 5th failing unit changes only the count)
+regex = ['(\d+) failed unit\(s\)', 'failed unit\(s\): ([^;]*)', '(\d+) unexpected exited', 'unexpected exited: ([^;]*)', '(\d+) unhealthy', 'unhealthy: ([^;]*)', '(\d+) restarting', 'restarting: ([^;]*)']
+
+[key.backup_freshness]           # "crit: backup-system FAILED (6d10h ago); stack-backup 28h old (limit 26h)"  -> the backup + its result word; for a
+mode = "regex"                   # late one also the decade of its age in hours (28h b2, 4 days b3, 41 days b4): late by a night is not late by a month
+regex = ['(?:^|; )([\w.-]+ [A-Z_]+) \(\S+ ago\)', '(?:^|; )([\w.-]+) (?P<mag>\S+) old \(limit']
+
+[key.docker_df]                  # housekeeping, alert = false; the summary is sizes only
+mode = "task"
+
+[key.memory_health]              # "warn: memory stall 6.1%, 8.0 GiB available, swap-in 140 pages/s, 1 OOM kill(s) in last 6h (...)": which conditions;
+mode = "regex"                   # a swap-in rate and an OOM count only warn however large, so their decade counts (1 kill is not 50)
+regex = ['(memory stall)', '\b(available)\b', '(swap-in) (?P<mag>\d+) pages', '(?P<mag>\d+) (oom kill)']
+
+[key.plex_media_mount_check]     # "crit: Media dir is not mounted (SSD path exists); ..." / "warn: Plex Media mounted from X, expected under Y"
+mode = "regex"                   # (the source device name moves between boots: the expected prefix is the stable part)
+regex = ['(is not mounted)', 'mounted from [^,]+, (expected under \S+)']
+
+[key.smart_trend]                # "SMART: sda realloc +2, 72C; nvme0 70C (+1 more)": per DISK (model + serial tail, not sda) which attribute and the decade
+mode = "regex"                   # of its growth (+2 is not +8000: the task only ever warns), which "hot" or "stale" note, never the temperature
+split = "; "
+alias = ["devices", "dev", "model"]
+regex = ['([A-Za-z][\w-]*) \+(?P<mag>\d+)', '\d+(C)\b', '(smartd data) \d+h old', '(unreadable)', '(no parsable rows)']
+
+[key.alert_path_health]          # "alert path: bridge missing; smartd hook broken; 3 smart hook sends failed rc=1: <stderr>"
+mode = "regex"
+regex = ['(bridge missing|smartd hook broken)', '\d+ (smart hook|notifier) sends failed', '(smart hook|notifier) log unreadable']
+
+[key.growth_watch]               # "growth over limit: kavita/logs +1.20 GiB/d (+1 more); 2/4 paths unmeasured" / "growth blind >12h: 2/4 ...: a/b, c/d"
+mode = "regex"                   # the growing path and the decade of its rate (+1 GiB/d is not +300 GiB/d), the blind paths and how many
+regex = ['^(growth over limit|growth blind)', '([^\s,;:]+) (?P<mag>[+-]?\d+(?:\.\d+)?) GiB/d', 'cut off\): ([^;]*)', 'blind >\S+: (\d+)/']
+
+[key.stuck_detector]             # "2 candidate(s), 1 actionable: tunarr 4.1 GiB leak/runaway; mem pressure crit"  -> how many are actionable, the top
+mode = "regex"                   # container and the decade of its size (4 GiB is not 40 GiB)
+regex = ['(\d+) actionable', 'actionable(?:, restarted \S+)?: (\S+) (?P<mag>\d[\d.]* ?[KMGT]?i?B)']
+
+[key.orphan_report]              # "1 idle gradle daemon, 3 zombies (1.2 GiB anon)"  -> the kinds of orphan with the decade of their count (3 zombies
+mode = "regex"                   # are not 3000) and of the memory they hold
+regex = ['(?P<mag>\d+) (idle gradle daemon|orphan emulator|stray server|orphan crashpad handler|zombie|long-running emulator)', '\((?P<mag>\d[\d.]* ?[KMGT]?i?B) anon\)']
+
+[key.pressure_state]             # "L3 slow batch: memory stall 11.0%, 8.0 GiB avail; top: ollama P1"  -> the LEVEL and which signals drive it, so another level
+mode = "regex"                   # or cause alerts; "cannot read /proc/pressure" is status error, which has its own key and is never covered
+regex = ['^(L\d)\b', '\b(memory stall|memory wait|avail|swap-in|io stall|io wait|cpu wait|vram)\b']
+
+[key.pressure_response]          # "L3 slow batch: 1 done, 1 failed; ALERT ONLY runaway (protected/unclassified, runaway)"
+mode = "regex"
+regex = ['\d+ (failed)\b', '(throttle\(s\) not restored)', '(ALERT ONLY)']
+
+[key.probes]                     # "3 down: Plex, Radarr, X +1; 1 degraded: X; 1 flapping: Y +1; 25/27 up"  -> the names and the counts (the list is
+mode = "regex"                   # clipped at 3, newest failure last: a new outage lands behind the cut and changes only the count)
+regex = ['(\d+) down:', 'down: ([^;]*)', '(\d+) degraded:', 'degraded: ([^;]*)', '(\d+) flapping:', 'flapping: ([^;]*)', '(\d+ bad probe defs)']
+
+[key.os_jobs]                    # "OS jobs: 2 of 13 need attention: logrotate overdue; fstrim failed (reason) (+1)"  -> which jobs and how many
+mode = "regex"
+regex = ['(?:attention: |; )([\w.@-]+ (?:overdue|failed|inactive|unknown))', '(\d+) of \d+ need attention']
+
+[key.docker_prune_exposure]      # "docker-prune.timer ON (next in 39.3 h): deletes container comfyui, tunarr +2 + image x (14.9 GiB); natives keep"
+mode = "regex"                   # the names it would delete and how many more are hidden behind "+2", never the countdown (the ceiling handles crit)
+regex = ['deletes container (.+?)(?= \+ image|;|$)', '\+ image (.+?)(?= \(|;|$)']
+
+[key.immich_recycle]             # "restart of immich_server failed: <error>" / "immich_server restarted but is unhealthy"
+mode = "regex"
+regex = ['(restart of \S+ failed)', '(\S+ restarted but is \S+)']
+
+[key.comfyui_idle_reclaim]       # "restart of comfyui failed: <error>"
+mode = "regex"
+regex = ['(restart of \S+ failed)']

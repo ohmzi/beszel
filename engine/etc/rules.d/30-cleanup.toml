@@ -1,0 +1,1323 @@
+# homelab-maint rules registry: Cleanup and retention. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync). The wording fields (title, why, does, proof, principle, owner_notes) are
+# written from the task code in homelab_maint/tasks/*.py; file, target, params, merge, mode, order and enabled compile into maint.toml.
+
+[meta]
+category = "cleanup"
+title = "Cleanup and retention"
+blurb = "What the script cleans or trims, under which limits (report-only until you say apply)."
+
+[[rule]]
+id = "task.docker_cache"
+title = "Docker build cache: trim to 8 GiB once it passes 15 GiB"
+kind = "cleanup"
+why = """\
+  BuildKit keeps every layer it has built, and the cache of this host's own buildx builder once reached 46 GB \
+  while the legacy prune job still reported success. Regenerable data needs a ceiling or it fills the disk \
+  unnoticed, and a pruned layer only costs a rebuild. The one thing that must not happen is pruning during a \
+  build, so a running build always wins."""
+does = """\
+  Daily routine step. Lists the buildx builders that are running and visible to the user the daily service \
+  runs as (root, so see owner_notes), measures each with `docker buildx du`, and for every builder above \
+  high_gib (15 GiB) runs `docker buildx prune --builder NAME -f --max-used-space` set to low_gib (8 GiB), \
+  which drops the least recently used entries until about 8 GiB remain. A builder it cannot measure is left \
+  alone. The reclaim estimate (size minus 8 GiB) must fit under max_gib_per_run (30 GiB): a cache above 38 GiB \
+  is skipped as over the cap, never pruned partly. Volumes are never touched. Report-only in the shipped \
+  config: it lists each builder it would prune with the estimate."""
+applies_to = ["docker_cache"]
+file = "maint.toml"
+target = "tasks.docker_cache"
+params = { high_gib = 15, low_gib = 8, max_gib_per_run = 30 }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Skipped while the docker_build busy gate reports a build: a docker, buildx or buildctl build command, a \
+  buildkitd step, or buildkitd above 10 percent of a core; a failed probe counts as busy. The audit target is \
+  builder:NAME, so protected.toml can veto it, and the per-run cap, PAUSE and the kill switch are enforced by \
+  the shared action gate (ctx.act). The routine's canary caps the first apply run at 10 percent. While \
+  report-only it just writes 'would prune' rows to the audit log."""
+principle = "capacity planning; in-use proof before deletion"
+owner_notes = """\
+  Gap found 2026-10-03: the daily service runs as root, root has no buildx builders of its own, so only root's \
+  default builder is seen; the owner's immaculaterr-builder (ohmz's docker config) is never pruned, no option \
+  exists for it and docker_prune_parity lists it as a gap. The legacy docker-prune.sh also used an age filter \
+  (until=168h) and a 20 GB cap per builder; this task has no age filter and trims by size alone (to low_gib \
+  once a builder passes high_gib). With max_gib_per_run = 30 a cache like the 46 GB one \
+  seen once (42.8 GiB, estimate about 35 GiB) is refused as over the cap (checked with a stubbed run), so a \
+  cache that size needs a manual prune or a higher cap. docker-prune.timer was disabled by the owner on \
+  2026-10-02."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.docker_images"
+title = "Unused Docker images: remove after 14 days with no container"
+kind = "cleanup"
+why = """\
+  Every pull leaves the previous image version behind, and they add up (docker_df warns at 40 GiB of \
+  reclaimable images). Removing one that is still needed means a slow re-pull or, for a local build such as \
+  ComfyUI, an image nobody can rebuild, so the rule waits a long time and wants three independent proofs \
+  before it removes anything."""
+does = """\
+  Daily routine step, after dangling_images. Reads every image from `docker system df -v` and every container \
+  including stopped ones. An image is a candidate only when no container references it now, this task has \
+  itself seen it unreferenced for unused_days (14), and the image ledger (written every 15 minutes by \
+  image_ledger) is fresh (at most 48 hours old), has existed for at least 14 days and has not seen the image \
+  in use within 14 days. Candidates go oldest first-seen, then largest, each with `docker image rm` (all tags \
+  by name for a multi-tag image; never -f, never `docker system prune`). Caps: 12 images and 15 GiB per run, \
+  each image counted by its unique size; one bigger than the cap is skipped. Report-only in the shipped \
+  config."""
+applies_to = ["docker_images"]
+file = "maint.toml"
+target = "tasks.docker_images"
+params = { unused_days = 14, max_items_per_run = 12, max_gib_per_run = 15 }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  No container, running, exited, created or dead, references the image, and docker system df must say 0 \
+  containers (any other value counts as referenced). A missing, stale or unreadable ledger selects nothing, \
+  and an image with an odd ledger entry is kept. The task also keeps its own first-seen clock, so a \
+  just-pulled image waiting for `compose up` is not eligible before it has been unreferenced for 14 days, and \
+  nothing can go before 14 days after the ledger was created. Images whose tags match protected.toml (immich, comfyui, ollama, plex, \
+  tunarr, kometa, the *arr stack ...) are never removed. Without -f docker itself refuses an image a container \
+  uses. The routine's canary caps the first apply run at 10 percent."""
+principle = "in-use proof before deletion; dry-run first"
+owner_notes = """\
+  Replaces the image step of docker-prune.sh, which counted from the image build date and 7 days; this counts \
+  unused time and 14 days, so it acts later. The ComfyUI image (about 14.9 GiB, a local build) stays while the \
+  stopped comfyui container references it. docker-prune.timer was disabled by the owner on 2026-10-02 because \
+  it would have removed that container and then that image."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.apt_clean"
+title = "APT package cache: apt-get clean"
+kind = "cleanup"
+why = """\
+  The .deb files in /var/cache/apt/archives are only needed until the install finishes and can always be \
+  downloaded again, so emptying them is the cheapest safe way to stop the root disk from growing. The only \
+  risk is racing a running apt or dpkg, so it never runs while one is active."""
+does = """\
+  Daily routine step (needs root to apply). Measures the files in /var/cache/apt/archives (the .deb packages) \
+  plus the root-only partial/ folder and, when there are any, runs `apt-get clean`. It never runs autoremove and never \
+  touches installed packages. It is skipped while apt or dpkg runs or holds a lock, and a non-root run cannot \
+  prove the lock and refuses to apply. Report-only in the shipped config: it only reports the cache size."""
+applies_to = ["apt_clean"]
+file = "maint.toml"
+target = "tasks.apt_clean"
+params = {}
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  The apt busy gate must be idle (no apt, apt-get, aptitude, dpkg or unattended-upgrade process, no lock on \
+  lock-frontend, dpkg lock, lists/lock or archives/lock) and a non-blocking lock probe must say free; unknown \
+  refuses apply. Only the package cache is removed and the freed size is the measured cache size."""
+principle = "capacity planning; in-use proof before deletion"
+owner_notes = """\
+  apt_cache does the same `apt-get clean` with a size floor. Run only one of the pair: apt_clean is the \
+  enabled one."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.apt_cache"
+title = "APT archives cache: clean above 10 MiB (switched off)"
+kind = "cleanup"
+why = """\
+  The same job as apt_clean, offered as the alternative: it ignores a cache below min_mib and reports the \
+  bytes it really freed, measured after the clean. It ships switched off so the two never both run on one \
+  cache."""
+does = """\
+  Switched off (enabled = false in its task table): the task does not run and the routine shows its step as \
+  disabled. When enabled it measures /var/cache/apt/archives, does nothing at or below min_mib (10 MiB), and \
+  otherwise runs `apt-get clean` when no apt or dpkg process or lock exists, reporting the measured freed \
+  bytes. Report-only in the shipped config."""
+applies_to = ["apt_cache"]
+file = "maint.toml"
+target = "tasks.apt_cache"
+params = { enabled = false, min_mib = 10 }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Same proofs as apt_clean: apt busy gate idle, lock probe free, no root means apply is refused. Switched off \
+  and report-only, so it does nothing today."""
+principle = "capacity planning; in-use proof before deletion"
+owner_notes = """\
+  To swap the pair set enabled = true here and enabled = false on apt_clean (README). Never enable both."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.stale_driver_packages"
+title = "Stale NVIDIA driver packages: purge branches other than the loaded one"
+kind = "cleanup"
+why = """\
+  Each driver upgrade leaves the previous branch installed, and a branch is a large set of packages. On a host \
+  whose GPU serves ComfyUI, Ollama, Plex and Immich, a wrong purge could leave no working driver after the \
+  next boot, so the rule removes only whole stale branches and only after proving that the loaded driver is \
+  intact and that nothing uses the stale files."""
+does = """\
+  Daily routine step (needs root). Reads the loaded driver version from /sys and /proc, lists the \
+  driver-branch packages (nvidia-*, libnvidia-*, xserver-xorg-video-nvidia-*, linux-modules-nvidia-*) and \
+  selects every package of a branch other than the loaded one (keep_branches could pin more; none are set). \
+  The whole set goes in one `apt-get -y purge`. The set's installed size must fit under max_gib_per_run (10 \
+  GiB), else the whole set is skipped as over the cap. Afterwards nvidia-smi, dkms, `dpkg --verify` of the \
+  loaded packages and the module the next boot loads are checked again; any failure is crit, and a missing \
+  module for the next boot names the dkms command that restores it. Report-only in the shipped config."""
+applies_to = ["stale_driver_packages"]
+file = "maint.toml"
+target = "tasks.stale_driver_packages"
+params = { max_gib_per_run = 10 }
+mode = "report"
+severity = "crit"
+destructive = true
+proof = """\
+  All must hold: the loaded version is known and the module on disk for the running kernel is the same \
+  (otherwise a reboot is pending and nothing is touched); no newer branch is installed; the loaded packages \
+  are installed and verify clean; a module exists for the running kernel (dkms status or \
+  linux-modules-nvidia); no stale package is on apt hold, has an edited config file or an unreadable file \
+  list; no stale library is mapped, open or named by any process (whole-host /proc pass, root only); `apt-get \
+  -s purge SET` removes exactly that set; apt and dpkg are idle and `dpkg --audit` is clean. Right before the \
+  purge apt and dpkg idleness, library use and the purge closure are checked again. The routine's canary caps \
+  the first apply run at 10 percent."""
+principle = "in-use proof before deletion; dry-run first"
+since = "2026-10-03"
+
+[[rule]]
+id = "task.apt_autoremove_unused"
+title = "Unused auto-installed packages: purge only what no process uses"
+kind = "cleanup"
+why = """\
+  `apt autoremove` is usually run on trust, and on a GPU and Docker host it can remove a library that a \
+  program loads on demand (CUDA, a JDK, GL drivers) without anyone noticing until the next start. This rule \
+  keeps the idea of autoremove but replaces trust with a proof taken from the running system, and keeps whole \
+  classes of package out of reach."""
+does = """\
+  Daily routine step (needs root). Simulates `apt autoremove --purge` to get the candidates (at most \
+  max_candidates, 80, are examined per run), then keeps a candidate when any of these hold: it is on the \
+  owner's keep list (tree, inxi), on apt hold, or matches protected.toml; it is in a built-in critical class \
+  (kernel, boot, systemd, libc, snap, Docker, libvirt and qemu, GPU and CUDA, JDK, firmware, storage, network, \
+  ssh); a running process maps, opens, executes or names one of its files; it ships anything but shared \
+  libraries or plugins under /usr/lib (programs, scripts, Python modules, systemd, D-Bus, udev or cron files, \
+  data); it has an edited config file; an installed package that stays needs it; or purging it would drag \
+  another package in. The survivors are simulated as one set and, if the result is exactly that set, purged in \
+  ONE `apt-get -y purge`; cap 5 GiB. Afterwards `systemctl --failed`, for the system and logged-in users, must \
+  not gain entries, else crit. Report-only in the shipped config."""
+applies_to = ["apt_autoremove_unused"]
+file = "maint.toml"
+target = "tasks.apt_autoremove_unused"
+params = { keep = ["tree", "inxi"], max_candidates = 80, max_gib_per_run = 5 }
+mode = "report"
+severity = "crit"
+destructive = true
+proof = """\
+  Fail closed: no root, an unreadable /proc, an unreadable dpkg state or any probe error keeps every package. \
+  One whole-host /proc pass gives the in-use answer; the set must pass `apt-get -s purge` unchanged; the \
+  in-use test and the closure run again right before the purge; apt and dpkg must be idle and `dpkg --audit` \
+  clean. The dry-run lists every package with its verdict and proof sentence. The routine's canary caps the \
+  first apply run at 10 percent."""
+principle = "in-use proof before deletion; protect before you clean"
+since = "2026-10-03"
+
+[[rule]]
+id = "task.snap_revisions"
+title = "Old snap revisions: keep 2, remove the disabled ones"
+kind = "cleanup"
+why = """\
+  Every snap refresh leaves older revisions on disk for rollback. Two revisions is the lowest value snapd \
+  accepts, so the rule fixes that setting and removes what is left over."""
+does = """\
+  Daily routine step (needs root). Sets `snap set system refresh.retain=2` when it differs (idempotent), then \
+  removes every DISABLED revision of a snap that has an active one, with `snap remove NAME --revision=N` \
+  (keep_disabled defaults to 0, so none are kept). The active revision is never removed. Nothing happens while \
+  `snap changes` shows an unfinished change or cannot be read. The size counted for the caps is the revision's \
+  .snap file. The Plex Media Server snap matches protected.toml, so its old revisions are skipped by this \
+  task. Report-only in the shipped config."""
+applies_to = ["snap_revisions"]
+file = "maint.toml"
+target = "tasks.snap_revisions"
+params = { retain = 2 }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Only revisions that snap itself marks disabled; the active revision is excluded by construction; names that \
+  match protected.toml are skipped; an unfinished snap change, an unreadable `snap list` or `snap changes`, or \
+  a retain value below 2 or above 20 stops the task. The routine's canary caps the first apply run at 10 \
+  percent."""
+principle = "capacity planning; protect before you clean"
+since = "2026-10-03"
+
+[[rule]]
+id = "task.retention"
+title = "Retention rules: where deleting files by age or count is allowed"
+kind = "cleanup"
+why = """\
+  Some applications write files forever; Kavita's logs once grew about 1 GiB a day. A retention rule trims one \
+  named folder by age or by count, and this shared rule fixes WHERE any retention rule may delete, so a wrong \
+  path in a later rule cannot reach anything else."""
+does = """\
+  Daily routine step (needs root). Evaluates every retention rule below (kavita-logs, kavita-backups). A \
+  rule's path must be an absolute directory inside allowed_roots (/volume1/docker/kavita/config and /var/log) \
+  and must not match protected.toml; its glob must be relative without '..'. Matches are chosen by \
+  modification time only (older than max_age_days, or beyond the newest keep_newest), anything changed in the \
+  last 10 minutes is never chosen, symlinks are skipped and never followed, and only files and EMPTY \
+  directories can be removed. A rule with no selector, an empty glob or a missing path selects nothing. \
+  Matches inside a never-touch tree (Plex, Docker volumes, backups, Immich, Kavita outside logs, backups and \
+  cache ...) are refused at run time even if a glob reaches them. Global caps apply: 40 GiB and 500 items. \
+  Report-only in the shipped config."""
+applies_to = ["retention"]
+file = "maint.toml"
+target = "tasks.retention"
+params = { allowed_roots = ["/volume1/docker/kavita/config", "/var/log"] }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Each delete goes through a directory fd opened with O_NOFOLLOW and re-checks inode and mtime, so a swapped \
+  symlink cannot redirect it. `rules check` blocks a config whose retention path lies outside allowed_roots or \
+  inside the never-touch list. Retention has no open-file test: it relies on the age and the 10 minute guard. \
+  An item that fails is skipped for 3 days (retry_after_days). The routine's canary caps the first apply run \
+  at 10 percent."""
+principle = "protect before you clean; dry-run first"
+owner_notes = """\
+  allowed_roots also lists /var/log although no shipped rule uses it. The Tunarr cache is app_cache_trim's now \
+  and crash dumps are crash_dumps', so one cleaner owns each file set."""
+since = "2026-10-03"
+
+[[rule]]
+id = "retention.kavita-logs"
+title = "Kavita logs: delete after 3 days"
+kind = "cleanup"
+why = """\
+  Kavita writes a log file per day into config/logs, and its debug logging once produced about 1 GiB a day \
+  (the incident growth_watch was written to catch). Three days of logs are enough to investigate a problem and \
+  keep the folder small."""
+does = """\
+  In /volume1/docker/kavita/config/logs, selects files matching kavita*.log whose modification time is older \
+  than 3 days (max_age_days). The current day's log is newer and is not selected. Directly in that folder \
+  only, no recursion. Report-only in the shipped config."""
+applies_to = ["retention"]
+file = "maint.toml"
+target = "tasks.retention.rules[]"
+merge = "append"
+severity = "warn"
+destructive = true
+proof = """\
+  Covered by the retention parent rule: confined to allowed_roots, not protected, never-touch checked per \
+  file, symlinks ignored, delete relative to a directory fd, nothing changed within 10 minutes. The routine's \
+  canary caps the first apply run at 10 percent."""
+principle = "capacity planning"
+owner_notes = """\
+  The log files are root-owned (written by the Kavita container), which is one reason the retention task needs \
+  root."""
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "kavita-logs"
+path = "/volume1/docker/kavita/config/logs"
+glob = "kavita*.log"
+max_age_days = 3
+
+[[rule]]
+id = "retention.kavita-backups"
+title = "Kavita backups: keep the newest 3 zips"
+kind = "cleanup"
+why = """\
+  Kavita writes a database backup zip every night (0.1 to 1 GiB each when checked on 2026-10-03) and never \
+  prunes them, so they fill the config volume. Three nightly zips give three restore points."""
+does = """\
+  In /volume1/docker/kavita/config/backups, takes the files matching *.zip, sorts them by modification time \
+  and keeps the newest 3 (keep_newest). Every older zip is selected, with no age condition and whatever its \
+  size; anything modified in the last 10 minutes is never selected. Report-only in the shipped config."""
+applies_to = ["retention"]
+file = "maint.toml"
+target = "tasks.retention.rules[]"
+merge = "append"
+severity = "warn"
+destructive = true
+proof = """\
+  Covered by the retention parent rule. Selection is by rank, so at least 3 zips survive while 3 exist and a \
+  zip still being written is skipped. The rule does not check that the surviving zips are valid backups. The \
+  routine's canary caps the first apply run at 10 percent."""
+principle = "capacity planning"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "kavita-backups"
+path = "/volume1/docker/kavita/config/backups"
+glob = "*.zip"
+keep_newest = 3
+
+[[rule]]
+id = "task.trash"
+title = "Trash: empty entries deleted more than 30 days ago"
+kind = "cleanup"
+why = """\
+  Files deleted from the desktop wait in ~/.local/share/Trash until someone empties it, so large files can sit \
+  on the root disk for months. Thirty days is long enough to notice a mistake."""
+does = """\
+  Daily routine step. For the configured user (ohmz) reads each Trash/info/*.trashinfo and, when its \
+  DeletionDate (local time) is more than max_age_days (30) old, removes the payload in Trash/files and then \
+  the info record. A missing or unparsable date keeps the entry; a directory is removed with a symlink-safe \
+  rmtree, and one that cannot be sized within the scan limit is left alone. Report-only in the shipped config."""
+applies_to = ["trash"]
+file = "maint.toml"
+target = "tasks.trash"
+params = { max_age_days = 30, users = ["ohmz"] }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  The Trash tree must be a real directory tree owned by the user with no symlink in it, so a symlinked \
+  ~/.local can never aim a root-run delete at other files. The ORIGINAL path recorded in the .trashinfo is \
+  checked against protected.toml: anything trashed from a protected place (tunarr, immich, comfyui, kometa \
+  ...) is never purged automatically. The payload's inode is re-checked before removal and the info file goes \
+  last. The routine's canary caps the first apply run at 10 percent."""
+principle = "capacity planning; protect before you clean"
+since = "2026-10-03"
+
+[[rule]]
+id = "task.gradle_reaper"
+title = "Idle Gradle and Kotlin daemons: SIGTERM after sustained idleness"
+kind = "cleanup"
+why = """\
+  Gradle and Kotlin compiler daemons stay in memory for days after a build, each holding a JVM heap, and are \
+  the usual leftover on a development host. They are ended for being idle, never for being big, and never \
+  while any build is running."""
+does = """\
+  Daily routine step. Finds JVMs that are a Gradle daemon, KotlinCompileDaemon or kotlin-compiler-embeddable \
+  and records one CPU-time sample per daemon (keyed by pid and start time) on every run, report mode included. \
+  A daemon is idle when at least min_samples (2) consecutive samples span at least idle_minutes (120) and its \
+  CPU grew by less than 0.05 percent of one core between each pair; with one run a day that means about a day \
+  of idleness. Idle daemons get SIGTERM, and SIGKILL only if the same process is still alive 30 seconds later. \
+  Nothing is touched while any Gradle client or worker process exists or the gradle busy gate is busy. \
+  Report-only in the shipped config."""
+applies_to = ["gradle_reaper"]
+file = "maint.toml"
+target = "tasks.gradle_reaper"
+params = { idle_minutes = 120, min_samples = 2 }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Nothing can happen on the first run, which only records the first sample. pid and start time are re-checked \
+  before every signal so a recycled pid is never hit. A daemon whose command line matches protected.toml is \
+  skipped. The audited action is one per daemon and the per-run caps and PAUSE apply through ctx.act. The \
+  routine's canary caps the first apply run at 10 percent."""
+principle = "never kill by size; detect by saturation, not size"
+since = "2026-10-03"
+
+[[rule]]
+id = "task.app_cache_trim"
+title = "App cache trim: rules for disposable application caches"
+kind = "cleanup"
+why = """\
+  Some applications fill a cache folder that is safe to empty but that nothing cleans up; Tunarr's subtitle \
+  cache once held about 131 thousand files. Trimming by file age is only acceptable while the application is \
+  watched, because a missing cache file can break a running app."""
+does = """\
+  Daily routine step (needs root while the cache is root-owned). Applies the rules below, today only \
+  tunarr-subtitles, one at a time. A rule path must be canonical, strictly inside an allowed root (the Tunarr \
+  cache folder or /volume1/docker/kavita/config), not a never-touch path, and must hold no database-looking \
+  file (*.db, *.sqlite, *-wal, *.bak ...), or the whole rule is refused. Regular files older than the rule's \
+  max_age_days by MTIME, never atime, and not changed in the last 10 minutes are removed in batches of \
+  batch_files (2000); one batch is one action, so a run is bounded by max_items_per_run (100 batches) and \
+  max_gib_per_run (15 GiB). With a container, the first batch is a canary of canary_files (200), the app then \
+  gets settle_s (5 s) and is probed, and is probed again every check_every (5) batches or check_s (10 s) and \
+  once after the rule; an unhealthy app aborts this and every remaining rule. In apply mode each unlinked file \
+  is written to a manifest in the state dir (kept 30 days). A rule that is refused, skipped or aborted \
+  warn_after_runs (2) runs in a row, or selects files but removes none 3 times, makes the task warn. \
+  Report-only in the shipped config."""
+applies_to = ["app_cache_trim"]
+file = "maint.toml"
+target = "tasks.app_cache_trim"
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Per rule: the container must be healthy before anything is touched (running, not unhealthy, health_url \
+  answering). Open-file proof by inode: no process holds a candidate open or mapped (one /proc snapshot per \
+  rule, retaken every 60 s; incomplete without root, which refuses apply). A container that bind-mounts the \
+  path must be named in the rule. Deletes are relative to O_NOFOLLOW directory fds with inode re-checks. The \
+  only protected.toml exemption is the baseline-listed regex for the subtitles folder; the rest of the Tunarr \
+  tree stays protected. The health probe is liveness only, which is why the first batch is small. The \
+  routine's canary caps the first apply run at 10 percent."""
+principle = "in-use proof before deletion; protect before you clean"
+owner_notes = """\
+  Trimmed by modification time because access times on these caches were reset by readers and cannot tell what \
+  is old. The README suggests enabling this last of the newer cleaners and reading the first run's container \
+  health line."""
+since = "2026-10-03"
+
+[rule.params]
+allowed_roots = ["/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache", "/volume1/docker/kavita/config"]
+unprotect = ['^/home/ohmz/StudioProjects/tunarr/\.docker-data/tunarr/cache/subtitles(/|$)']
+max_gib_per_run = 15
+max_items_per_run = 100
+batch_files = 2000
+canary_files = 200
+check_every = 5
+check_s = 10
+settle_s = 5
+warn_after_runs = 2
+manifest_keep_days = 30
+
+[[rule]]
+id = "app_cache_trim.tunarr-subtitles"
+title = "Tunarr subtitle cache: delete files older than 30 days"
+kind = "cleanup"
+why = """\
+  Tunarr extracts subtitle files into a cache under its Docker data folder and never trims it. They are \
+  regenerated on demand, so removing old ones costs only a little extraction time later. growth_watch also \
+  watches this folder."""
+does = """\
+  In /home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles, removes regular files whose \
+  modification time is older than 30 days, root-owned ones included (root_owned_ok, because the cache files \
+  are root-owned), in 2000-file batches. The container tunarr-host-net must be running and its web UI at \
+  http://127.0.0.1:8000/ must answer before, during and after. Only the subtitles folder is un-protected; the \
+  rest of the Tunarr data and cache stays protected."""
+applies_to = ["app_cache_trim"]
+file = "maint.toml"
+target = "tasks.app_cache_trim.rules[]"
+merge = "append"
+severity = "warn"
+destructive = true
+proof = """\
+  The first batch is a 200-file canary followed by a 5 s settle and a probe. Tunarr has no Docker HEALTHCHECK, \
+  so health means the container is running and the UI answers (liveness only); a failed probe stops the run \
+  and the task warns. A manifest lists every removed file. The whole rule is refused if the folder holds a \
+  database-looking file."""
+principle = "in-use proof before deletion; capacity planning"
+owner_notes = """\
+  By modification time, not access time: atimes on this cache had been reset by readers. The baseline \
+  allow-list holds exactly this unprotect regex."""
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "tunarr-subtitles"
+path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles"
+max_age_days = 30
+root_owned_ok = true
+container = "tunarr-host-net"
+health_url = "http://127.0.0.1:8000/"
+
+[[rule]]
+id = "task.log_compress"
+title = "Rotated logs: gzip files over 50 MiB"
+kind = "cleanup"
+why = """\
+  logrotate can leave a rotated log uncompressed; one syslog.1 reached 558 MB and compressed to 48 MB. \
+  Compressing keeps the history and gives the space back, where deleting would lose evidence."""
+does = """\
+  Daily routine step (needs root). Under /var/log (the folder and one level below, journal excluded) finds \
+  regular files that are named like a rotated log (syslog.1, kern.log.2, app-20260927, x.old), not already \
+  compressed, at least min_mib (50 MiB), older than 1 day by mtime and with one hard link. Each is gzipped \
+  next to itself, the .gz is checked with `gzip -t` and a length check, and only then the original is taken \
+  out of the way and removed. Cap 5 GiB of raw size per run. Report-only in the shipped config."""
+applies_to = ["log_compress"]
+file = "maint.toml"
+target = "tasks.log_compress"
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  No process holds the file open (inode scan plus the shared in-use module, before and again after \
+  compressing). logrotate.service must be idle and have finished no run in the last 10 minutes, at the start \
+  and again right before the original is removed. The original is removed by an atomic rename to NAME.hm-del \
+  whose inode is verified, so a rotator that renamed files meanwhile can never cost the new live log; the .gz \
+  is published without overwriting anything. Any failure deletes the temp file and puts the original back. The \
+  live log is never touched. Needs root and free space of the file size plus 16 MiB. The routine's canary caps \
+  the first apply run at 10 percent."""
+principle = "in-use proof before deletion; capacity planning"
+owner_notes = """\
+  The systemd journal (/var/log/journal) is excluded: journald trims itself and config_drift checks its \
+  SystemMaxUse."""
+since = "2026-10-03"
+
+[rule.params]
+roots = ["/var/log"]
+min_mib = 50
+min_age_days = 1
+max_depth = 2
+exclude_dirs = ["journal"]
+max_gib_per_run = 5
+
+[[rule]]
+id = "task.dangling_images"
+title = "Dangling Docker images: remove after 24 hours unreferenced"
+kind = "cleanup"
+why = """\
+  Untagged ('dangling') images are what remains when a tag moves to a newer build; they are most of the \
+  clutter after a rebuild and nothing starts from them by name. An image that was just loaded and waits for \
+  `compose up` is also untagged, so 'untagged' alone is not enough to remove it."""
+does = """\
+  Daily routine step, before docker_images. Selects images with no tag that no container (running or exited) \
+  references, created more than min_age_hours (24) ago, that this task has itself seen unreferenced for 24 \
+  hours, and that the image ledger (fresh within 48 hours, not younger than the window) has not seen in use in \
+  that window. An image with no registry digest (a local build or `docker load`, which cannot be pulled again) \
+  waits local_build_days (7) instead. Each goes with `docker image rm ID` (never -f, -a or `system prune`); \
+  the freed size is the image's unique size. Caps: 20 images and 15 GiB per run. Report-only in the shipped \
+  config."""
+applies_to = ["dangling_images"]
+file = "maint.toml"
+target = "tasks.dangling_images"
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  No usable ledger means nothing is selected. Before every removal the docker_build gate and the container \
+  references are read again, and a build that started or a container that now uses the image cancels that one \
+  removal. An image whose registry digest names a protected workload (immich, comfyui, ollama, plex ...) is \
+  kept as protected. Tagged unused images stay with docker_images. The routine's canary caps the first apply \
+  run at 10 percent."""
+principle = "in-use proof before deletion; dry-run first"
+since = "2026-10-03"
+
+[rule.params]
+min_age_hours = 24
+ledger_max_age_hours = 48
+local_build_days = 7
+max_items_per_run = 20
+max_gib_per_run = 15
+
+[[rule]]
+id = "task.crash_dumps"
+title = "Crash dumps: apport reports after 2 days, core dumps after 7"
+kind = "cleanup"
+why = """\
+  Crash reports and core dumps can be large and nobody reads them after the first look, so keeping them is \
+  slow growth on the root disk. A few days is enough to look at the latest crash."""
+does = """\
+  Daily routine step (needs root). In /var/crash removes apport *.crash files older than crash_max_age_days \
+  (2). In /var/lib/systemd/coredump removes core.* files older than coredump_max_age_days (7), by mtime and by \
+  the timestamp in the name; .partial files are dumps in progress and are skipped. Only plain files directly \
+  in those two folders, never a directory. The journal's coredump list then shows the file as missing \
+  (coredumpctl has no delete command). Report-only in the shipped config."""
+applies_to = ["crash_dumps"]
+file = "maint.toml"
+target = "tasks.crash_dumps"
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Per file: a regular file, no symlink, older than the limit, held open by no process (inode scan plus the \
+  shared in-use module), and the caller may unlink it (root, or the owner in the sticky /var/crash); the inode \
+  is re-checked before the unlink. Without root, apply is refused for files it cannot prove unused. The \
+  routine's canary caps the first apply run at 10 percent."""
+principle = "capacity planning; protect before you clean"
+owner_notes = """\
+  Found 2026-10-03: the global protected pattern 'systemd' matches /var/lib/systemd/coredump/..., so every \
+  core dump is reported 'protected' and none is ever removed, apply or not (reproduced with the shipped \
+  protected.toml); only /var/crash is effective. Lifting it needs an unprotect for this task, which is not on \
+  the baseline allow-list, so it would be an owner override (allow_unprotect). Not changed here."""
+since = "2026-10-03"
+
+[rule.params]
+crash_dir = "/var/crash"
+crash_max_age_days = 2
+coredump_dir = "/var/lib/systemd/coredump"
+coredump_max_age_days = 7
+
+[[rule]]
+id = "task.tool_caches"
+title = "Developer tool caches: npm, pip, uv, pnpm, thumbnails, Gradle logs, browsers"
+kind = "cleanup"
+why = """\
+  These caches can grow to GiB and the tools rebuild them when needed, so dropping them is cheap, but each is \
+  in use while its tool or browser runs. Each cache is cleaned through its own tool's command and only while \
+  that tool is not running."""
+does = """\
+  Daily routine step (needs root; the tools run as the user ohmz under `timeout`). Cleans, each only when \
+  larger than min_mib (64 MiB): `npm cache clean --force`, `pip cache purge`, `uv cache prune` (never \
+  --force), and `pnpm store prune` per store version, only when files nothing links to exist and a pnpm of \
+  that major is on PATH or pinned by a project's packageManager (never an unpinned download). Also thumbnails \
+  older than thumbs_days (30) by mtime, Gradle daemon logs older than gradle_log_days (14) whose daemon pid is \
+  gone (never ~/.gradle/caches), and browser cache files older than browser_days (7) while that browser is not \
+  running (never profiles, bookmarks or cookies). A package manager counts as running while it installs or \
+  fetches, or while an npx, pnpx, uvx or `uv run` launcher is younger than long_lived_min (30 minutes). Cap 10 \
+  GiB per run. Each cache has an off switch (npm, pip, uv, pnpm, thumbnails, gradle_logs, browsers = false). \
+  Report-only in the shipped config."""
+applies_to = ["tool_caches"]
+file = "maint.toml"
+target = "tasks.tool_caches"
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  The process table is read again right before every clean and a tool that started cancels it. Cache locations \
+  are asked from the tool and must lie below the user's home. The clock must be trusted (NTP synchronised, or \
+  within 6 hours of the tool's own last write) because every age is computed from it. An unreadable /proc \
+  selects nothing. Each result row carries its proof sentence, for example 'npm not running; regenerable \
+  cache'. The routine's canary caps the first apply run at 10 percent."""
+principle = "in-use proof before deletion; capacity planning"
+owner_notes = "Thumbnails and browser cache are judged by mtime because readers reset atime."
+since = "2026-10-03"
+
+[rule.params]
+user = "ohmz"
+min_mib = 64
+thumbs_days = 30
+gradle_log_days = 14
+browser_days = 7
+long_lived_min = 30
+projects_root = "/home/ohmz/StudioProjects"
+max_gib_per_run = 10
+
+[[rule]]
+id = "task.caps"
+title = "Container memory ceilings for the batch workloads"
+kind = "policy"
+why = """\
+  A leak or runaway in one container (Tunarr, Kavita, SABnzbd, OmniVoice, ComfyUI) should hit its own ceiling \
+  instead of pushing the whole 94 GiB host into swap and stalling Plex and Immich. It is a bulkhead for P2 \
+  workloads: high enough that normal use never reaches it, and only set once the recorded history proves that."""
+does = """\
+  Daily routine step. For each container in ceilings (tunarr-host-net 40 GiB, kavita 20, sabnzbd 32, \
+  omnivoice-studio-gpu 16, comfyui 48) that is RUNNING and whose current limit differs, runs `docker update \
+  --memory C --memory-swap C*1.25` (swap_extra_ratio 0.25 adds 25 percent swap on top). Nothing when the limit \
+  already equals the ceiling; a stricter limit that exists already is kept; a stopped container is skipped and \
+  gets its ceiling on a later run. Report-only in the shipped config."""
+applies_to = ["caps"]
+file = "maint.toml"
+target = "tasks.caps"
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  A ceiling is refused unless the spike sampler's history is long enough to trust: at least 8 samples spanning \
+  at least 72 hours inside the last 14 days, the newest no older than 2 hours (the sampler is alive), and the \
+  ceiling at least 1.25 times the highest anon plus swap or cgroup memory.peak seen. `unprotect` exempts \
+  exactly these five names because a memory limit is not a kill; every other container stays protected. The \
+  action is idempotent."""
+principle = "capacity planning; classes of service (P0-P3)"
+owner_notes = """\
+  Container names are case-sensitive and this host's container is 'Sabnzbd', so the 'sabnzbd' ceiling never \
+  matches a running container and is never set (checked against docker ps on 2026-10-03). comfyui is listed as \
+  expected-stopped, so its ceiling waits until it runs."""
+since = "2026-10-03"
+
+[rule.params]
+ceilings = { tunarr-host-net = 40, kavita = 20, sabnzbd = 32, omnivoice-studio-gpu = 16, comfyui = 48 }
+swap_extra_ratio = 0.25
+unprotect = ["^tunarr-host-net$", "^kavita$", "^sabnzbd$", "^omnivoice-studio-gpu$", "^comfyui$"]
+
+[[rule]]
+id = "task.openwebui_media_prune"
+title = "Open WebUI generated media: delete after 7 days"
+kind = "cleanup"
+why = """\
+  Open WebUI and ComfyUI write every generated image and video to disk and nothing expires them. Generated \
+  media can be regenerated from the prompt, uploads cannot, so the rule is a strict allow-list of \
+  generated-file name patterns and never touches anything else."""
+does = """\
+  Daily routine step. Two allow-listed folders that are fixed in the code, not in the config: \
+  /volume1/docker/comfyui/output (owui_*.png, owui_vid_*.webm) and /volume1/docker/openwebui/config/uploads \
+  (*_owui_vid.webm, *_owui_vid.html, *_generated-image.png, *_generated_image*). Deletes regular files \
+  directly in those folders (no recursion) whose age is at least retention_days + 1 = 8 whole days (`find \
+  -mtime +7` semantics); files dated in the future are kept. Global caps apply: 500 files and 40 GiB. \
+  Report-only in the shipped config."""
+applies_to = ["openwebui_media_prune"]
+file = "maint.toml"
+target = "tasks.openwebui_media_prune"
+params = { retention_days = 7, unprotect = ["^/volume1/docker/comfyui/output/owui_"] }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  A pattern needs at least 4 literal characters and no slash, and the folder must be an absolute real \
+  directory, so a typo can never turn the allow-list into 'everything'. Deletes go through a directory fd with \
+  an inode re-check. 'comfyui' is a protected pattern, so the task carries one unprotect, for \
+  ^/volume1/docker/comfyui/output/owui_ only; matches the protected list forbids are reported as 'protected', \
+  never skipped silently. The routine's canary caps the first apply run at 10 percent."""
+principle = "capacity planning; protect before you clean"
+owner_notes = """\
+  Port of prune-openwebui-media.sh (daily 04:00). That legacy timer is still enabled and does the real work \
+  until the cutover; while both are enabled both delete, which is harmless because deleting is idempotent. A \
+  `rules` list in this task's table would replace the two built-in folders."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.comfyui_idle_reclaim"
+title = "ComfyUI idle VRAM: restart after two idle checks"
+kind = "cleanup"
+why = """\
+  ComfyUI keeps models in GPU memory after a job ends and does not give them back, which leaves less VRAM for \
+  Ollama, Immich machine learning and the other GPU users while it sits idle; a restart is the only way to \
+  free it. Size alone is never the reason: the restart needs an empty queue and a large VRAM holding on two \
+  checks in a row, so a running job is never interrupted."""
+does = """\
+  Check tier, every 15 minutes, at any hour (it needs no routine window; an evening freeze holds it to \
+  report-only). When the comfyui container is running it asks \
+  ComfyUI's queue (http://127.0.0.1:8188/queue) and sums the VRAM held by the container's processes from \
+  nvidia-smi. An empty queue with more than threshold_mb (3000 MiB) held is a strike; the second strike within \
+  strike_ttl_min (45 minutes) and at least strike_min_gap_min (4 minutes) after the first runs `docker restart \
+  comfyui`. A job, an unreadable queue or light VRAM resets the strikes. At least min_gap_min (30 minutes) \
+  must pass between restarts, and apply mode asks the queue once more right before restarting and cancels if a \
+  job arrived. Report-only in the shipped config."""
+applies_to = ["comfyui_idle_reclaim"]
+file = "maint.toml"
+target = "tasks.comfyui_idle_reclaim"
+params = { unprotect = ["^comfyui$"] }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Fail closed: a queue error, non-JSON answer, an answer without both queue lists and a failing nvidia-smi all \
+  mean busy, so nothing happens. Strikes are kept in separate lanes for apply and report runs, so a \
+  report-mode run can never add the strike that makes an apply run restart. A stopped container is not \
+  started. 'comfyui' is protected, so the task has an unprotect for ^comfyui$ (baseline allow-listed). A \
+  freeze (evenings 18:00-23:30 or the FREEZE file) holds it to report-only and PAUSE stops it."""
+principle = "never kill by size; detect by saturation, not size"
+owner_notes = """\
+  Port of comfyui-idle-vram.sh (every 5 minutes). That legacy timer is still enabled and does the real work \
+  until the cutover. The check tier runs every 15 minutes, so two checks mean 15 to 30 minutes of idleness \
+  instead of the legacy 5 to 10. comfyui is listed as expected-stopped; at authoring time the container was \
+  exited."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.immich_recycle"
+title = "Immich server recycle: restart every 2 hours when Immich is idle"
+kind = "cleanup"
+why = """\
+  immich_server grows in memory over hours, and restarting it every 2 hours bounds that growth. A restart in \
+  the middle of an upload, a machine-learning job or a backup would break it, so the restart waits for a quiet \
+  moment instead of following a blind timer."""
+does = """\
+  Check tier, every 15 minutes; its own cadence is every_hours (2) minus 10 minutes of slack since the last \
+  attempt. When immich_server is running and at least min_gap_min (30 minutes) have passed since the last \
+  restart, it asks the immich-recycle gate: idle means no backup unit active and immich_server, \
+  immich_machine_learning and immich_postgres each below immich_cpu_busy_pct (15 percent of one core, sampled \
+  over 10 seconds). Idle: `docker restart immich_server`, then it checks the container is running again (else \
+  warn). Busy: defer; after 12 hours of deferral (max_defer_hours) one restart is let through so memory growth \
+  stays bounded. A stopped immich_server is not started. Report-only in the shipped config."""
+applies_to = ["immich_recycle"]
+file = "maint.toml"
+target = "tasks.immich_recycle"
+params = { unprotect = ["^immich_server$"] }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  The gate fails closed: a probe error, an unreadable cgroup or a docker failure counts as busy. Report mode \
+  only PROBES the gate and never writes the deferral record in gates.json, which the legacy timer shares; \
+  apply mode calls the real gate. immich_server is protected by the global 'immich' pattern, so the task has \
+  an unprotect for ^immich_server$ (baseline allow-listed) and no other Immich container is affected. A freeze \
+  holds it to report-only, PAUSE stops it, and every restart is audited."""
+principle = "capacity planning; protect before you clean"
+owner_notes = """\
+  Port of immich-server-recycle.service with its gate drop-in. That legacy timer (every 2 hours) is still \
+  enabled and does the real restart until the cutover. Use ONE driver for the cadence: the check tier started \
+  with --apply, or a scheduler schedule."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.docker_containers_prune"
+title = "Stopped Docker containers: remove after 7 days stopped"
+kind = "cleanup"
+why = """\
+  A stopped container keeps its writable layer and a name, and an abandoned test container can hold GiB. The \
+  legacy docker-prune.sh removed any stopped container CREATED more than a week ago, including one stopped on \
+  purpose an hour ago, which is why the owner disabled that timer. This rule counts from when the container \
+  stopped and keeps the ones that are stopped on purpose."""
+does = """\
+  Weekly routine step. Lists all containers and selects those in status exited, created or dead that have been \
+  stopped (finished, or created if never started) for at least stopped_days (7), oldest first, each removed \
+  with `docker rm ID` (no -f, no -v, so volumes are never touched). Containers named in \
+  failed_units.expected_stopped_containers (comfyui) or in this task's keep list are kept, and so is any whose \
+  name, image or compose project matches protected.toml. Per-run cap 25 containers, a default applied because \
+  removing a container is irreversible (max_items_per_run overrides it). Report-only in the shipped config."""
+applies_to = ["docker_containers_prune"]
+file = "maint.toml"
+target = "tasks.docker_containers_prune"
+params = { stopped_days = 7 }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Kept by name, by image and by compose project; expected-stopped containers are always kept; `docker rm` \
+  itself refuses a running container. A removed container cannot be undone, hence the small batch. The \
+  routine's canary caps the first apply run at 10 percent."""
+principle = "protect before you clean; dry-run first"
+owner_notes = """\
+  docker-prune.timer was disabled by the owner on 2026-10-02 because its container prune would have removed \
+  the stopped comfyui container and then its 14.9 GiB local image. This task never selects comfyui \
+  (expected-stopped and protected). Port of step 1 of docker-prune.sh."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.c2_candidates"
+title = "Cleanup candidates: weekly plan of known leftovers, applied only on approval"
+kind = "cleanup"
+why = """\
+  Some leftovers are big but need a human decision: an old virtualenv, a retired app's config, a backup \
+  tarball. A rule that deleted them on a timer would be dangerous and a list nobody acts on is useless, so the \
+  weekly task makes a PLAN with sizes and in-use state and the owner approves its exact hash."""
+does = """\
+  Weekly routine step (heavy disk reads, so only in the quiet window; root to apply). For each candidate below \
+  that exists it records the size (du -sxb within a time budget), the last change, whether a container \
+  (running or stopped) mounts it or a process has it open (lsof), the reason, needs_manual_check and the exact \
+  rsync or rm command. The plan (sorted, sizes rounded to MiB so its hash is stable) is shown by \
+  `homelab-maint plan c2_candidates`. Nothing is removed unless `homelab-maint approve c2_candidates HASH` is \
+  run for the current hash (valid 48 hours, single use) AND the run is root AND mode is apply. Apply re-proves \
+  each item with a fresh docker snapshot and lsof, archives first when archive_to is set (rsync -aHSAX, \
+  verified by checksum), then removes. needs_manual_check items are refused unless allow_manual_check_items is \
+  set; it is not."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates"
+params = { unprotect = ["StudioProjects/kometa/backups/config-backup-"] }
+severity = "none"
+destructive = true
+proof = """\
+  A plan-only task: a timer can never delete from it. A candidate matching protected.toml is listed as \
+  'protected' and never planned. A symlink, a symlink in the path or a path shallower than four components is \
+  refused. Apply refuses on any doubt: unknown container mounts, an lsof timeout or a non-root run, an \
+  unverified archive, or an archive folder on the root filesystem or on the source's own filesystem. The \
+  removal is irreversible once the copy has been verified, which is why a human approves the hash."""
+principle = "dry-run first; in-use proof before deletion"
+owner_notes = """\
+  The unprotect entry exists for the Kometa tarball, but it only exempts the PATH. The candidate's NAME \
+  'kometa-backup-tarball' also matches the global 'kometa' pattern, so that candidate is reported 'protected' \
+  and never planned (reproduced with the shipped protected.toml). On 2026-10-03 the tarball, ~/.venv and the \
+  Pixel Fold emulator folder were already gone, so those candidates report nothing."""
+since = "2026-10-03"
+
+[[rule]]
+id = "c2.cursor-state-backup"
+title = "Cursor chat-state backup file"
+kind = "cleanup"
+why = """\
+  A stale backup of Cursor's chat and state database (the candidate note says the app has been unused since \
+  June); it held 9.6 GiB on 2026-10-03. It sits inside the Cursor config tree, which automatic cleaners must \
+  never enter, so a person approves it."""
+does = """\
+  When /home/ohmz/.config/Cursor/User/globalStorage/state.vscdb.backup exists it is listed in the weekly plan \
+  with size and in-use state. On approval it is removed with rm -f; no archive copy is made."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates.candidates[]"
+merge = "append"
+severity = "none"
+destructive = true
+proof = """\
+  Plan only and approved by hash. The path matches the never-touch pattern /.config/Cursor, which blocks \
+  retention and cache-trim rules but not a C2 plan, because a human approves the exact plan. In-use checks as \
+  for every candidate."""
+principle = "dry-run first; in-use proof before deletion"
+owner_notes = "The file exists, last changed 2026-05-24."
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "cursor-state-backup"
+path = "/home/ohmz/.config/Cursor/User/globalStorage/state.vscdb.backup"
+why = "stale Cursor chat-state backup (app unused since June)"
+
+[[rule]]
+id = "c2.cursor-worktrees"
+title = "Cursor worktrees (old git worktrees under ~/.cursor)"
+kind = "cleanup"
+why = """\
+  ~/.cursor/worktrees holds git worktrees kept by Cursor; 17 old ones were noted when the candidate was \
+  written and 18 were counted on 2026-10-03. They can hold commits that were never pushed, so a person has \
+  to look before they go."""
+does = """\
+  Listed in the weekly plan and flagged needs_manual_check, so apply refuses it unless \
+  allow_manual_check_items is true (it is false). It can only go when the owner checks each worktree for \
+  unpushed commits and stashes and removes it by hand or changes that setting. The planned command is rm -rf \
+  of the folder, no archive."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates.candidates[]"
+merge = "append"
+severity = "none"
+destructive = true
+proof = """\
+  Never removed automatically: manual-check items are refused on apply by default. The path matches the \
+  never-touch pattern /.cursor, which blocks the automatic cleaners; only an approved plan can reach it."""
+principle = "dry-run first; in-use proof before deletion"
+owner_notes = "The folder exists, last changed 2026-03-23."
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "cursor-worktrees"
+path = "/home/ohmz/.cursor/worktrees"
+why = "17 old worktrees; check for unpushed commits first"
+needs_manual_check = true
+
+[[rule]]
+id = "c2.orphan-docker-plex-config"
+title = "Old Plex config under /volume1/docker/plex (archive first)"
+kind = "cleanup"
+why = """\
+  The Docker-era Plex configuration folder: no container has mounted it since 2025-05. Plex metadata is slow \
+  to recreate, so it is archived to the cold disk before anything is removed."""
+does = """\
+  When /volume1/docker/plex exists it is listed in the weekly plan. On approval it is copied to \
+  /media/WD24to10TB/archive/plex with rsync -aHSAX, verified by checksum, re-checked for containers and open \
+  files, and only then removed. The archive folder must be a mounted filesystem different from both the root \
+  filesystem and the source's, with 5 percent spare room."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates.candidates[]"
+merge = "append"
+severity = "none"
+destructive = true
+proof = """\
+  Refused while any container, even a stopped one, mounts it or lsof sees it open. /volume1/docker/plex is on \
+  the baseline never-touch list for every automatic cleaner, so only this human-approved plan can ever remove \
+  it. The archive target is checked so that a stub folder left on / after the cold disk is unmounted can never \
+  be filled."""
+principle = "dry-run first; in-use proof before deletion"
+owner_notes = """\
+  The folder exists (last changed 2025-05-05). The live Plex is the snap, whose Media folder is bind-mounted \
+  from the SanDisk SSD, not this folder."""
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "orphan-docker-plex-config"
+path = "/volume1/docker/plex"
+why = "unmounted by any container since 2025-05; archive first"
+archive_to = "/media/WD24to10TB/archive"
+
+[[rule]]
+id = "c2.home-venv"
+title = "Python virtualenv ~/.venv (11 GiB torch and vllm)"
+kind = "cleanup"
+why = """\
+  The candidate list records it as an 11 GiB torch and vllm environment that no process uses. It can be \
+  rebuilt from a package list, so it is a plan candidate and not a protected asset."""
+does = """\
+  When /home/ohmz/.venv exists it is listed in the weekly plan. On approval it is removed with rm -rf; this \
+  fixed candidate does not archive anything first (the separate unused_venvs plan archives `pip freeze` before \
+  removing a venv)."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates.candidates[]"
+merge = "append"
+params = { name = "home-venv", path = "/home/ohmz/.venv", why = "11 GiB torch/vllm env no process uses" }
+severity = "none"
+destructive = true
+proof = """\
+  Plan only, approved by hash, refused while a container mounts it or a process has it open. Nothing is \
+  selected on any doubt."""
+principle = "dry-run first; in-use proof before deletion"
+owner_notes = "Not on disk on 2026-10-03, so this candidate currently reports nothing."
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "c2.android-fold-avd"
+title = "Android emulator image Pixel_10_Pro_Fold (9.3 GiB)"
+kind = "cleanup"
+why = """\
+  An Android Virtual Device untouched since June that takes 9.3 GiB. Emulator images can be recreated from the \
+  SDK, so removal costs a download."""
+does = """\
+  When /home/ohmz/.android/avd/Pixel_10_Pro_Fold.avd exists it is listed in the weekly plan. On approval it is \
+  removed with rm -rf; no archive."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates.candidates[]"
+merge = "append"
+severity = "none"
+destructive = true
+proof = """\
+  Plan only, approved by hash, refused while a container mounts it or a process, such as a running emulator, \
+  has it open."""
+principle = "dry-run first; in-use proof before deletion"
+owner_notes = "Not on disk on 2026-10-03, so this candidate currently reports nothing."
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "android-fold-avd"
+path = "/home/ohmz/.android/avd/Pixel_10_Pro_Fold.avd"
+why = "untouched since June; 9.3 GiB"
+
+[[rule]]
+id = "c2.kometa-backup-tarball"
+title = "Kometa config backup tarball (10.8 GiB, archive to the cold disk)"
+kind = "cleanup"
+why = """\
+  A 10.8 GiB tarball of Kometa's config (the file name says 2026-09-22) that sits inside the protected kometa \
+  folder. The plan moves it to the cold disk: archive first, then remove."""
+does = """\
+  When /home/ohmz/StudioProjects/kometa/backups/config-backup-20260922-190738.tar.gz exists it is listed in \
+  the weekly plan. On approval it is copied to /media/WD24to10TB/archive, verified by checksum, re-checked and \
+  then removed."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates.candidates[]"
+merge = "append"
+severity = "none"
+destructive = true
+proof = """\
+  Plan only, approved by hash. The same archive-target checks as the other archive candidates. See the parent \
+  rule: this candidate is currently reported 'protected' because its name contains 'kometa'."""
+principle = "dry-run first; in-use proof before deletion"
+owner_notes = """\
+  Reported 'protected' and never planned while the name matches the global 'kometa' pattern. The file was not \
+  on disk on 2026-10-03, the backups folder was empty."""
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "kometa-backup-tarball"
+path = "/home/ohmz/StudioProjects/kometa/backups/config-backup-20260922-190738.tar.gz"
+why = "10.8 GiB; archive to cold disk"
+archive_to = "/media/WD24to10TB/archive"
+
+[[rule]]
+id = "c2.hermes-genesis-gguf"
+title = "Hermes Genesis model files (archive to the cold disk, manual check)"
+kind = "cleanup"
+why = """\
+  ~/models/hermes-genesis duplicates blobs that Ollama also holds, but the docs say to keep it because it is \
+  not backed up anywhere else. So the plan can only archive it to the cold disk, and it needs a human check."""
+does = """\
+  Listed in the weekly plan and flagged needs_manual_check, so apply refuses it unless \
+  allow_manual_check_items is true (it is false). The planned command copies it to /media/WD24to10TB/archive \
+  and then removes the original; nothing is deleted without the copy."""
+applies_to = ["c2_candidates"]
+file = "maint.toml"
+target = "tasks.c2_candidates.candidates[]"
+merge = "append"
+severity = "none"
+destructive = true
+proof = """\
+  ~/models is on the never-touch list of every automatic cleaner. Manual-check items are refused on apply by \
+  default; an approved apply still needs the verified archive copy first."""
+principle = "dry-run first; protect before you clean"
+owner_notes = "The folder exists, last changed 2026-07-26."
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "hermes-genesis-gguf"
+path = "/home/ohmz/models/hermes-genesis"
+why = "duplicates Ollama blobs but docs say keep (unbacked-up); archive, do not delete"
+archive_to = "/media/WD24to10TB/archive"
+needs_manual_check = true
+
+[[rule]]
+id = "task.stale_build_output"
+title = "Stale build output: target, .next, __pycache__ and similar in projects idle for 90 days"
+kind = "cleanup"
+why = """\
+  Rust target folders, .next, .turbo and pycache of old projects run to many GiB (103 build-named folders were \
+  found under StudioProjects) and the next build recreates them. Deleting one is only safe when nobody works \
+  on the project and the folder is provably tool output, not somebody's hand-made one."""
+does = """\
+  Weekly routine step (heavy: it walks StudioProjects, about 1.3 million entries, and runs git per candidate; \
+  needs root). Finds folders named target, dist, build, .next, .turbo, __pycache__, .pytest_cache, .mypy_cache \
+  or .vitepress/dist up to max_depth (7) under /home/ohmz/StudioProjects. A folder is selected only when ALL \
+  hold: it is git-ignored with nothing tracked or staged in it; every enclosing repo, its linked worktrees and \
+  its working files are idle for idle_days (90); the output is untouched for output_days (30); it carries its \
+  tool's signature (cargo CACHEDIR.TAG, .next BUILD_ID, only .pyc ...) and none of backup or patch files, \
+  .env, databases, keys, signed apks or files of another owner; no container bind-mounts the project; no \
+  process has its cwd, an open or mapped file, or an argv path in the project; no unit, cron entry, launcher, \
+  rc file, nginx or caddy config, run file or symlink points at it; and it holds no mount point. dist and \
+  build are only listed (apply_generic = false) because they are not provably regenerable. Caps: 200 folders \
+  and 30 GiB per run. Report-only in the shipped config."""
+applies_to = ["stale_build_output"]
+file = "maint.toml"
+target = "tasks.stale_build_output"
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  Fail closed on any probe error: an unreadable /proc, unknown docker mounts, a git failure, a scan past its \
+  900 s budget, or a clock that cannot be trusted (NTP unsynchronised and far from the tool's last write). The \
+  docker_build and gradle gates must be idle. Deletes are relative to an O_NOFOLLOW directory chain with an \
+  inode re-check, and the project is re-proved unused right before each removal. protected.toml also matches \
+  project PATHS (homarr, tunarr, immich, kometa, claude, comfyui ...), so most of the 103 folders are skipped \
+  for that reason; the result lists the biggest kept folders with the reason. The routine's canary caps the \
+  first apply run at 10 percent."""
+principle = "in-use proof before deletion; dry-run first"
+owner_notes = """\
+  When this was written 75 of the 103 build-named folders were skipped because of protected-name matches in \
+  the project path. Lift one project on purpose with unprotect, for example '/StudioProjects/homarr(/|$)'."""
+since = "2026-10-03"
+
+[rule.params]
+projects_root = "/home/ohmz/StudioProjects"
+home = "/home/ohmz"
+idle_days = 90
+output_days = 30
+apply_generic = false
+clock_tolerance_h = 6
+ref_timeout_s = 120
+max_depth = 7
+scan_budget_s = 900
+max_items_per_run = 200
+max_gib_per_run = 30
+
+[[rule]]
+id = "task.unused_venvs"
+title = "Unused Python virtualenvs: weekly plan, archive then remove on approval"
+kind = "cleanup"
+why = """\
+  Virtualenvs of finished experiments can reach many GiB (a torch and vllm one was 11 GiB) and can be rebuilt \
+  from a package list. Removing one that is still used breaks a service silently, so the task only plans and a \
+  person approves."""
+does = """\
+  Weekly routine step (needs root). Looks under /home/ohmz (no deeper than max_depth, 3 levels) for folders \
+  holding pyvenv.cfg. A venv becomes a plan item only when nothing changed in it, nor READ where the mount \
+  keeps atime, for idle_days (60); the project around it is idle too (a project-local venv of a git project \
+  active within active_days, 90, stays); no process has it open, mapped, as its cwd, activated or named in \
+  argv (also relative to the process's cwd); no container mounts it; no unit, cron entry, launcher, rc file, \
+  script or project config names it or `cd`s into its project; and no symlink points into it. A venv that \
+  holds what a package list cannot rebuild (src checkouts, .git, hand-made or hand-patched files, a noatime \
+  mount) is planned as needs_manual_check. Approval by hash archives `pip freeze`, pyvenv.cfg, a bin listing \
+  and install metadata to /media/WD24to10TB/archive/dev-leftovers, reads them back, and then removes the venv. \
+  Approval lasts 48 hours."""
+applies_to = ["unused_venvs"]
+file = "maint.toml"
+target = "tasks.unused_venvs"
+mode = "report"
+severity = "none"
+destructive = true
+proof = """\
+  A plan-only task: apply needs root, an approval for the current hash, no backup running (the backup gate is \
+  idle) and a fresh re-proof of every item right before it acts. A manual-check item is refused unless \
+  allow_manual_check_items is true (it is false). The archive folder must be on a different, mounted \
+  filesystem. The venv's own python only ever runs as its owner, never as root, and the clock must be trusted. \
+  Fail closed on any probe error or a reference search that ran out of its 120 s budget."""
+principle = "dry-run first; in-use proof before deletion"
+since = "2026-10-03"
+
+[rule.params]
+roots = ["/home/ohmz"]
+home = "/home/ohmz"
+max_depth = 3
+idle_days = 60
+active_days = 90
+archive_dir = "/media/WD24to10TB/archive/dev-leftovers"
+ref_timeout_s = 120
+approval_ttl_hours = 48
+allow_manual_check_items = false
+
+[[rule]]
+id = "task.large_cold_files"
+title = "Large cold files: weekly plan, archive then remove on approval"
+kind = "cleanup"
+why = """\
+  Big files that nobody has touched for months are the quickest way to win back space on the main disk. They \
+  are also the easiest to regret, so the task plans and a person approves; an archive copy is made first."""
+does = """\
+  Weekly routine step (needs root). Scans /home/ohmz/StudioProjects, /home/ohmz/.config and \
+  /home/ohmz/.android for files and folders of at least min_gib (2 GiB) whose newest change (mtime, ctime, and \
+  the last read where the mount keeps atime) is older than cold_days (90). A candidate must be unused now: no \
+  mounting container, no process, no unit, script or config naming it, no symlink pointing at it. Anything in \
+  or containing a git repo, one file of a folder that is not cold, or on a mount without atime is flagged \
+  needs_manual_check. Approval by hash copies to \
+  /media/WD24to10TB/archive/<studioprojects|config|android>/<relative parent> with rsync -aHSAX, verifies by \
+  checksum, re-proves the item is unused and still cold, and only then removes the original. The scan has a \
+  900 s budget; an incomplete scan says so."""
+applies_to = ["large_cold_files"]
+file = "maint.toml"
+target = "tasks.large_cold_files"
+mode = "report"
+severity = "none"
+destructive = true
+proof = """\
+  A plan-only task: nothing is removed without root, an approval for the current hash and a fresh re-check. \
+  Never a candidate: anything inside .git, node_modules, site-packages or a virtualenv, or a folder with a \
+  never-touch part (for example ~/.config/Cursor), an unreadable part or another filesystem inside it. The \
+  archive path is opened with O_NOFOLLOW directory fds, so a symlink swapped into the archive tree cannot \
+  redirect the root-privileged copy. Manual-check items are refused unless allow_manual_check_items is true \
+  (it is false)."""
+principle = "dry-run first; in-use proof before deletion"
+since = "2026-10-03"
+
+[rule.params]
+roots = ["/home/ohmz/StudioProjects", "/home/ohmz/.config", "/home/ohmz/.android"]
+min_gib = 2
+cold_days = 90
+archive_root = "/media/WD24to10TB/archive"
+scan_budget_s = 900
+approval_ttl_hours = 48
+allow_manual_check_items = false
+
+[[rule]]
+id = "task.flatpak_unused"
+title = "Unused Flatpak runtimes: uninstall --unused, runtimes only"
+kind = "cleanup"
+why = """\
+  Flatpak leaves runtimes and extensions behind when the app that needed them is removed or updated, and they \
+  can take GiB. flatpak itself knows which are unused (pins, extensions, end-of-life rebases), so the rule \
+  asks flatpak first and adds its own safety net on top."""
+does = """\
+  Weekly routine step (needs root). For each installation in `installations` (default: the system installation \
+  only) runs `flatpak uninstall --unused` with 'n' answered, to see what it WOULD remove. Only if every listed \
+  ref is an installed runtime or extension, never an application, and none is used by a running sandbox does \
+  it run `flatpak uninstall --unused -y --noninteractive` for that installation. The cap of 10 GiB is per run, \
+  summed over the installations; an installation whose list alone is bigger is skipped as over the cap. \
+  Afterwards the set of installed applications must be unchanged, else crit. Report-only in the shipped \
+  config."""
+applies_to = ["flatpak_unused"]
+file = "maint.toml"
+target = "tasks.flatpak_unused"
+params = { max_gib_per_run = 10 }
+mode = "report"
+severity = "crit"
+destructive = true
+proof = """\
+  The whole installation is refused when any listed ref is not a runtime; when an app of another installation \
+  (a user app on a system runtime) uses a listed runtime, which flatpak's own list ignores; when a running \
+  sandbox uses one (matched by commit against every /proc/*/root/.flatpak-info); when a flatpak command is \
+  running; or when /proc is not fully readable (no root). The unused list is read again right before the \
+  removal and must be identical. The routine's canary caps the first apply run at 10 percent."""
+principle = "in-use proof before deletion; capacity planning"
+since = "2026-10-03"
+
+[[rule]]
+id = "task.swap_auto_relief"
+title = "Automatic swap relief (empty a quiet, cold, nearly full swap that hangs around)"
+kind = "cleanup"
+why = """\
+A swap that is nearly full of pages nobody has touched for hours is not a fault, but it is a risk: with no free swap left, the next real \
+memory spike goes to the OOM killer instead of a slowdown. The industry standard (systemd-oomd, Meta's oomd, the proactive-reclaim work) \
+never judges how full swap is; it judges pressure and refaults, because idle pages parked in swap are working as intended and only \
+a swap that is in use or a stalled system is a problem. So this rule acts only on swap that is full, quiet and cold for long enough, and \
+it clears it without touching any process: swapoff moves the pages back to RAM, swapon puts the empty area back."""
+does = """\
+Every check run it samples swap-in and swap-out, the memory stall, and for every cgroup that holds swap its refaults (workingset_refault_anon). \
+A holder refaulting fewer than cold_refault_pps (5) pages per second is cold (idle), more is active. The swap is hanging around when it is \
+at least trigger_pct (80) full, quiet (no swap-in worth the name, no memory stall) and at least min_cold_share (0.7) of it is held by cold \
+holders, continuously for persist_hours (2); the watch only ends when swap falls under release_pct (60) or the cold share under min_cold_share minus 0.2, so it does not flap around the line, but a real change of character stops it. \
+Time it did not watch (host down, PAUSE, missed runs) never counts: a gap over max_gap_hours (0.75) restarts the timer. It acts only inside the maintenance window (local window_start_hour to window_end_hour, 2 to 6), because swapoff can stall a process that maps memory while its pages are read back, which the busy gates cannot see. Quiet also means swap-out under quiet_out_mib_s (8). \
+Only then it checks every precondition of the relief again: free RAM for the pages with headroom to spare, every protected workload idle (the busy \
+gates: ComfyUI, Ollama, Plex, backups, builds, Immich), the swap disk quiet, no memory stall, and the memory.max and memory.high of every cgroup that holds swap, small ones included, and of each of its ancestors, large enough to take \
+its pages back (swapped-in pages are charged to those limits), with relief_headroom_gib (16 GiB, or 15 percent of RAM) left free, clear of the host's own memory warnings. A blocked relief is retried each run and never forced; blocked for max_defer_hours (24) \
+it becomes a visible warning, not a page. When everything holds and mode is apply it starts the relief as its own systemd unit \
+(homelab-maint-swap-relief, at most 45 minutes, nice 19), which refuses unless the rule is in apply mode and the kill switch is absent, aborts and keeps the swap if \
+available RAM or the memory stall turns bad, PAUSE appears or the rule leaves apply mode (checked every few seconds), and always runs swapon again (the unit also runs swapon -a when it stops, however it stops). At most one automatic relief per min_interval_hours (12). A launch is never booked as a relief: the task reads the OUTCOME the relief wrote to its ledger. A relief that was refused, aborted or left no outcome backs off (retry_hours, doubling, at most 24 hours) and after max_failed_attempts (3) shows as a warning. Circuit breaker: if swap is back above trigger_pct within \
+refill_hours (6) after breaker_after_refills (2) confirmed reliefs in a row, the workload does not fit in RAM or something leaks, so the automation pauses for \
+breaker_days (3) and the owner is paged with the top holders (the notifier confirms it on two runs in a row, sends one page and then a reminder every 24 hours). A relief the owner runs by hand and one the automation runs are recorded in the \
+relief ledger, so the swap-in they cause is never read as pressure by any other check or by the pressure ladder. In report mode it only says what it would do."""
+applies_to = ["swap_auto_relief"]
+file = "maint.toml"
+target = "tasks.swap_auto_relief"
+params = { disruptive = true, trigger_pct = 80.0, release_pct = 60.0, persist_hours = 2.0, min_cold_share = 0.7, cold_refault_pps = 5.0, min_interval_hours = 12.0, refill_hours = 6.0, breaker_after_refills = 2.0, breaker_days = 3.0, max_defer_hours = 24.0, quiet_out_mib_s = 8.0, window_start_hour = 2.0, window_end_hour = 6.0, max_gap_hours = 0.75, retry_hours = 1.0, max_failed_attempts = 3.0, sample_s = 3 }
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+No process is ever killed or restarted: swapoff only moves pages back to RAM and swapon restores the area. It starts only when free RAM covers the \
+pages with headroom, every busy gate (fail closed: a probe error counts as busy) is idle, the swap disk is quiet, memory stall is calm and the memory.max and memory.high of every holder and ancestor fit its resident plus swapped memory. The relief aborts on a signal (the area stays in service) the moment available RAM or the \
+memory stall turns bad, always runs swapon again, and the check also warns if /etc/fstab lists swap that is not on. Report-only until switched on."""
+principle = "act on saturation and persistence, never on size; relieve only without hurting work in progress"
+owner_notes = """\
+Ships in report mode like every cleaner. Switch it on with mode = apply on this rule in the host registry, then rules check and rules sync. \
+Pause it with homelab-maint pause (the kill switch) or set mode back to report: either also stops a relief that is already running, which leaves the swap in service. A freeze holds it (disruptive = true). Its safety limits are the relief_* options of task.swap_audit. The same relief by hand: homelab-maint swap relieve --apply (no window, no persistence: the owner decides). If swap that /etc/fstab lists is found off (a relief killed between swapoff and swapon), this task switches it back on with swapon -a."""
+since = "2026-10-03"

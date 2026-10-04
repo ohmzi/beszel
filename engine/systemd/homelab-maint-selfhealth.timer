@@ -1,0 +1,12 @@
+[Unit]
+Description=Rewrite the homelab-maint pipeline health (public/self.json) every minute
+
+[Timer]
+# First run two minutes after boot (the first check run follows at 3 min), then a minute after the previous run started.
+# No Persistent=: a minute missed while the host was off is not worth catching up; the page ages the file by itself.
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

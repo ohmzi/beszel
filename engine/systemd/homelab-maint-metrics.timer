@@ -1,0 +1,12 @@
+[Unit]
+Description=Sample temperatures, fans and load every minute (homelab-maint metrics ring)
+
+[Timer]
+# First sample a minute after boot, then one a minute after the previous run started.
+# No Persistent=: a minute missed while the host was off is not worth catching up.
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

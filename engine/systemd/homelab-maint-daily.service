@@ -1,0 +1,16 @@
+[Unit]
+Description=homelab-maint daily tier (C1 safe cleaners)
+After=docker.service
+
+[Service]
+Type=oneshot
+# --apply only PERMITS mutation. Each task still needs mode = "apply" in
+# /etc/homelab-maint/maint.toml, and /etc/homelab-maint/PAUSE[.task] overrides both.
+ExecStart=/usr/local/sbin/homelab-maint run --tier daily --apply
+Nice=10
+IOSchedulingClass=idle
+OOMScoreAdjust=500
+MemoryMax=2G
+# Docker/apt/snap work can be slow on a busy host; the per-task SIGALRM guards still apply.
+TimeoutStartSec=3h
+SyslogIdentifier=homelab-maint

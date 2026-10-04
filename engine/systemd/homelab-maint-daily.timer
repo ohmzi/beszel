@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the homelab-maint daily tier every morning
+
+[Timer]
+OnCalendar=*-*-* 07:30:00
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

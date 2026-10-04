@@ -1,0 +1,317 @@
+# homelab-maint rules registry: Alerts and notifications. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync).
+# Every rule here compiles into notify.toml and describes delivery policy: none deletes anything, so none carries a `proof`, and `severity` is none because these rules shape messages, they do not raise problems.
+
+[meta]
+category = "alerts"
+title = "Alerts and notifications"
+blurb = "Who is told what, when and how often; acknowledgements."
+
+[[rule]]
+id = "notify.root"
+title = "Notification kill switch file (NOTIFY_MUTE)"
+kind = "alert"
+principle = "one umbrella"
+why = "Sometimes the owner needs the phone quiet for an evening of planned work without turning checks off. One empty file does it, and it is deliberately not the global PAUSE file: pausing maintenance must not hide problems. Critical alerts still get through, because a muted pager that also hides a real outage is worse than a noisy one."
+does = "While the file /etc/homelab-maint/NOTIFY_MUTE exists, notify.send drops every message (email and SMS) except a critical alert or critical incident_open; the delivery log says `muted` and callers do not retry. Test messages (`notify-test`) ignore the file. The name is relative to the config directory and is the only top-level key of notify.toml."
+applies_to = []
+file = "notify.toml"
+target = ""
+params = { mute_file = "NOTIFY_MUTE" }
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.transport"
+title = "Delivery path: owner's Hermes transports with the legacy bridge as backup"
+kind = "alert"
+principle = "one umbrella; fail closed"
+why = "There is one way out for every message the umbrella sends, and it reuses the owner's existing Hermes SMS and Gmail transports so no credentials are copied into this project. A dead transport (Gmail or DNS outage) must cost one slow attempt, not one per queued message, hence the circuit breaker."
+does = "kind = hermes: the message is written as JSON to the stdin of a child (`python3 -m homelab_maint.notify --child`, started through runuser as the owner's account) that calls Hermes alert_transports.send_report from scripts_dir; bodies never appear in argv. timeout_s = 90 limits that call. If the primary fails before any channel reports (not a timeout) and both SMS and email were wanted, the legacy script in [global] bridge is tried as fallback with a 20 s limit (fallback_timeout_s). After a failed transport (nothing reported, or a timeout) it is not tried again for breaker_s = 300 s: callers get skipped = breaker at once and critical pages wait in the outbox. kind = none would log only; kind = bridge would use the legacy script alone."
+file = "notify.toml"
+target = "transport"
+since = "2026-10-03"
+owner_notes = "No credentials live in homelab-maint: they stay in ~ohmz/.hermes/alert_transports.env and alert_contacts.json."
+
+[rule.params]
+kind = "hermes"
+scripts_dir = "/home/ohmz/StudioProjects/ai-stack/scripts"
+fallback = "bridge"
+timeout_s = 90
+fallback_timeout_s = 20
+breaker_s = 300
+
+[[rule]]
+id = "notify.site"
+title = "Message look and feel: site link, SMS prefix, subject prefix"
+kind = "alert"
+principle = "one umbrella"
+why = "A message must be recognisable at a glance on a phone and must send the owner to the right page. Links are email-only because the carrier drops them from SMS."
+does = "url = https://maintainer.ohmzhomelab.ca is the dashboard link printed in emails (never in an SMS) and the fallback base for the acknowledge link. sms_prefix = homelab starts every SMS (`homelab: CRIT Disk space ...`, one ASCII segment of at most 130 characters). subject_prefix = '[homelab] ' starts every email subject. masthead = Maintenance is the word shown after Ohmz in the email header. host_label empty means this machine's hostname."
+file = "notify.toml"
+target = "site"
+since = "2026-10-03"
+
+[rule.params]
+url = "https://maintainer.ohmzhomelab.ca"
+host_label = ""
+sms_prefix = "homelab"
+subject_prefix = "[homelab] "
+masthead = "Maintenance"
+
+[[rule]]
+id = "notify.routes"
+title = "Which channel each kind of message uses"
+kind = "alert"
+principle = "one umbrella"
+why = "Not every message deserves a text. Recoveries and resolved incidents follow the page that preceded them, digests and reports are reading material for email, and a test must show how the real thing is routed. SMS is reserved for things that need a person now."
+does = "Per kind: recovery = both (the SMS part is dropped when the problem was never texted, see escalation), maintenance = email (plus SMS when the event is marked significant), digest_daily = email, report_weekly = email, incident_resolved = both, ack_expired = email (never texts), test = mirror (a test is routed exactly like the kind it imitates). Alert and incident_open have their own tables keyed by severity (next rules). A route value that is not understood falls back to email only."
+file = "notify.toml"
+target = "routes"
+since = "2026-10-03"
+
+[rule.params]
+recovery = "both"
+maintenance = "email"
+digest_daily = "email"
+report_weekly = "email"
+incident_resolved = "both"
+ack_expired = "email"
+test = "mirror"
+
+[[rule]]
+id = "notify.routes.alert"
+title = "Alert routes by severity: crit texts, warn and info email"
+kind = "alert"
+principle = "classes of service P0-P3"
+why = "A critical page is something to act on tonight and gets both channels. A warning is worth an email first and only becomes a text if it persists, so a flapping low-grade problem does not wake the phone. This is the classes-of-service idea applied to messages."
+does = "crit = SMS and email, warn = email, info = email. A warning also gets an SMS once it has been notified warn_sms_after (2) times, that is when it survived a reminder (see notify.escalation). A per-task route in task_routes is final and is never escalated."
+file = "notify.toml"
+target = "routes.alert"
+params = { crit = "both", warn = "email", info = "email" }
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.routes.incident_open"
+title = "Incident-open routes by severity (same as alerts)"
+kind = "alert"
+principle = "one umbrella"
+why = "An incident and its alert describe one problem, so they use the same channels; the coverage rule (notify.dedupe.covered_by) makes sure only one of the two actually goes out. Incident messages are not sent automatically today, so this table only matters for manual and hook sends."
+does = "crit = SMS and email, warn = email, info = email. Today nothing in the runner sends incident_open on its own (INTEGRATION decision 31: the alert email already carries the playbook), so this table is used by `notify send incident_open ...` from a shell hook and by the coverage check."
+file = "notify.toml"
+target = "routes.incident_open"
+params = { crit = "both", warn = "email", info = "email" }
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.significant"
+title = "Significant maintenance also texts"
+kind = "alert"
+principle = "one umbrella"
+why = "Most maintenance is routine and email is enough, but a cutover, a restart or an unusually large cleanup is something the owner wants to know about immediately. Texting only these keeps the phone for the few maintenance events that change what the owner may notice."
+does = "When a maintenance event carries facts.significant = true, the channels in this table (both) are added to the maintenance route (email), so that message is also texted."
+file = "notify.toml"
+target = "significant"
+params = { maintenance = "both" }
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.task_routes"
+title = "Per-task route overrides (none shipped)"
+kind = "alert"
+principle = "one umbrella"
+why = "One noisy check should be silenceable without disabling it. An explicit route is the owner's decision and is therefore final."
+does = "Empty today. An entry such as `docker_df = \"email\"` or `noisy_check = \"none\"` replaces the route of that task's alert and incident_open messages, is never escalated, and `none` drops them (route-none in the delivery log). The check itself keeps running and keeps its true colour in status.json."
+file = "notify.toml"
+target = "task_routes"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.todo"
+title = "Fallback 'what to do' lines per task (none shipped)"
+kind = "alert"
+principle = "one umbrella"
+why = "An alert email is only useful if it says what to check first. The lines normally come from the task's playbook; this table lets the owner override one task or set a default without editing the packaged playbooks."
+does = "Empty today. `[todo] my_task = [...]` replaces the 'What to do' lines of that task's alert email; the order is the caller's own details.todo, then this table for the task, then the playbook in etc/playbooks.toml, then `_default` of this table."
+file = "notify.toml"
+target = "todo"
+params = {}
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.escalation"
+title = "Warnings text only after they persist; recoveries text only if the problem texted"
+kind = "alert"
+principle = "classes of service P0-P3"
+why = "A warning that is still there after a reminder deserves attention, one that cleared by itself does not. A recovery SMS about a problem the owner never got a text for is noise. Both rules keep the phone for things that matter (page once, never twice)."
+does = "warn_sms_after = 2: a warning alert or incident_open gets an extra SMS on its second notification (it survived a 24 h reminder); 0 would disable that. recovery_sms_only_if_texted = true: a recovery or resolved-incident SMS is dropped when no SMS was sent for that problem. episode_ttl_h = 72: the escalation memory of an unresolved problem is forgotten after 72 h without news."
+file = "notify.toml"
+target = "escalation"
+params = { warn_sms_after = 2, recovery_sms_only_if_texted = true, episode_ttl_h = 72 }
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.dedupe"
+title = "Coverage window between an alert and its incident"
+kind = "alert"
+principle = "page once, never twice"
+why = "The alert pager and the incident ledger both announce the same problem. Without a rule the owner would be told twice, so whichever speaks first covers the other."
+does = "cover_window_s = 1800: an alert is not sent if an incident_open for the same key and at least the same severity went out in the last 30 minutes, and the other way round; the same pairing applies to recovery and incident_resolved (see covered_by). A page whose SMS leg is still being retried covers nothing, so it cannot swallow a later alert."
+file = "notify.toml"
+target = "dedupe"
+params = { cover_window_s = 1800 }
+since = "2026-10-03"
+
+[[rule]]
+id = "notify.dedupe.window_s"
+title = "Do not repeat the same message inside these windows"
+kind = "alert"
+principle = "page once, never twice"
+why = "Repeating an identical message does not inform anyone. The windows are set per kind to the natural repeat cycle: an alert repeats through the 24 h reminder, a daily digest once a day, a weekly report once a week."
+does = "Same kind + severity + key inside the window is skipped (`dedupe` in the delivery log). Seconds: alert 21600 (6 h), recovery 3600, maintenance 3600, digest_daily 72000 (20 h), report_weekly 432000 (5 days), incident_open 21600, incident_resolved 3600, ack_expired 604800 (7 days, one notice per acknowledgement), test 0 (never deduplicated). State for a key is kept 7 days."
+file = "notify.toml"
+target = "dedupe.window_s"
+since = "2026-10-03"
+
+[rule.params]
+alert = 21600
+recovery = 3600
+maintenance = 3600
+digest_daily = 72000
+report_weekly = 432000
+incident_open = 21600
+incident_resolved = 3600
+ack_expired = 604800
+test = 0
+
+[[rule]]
+id = "notify.dedupe.covered_by"
+title = "Which kinds cover which (alert vs incident, recovery vs resolved)"
+kind = "alert"
+principle = "page once, never twice"
+why = "The pairing says which two message kinds describe the same event so that only the first one is sent. Without it the alert pager and the incident ledger would each tell the owner about the same problem."
+does = "alert is covered by incident_open, incident_open by alert, recovery by incident_resolved, incident_resolved by recovery, for the same dedupe key within cover_window_s and only when the earlier one was at least as severe."
+file = "notify.toml"
+target = "dedupe.covered_by"
+since = "2026-10-03"
+
+[rule.params]
+alert = ["incident_open"]
+incident_open = ["alert"]
+recovery = ["incident_resolved"]
+incident_resolved = ["recovery"]
+
+[[rule]]
+id = "notify.budget"
+title = "Daily message budget: 30 total, 40 hard cap, 10 texts"
+kind = "alert"
+principle = "one umbrella"
+why = "A runaway loop or a long outage must not flood the owner's phone and mailbox. The caps apply to a rolling 24 hours and count only deliveries that worked. Criticals may exceed the soft caps because a real emergency must never be dropped, but nothing passes the hard cap."
+does = "Rolling 24 h: total_per_day = 30 messages, hard_cap_per_day = 40 (nothing passes it, critical included), sms_per_day = 10 texts (beyond that a message goes by email only), crit_sms_reserve = 5 extra texts only a critical alert can use, crit_bypass = true: a critical alert/incident_open skips the per-kind and total caps. A skipped message is logged once an hour per key and audited `budget-exhausted`; a failed delivery consumes no budget."
+proof = "`rules check` refuses a hard_cap_per_day above 60 (release floor)."
+file = "notify.toml"
+target = "budget"
+since = "2026-10-03"
+
+[rule.params]
+total_per_day = 30
+hard_cap_per_day = 40
+sms_per_day = 10
+crit_sms_reserve = 5
+crit_bypass = true
+
+[[rule]]
+id = "notify.budget.per_day"
+title = "Per-kind daily caps (alert 8, recovery 8, ... test 20)"
+kind = "alert"
+principle = "one umbrella"
+why = "A per-kind cap stops one noisy kind from using the whole budget: eight alert pages a day is already more than a person can act on. The caps are per kind so that a flood of one kind (a flapping check) cannot use up the budget of the pages that matter."
+does = "Maximum deliveries per rolling 24 h by kind: alert 8, recovery 8, maintenance 6, digest_daily 2, report_weekly 2, incident_open 6, incident_resolved 6, ack_expired 10, test 20. A critical alert or incident_open bypasses these caps (crit_bypass); everything else is skipped with `daily budget for KIND reached`."
+file = "notify.toml"
+target = "budget.per_day"
+since = "2026-10-03"
+
+[rule.params]
+alert = 8
+recovery = 8
+maintenance = 6
+digest_daily = 2
+report_weekly = 2
+incident_open = 6
+incident_resolved = 6
+ack_expired = 10
+test = 20
+
+[[rule]]
+id = "notify.quiet_hours"
+title = "Quiet hours 23:30-07:00: no non-critical texts"
+kind = "alert"
+principle = "classes of service P0-P3"
+why = "At night a non-critical text only wakes someone. The email still arrives for the morning, and criticals are never held because a real outage should reach the owner at any hour."
+does = "Between 23:30 and 07:00 host local time (tz empty = the host zone, America/Toronto), the SMS leg of every non-critical message is removed; the email is still sent. If SMS was the only channel the message is skipped as `quiet-hours` and treated as handled. suppress = [\"sms\"]; adding \"email\" would hold email too. Test messages and critical alerts/incidents ignore quiet hours."
+file = "notify.toml"
+target = "quiet_hours"
+params = { enabled = true, window = "23:30-07:00", tz = "", suppress = ["sms"] }
+since = "2026-10-03"
+owner_notes = "The comment in notify.toml and the `notify route` CLI say the text is 'held until morning'. The code drops it: nothing queues it for 07:00, and the alert state counts it as sent, so only the 24 h reminder can text again."
+
+[[rule]]
+id = "notify.retry"
+title = "Retries: critical texts, undelivered critical pages and expiry notices"
+kind = "alert"
+principle = "fail closed"
+why = "A critical page that reached the inbox but not the phone is half delivered, and one that could not be delivered at all must not be lost. Retrying only what failed, with a back-off, repairs both without sending duplicates."
+does = "sms_attempts = 3 tries in all for a critical page whose SMS failed while the email went (only the text is retried, at least sms_gap_s = 300 s apart, within sms_window_s = 3000 s of the first). A critical alert or incident_open that could not be delivered at all (transport down, circuit open) waits in the outbox and is replayed oldest first through the same routing, dedupe and budgets, waiting outbox_gap_s = 300 s, doubling after each failure up to an hour, until it lands or outbox_ttl_s = 43200 s (12 h) after the first attempt (then logged and audited `outbox-expired`). outbox_max = 10 pages are kept (the oldest goes first, a critical page last); notices_max = 20 ack_expired notices have their own space and can never push a page out. The tick calls `flush` every minute."
+file = "notify.toml"
+target = "retry"
+since = "2026-10-03"
+
+[rule.params]
+sms_attempts = 3
+sms_window_s = 3000
+sms_gap_s = 300
+outbox_ttl_s = 43200
+outbox_gap_s = 300
+outbox_max = 10
+notices_max = 20
+
+[[rule]]
+id = "notify.ack"
+title = "Acknowledge button in alert emails (the pager's copy of the ack policy)"
+kind = "alert"
+principle = "fail closed"
+why = "The owner can say 'I understand this error and I am okay with it' for a while, so a known issue stops paging but never hides a different or worse one. The pager needs its own copy of the policy because it decides, inside notify.send, whether to send or hold."
+does = "enabled = true; button = auto: the email carries the Acknowledge link only once STATE_DIR/ack/web_ready exists (the website serves /ack), until then only the Issue ID line, so a link never opens a 404. The link is base_url/ack?id=..&t=..&d=..&s=.. with a 256-bit single-use token valid token_ttl_days = 30; `d` is days = 90 rounded down to 7/30/90/365 and capped by ack.toml max_days. button_kinds (alert, incident_open, ack_expired) carry it. suppress_kinds (alert, recovery, incident_open, incident_resolved) are the only kinds an acknowledgement may hold; digests, reports, maintenance, ack_expired and tests are never held. require_rule = true, allow_tasks, deny_tasks = [smart_event], deny_prefixes = [job:]: only tasks whose fingerprint names the exact error are offered a button. days, escalation_breaks and button_text only word the email; the rule itself is in ack.toml. notice_group_over = 2: more than 2 expiry notices in one run become one email. Any doubt means the alert is sent as before."
+file = "notify.toml"
+target = "ack"
+since = "2026-10-03"
+owner_notes = "The four policy keys (require_rule, allow_tasks, deny_tasks, deny_prefixes) exist here AND in ack.toml; the pager reads this copy, the dashboard reads ack.toml. Change both together; doctor has a row for equality, test_acks pins it."
+
+[rule.params]
+enabled = true
+button = "auto"
+base_url = "https://maintainer.ohmzhomelab.ca"
+mint_url = "http://127.0.0.1:8088/api/beszel/maintenance/ack/mint"
+token_ttl_days = 30
+days = 90
+button_text = "Acknowledge for {days} days"
+escalation_breaks = true
+suppress_kinds = ["alert", "recovery", "incident_open", "incident_resolved"]
+button_kinds = ["alert", "incident_open", "ack_expired"]
+require_rule = true
+allow_tasks = []
+deny_tasks = ["smart_event"]
+deny_prefixes = ["job:"]
+notice_group_over = 2
+
+[[rule]]
+id = "notify.log"
+title = "Delivery log retention: 90 days, 2 MiB, 5000 lines"
+kind = "alert"
+principle = "one umbrella"
+why = "The delivery log answers 'did the page go out, and if not why'. It must not grow without bound on a host whose disks fill up."
+does = "STATE_DIR/notifications.jsonl keeps one row per attempt (time, kind, severity, title, channels, ok, note, key; no bodies or addresses). When the file passes max_bytes = 2 MiB it is rewritten keeping rows from the last keep_days = 90 days and at most max_lines = 5000 of those."
+file = "notify.toml"
+target = "log"
+params = { keep_days = 90, max_bytes = 2097152, max_lines = 5000 }
+since = "2026-10-03"

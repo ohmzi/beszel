@@ -1,0 +1,26 @@
+# bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+
+# virtualenvs and packaging
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# generated dev screenshots (web/tools/screenshot.sh recreates them); not source
+web/shots-*/
+
+# local deployment settings and anything that could carry a secret
+web/.env
+*.env
+*.secret
+*.log

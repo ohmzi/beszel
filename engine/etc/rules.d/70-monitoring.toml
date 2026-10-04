@@ -1,0 +1,3238 @@
+# homelab-maint rules registry: Monitoring probes. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync).
+# probe-group.* and probe.* rules compile into probes.toml (a group rule is a [[group]], each probe rule one member), live.* into the [live] table of maint.toml. Probes only read, so none carries a `proof`. The `does` of a probe is generated from its effective values (group defaults, then its own); `severity` is the page a confirmed outage causes (P0 critical, P1 and P2 warning, info never pages).
+
+[meta]
+category = "monitoring"
+title = "Monitoring probes"
+blurb = "Probes and the live monitor: what is watched and how."
+
+[[rule]]
+id = "task.probes"
+title = "Probes task: folds probe results into the 15-minute status"
+kind = "probe"
+severity = "crit"
+principle = "classes of service P0-P3; one umbrella"
+why = "Detection runs every minute in the probes engine, but the rest of the umbrella (dashboard, incidents, alerts, SLOs) works from the check tier's status. This task is the bridge, and the one that pages."
+does = "C0 check-tier task. Reads the engine's latest state (probes.json) and returns one result: error and a page 'MONITORING BLIND' if a probes.toml is present but unusable; crit when a crit-severity probe is confirmed down; warn for a confirmed-down warn probe, a degraded or flapping probe, or invalid probe definitions; info for info-only trouble; ok otherwise. alert_mode = task (shipped): the check tier pages on the task level, so a problem is announced up to about 30 minutes after the probe confirmed it (2 runs of the 15-minute tier), and a second probe going down at the same level is not announced until the 24 h reminder. alert_mode = events would instead page per probe from the tick's `probes run --notify` (about 2 minutes after the first failed look) and the check tier then skips the task-level page. Status always stays honest in both modes."
+applies_to = ["probes"]
+file = "maint.toml"
+target = "tasks.probes"
+params = { alert_mode = "task" }
+since = "2026-10-03"
+owner_notes = "The check tier's own run also calls the engine every 15 minutes, so the probe plane keeps working if the tick dies. The Kuma push monitor 'umbrella-probes' is the dead-man's switch for this whole plane."
+
+[[rule]]
+id = "live.settings"
+title = "Live monitor: 5 second heartbeat and probe cadences"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "The website's Live tab needs second-level data without loading the host. Cheap /proc reads run every 5 seconds; anything that forks or can hang runs in its own thread on a slower cadence."
+does = "homelab-maint-live samples every interval_s = 5 s and rewrites public/live.json (52 KB budget, 720 history points = 60 min). Probe threads: GPU (nvidia-smi) every 10 s, hwmon temperatures every 15 s, fan speeds every 60 s (the fan chip is the dearest read), Docker over its socket every 10 s (only while dockerd is demonstrably up, so asking never starts it), services every 30 s, disk usage every 30 s. A service answering slower than slow_ms = 2000 reads degraded; http_timeout_s = 5 per service. cpu_fans = [1, 4] and case_fans = [2, 3, 5] name the nct6798 fan headers. Read once at start: restart the unit after editing. It only reads the host."
+file = "maint.toml"
+target = "live"
+since = "2026-10-03"
+owner_notes = "Mounts default to [tasks.disk_forecast] watch."
+
+[rule.params]
+interval_s = 5
+gpu = true
+sensors = true
+docker = true
+disk = true
+gpu_every_s = 10
+sensors_every_s = 15
+fans_every_s = 60
+docker_every_s = 10
+services_every_s = 30
+disk_every_s = 30
+http_timeout_s = 5
+slow_ms = 2000
+cpu_fans = [1, 4]
+case_fans = [2, 3, 5]
+
+[[rule]]
+id = "live.service.plex"
+title = "Live tab tile: Plex"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Plex is the service the household uses most, so its state is the first tile of the Live tab. Plex is probed natively because Uptime Kuma cannot reach the snap. The tile is a display, not an alert; the probe plane pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: http://127.0.0.1:32400/identity plus the unit snap.plexmediaserver.plexmediaserver.service. Plex is a snap, so this tile checks no container. The loopback URL must answer HTTP 200-399 within 2000 ms (slower, or another code below 500, reads degraded; 5xx reads down). The unit is asked only when the fetch fails: then the tile reads down and names the unit state if the unit is not active, or the connection error if it is. Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "Plex"
+unit = "snap.plexmediaserver.plexmediaserver.service"
+url = "http://127.0.0.1:32400/identity"
+
+[[rule]]
+id = "live.service.immich"
+title = "Live tab tile: Immich"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Immich holds the family photos; an unhealthy server container is the thing to see at a glance. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container immich_server and http://127.0.0.1:2283/api/server/ping. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Immich", container = "immich_server", url = "http://127.0.0.1:2283/api/server/ping" }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "live.service.kavita"
+title = "Live tab tile: Kavita"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Kavita serves the ebook and comic library. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container kavita and http://127.0.0.1:5000/api/health. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Kavita", container = "kavita", url = "http://127.0.0.1:5000/api/health" }
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "live.service.seerr"
+title = "Live tab tile: Seerr"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Seerr is where media requests come in, so it is part of the front of the media stack. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container Seerr and http://127.0.0.1:5056/api/v1/status. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Seerr", container = "Seerr", url = "http://127.0.0.1:5056/api/v1/status" }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "live.service.open-webui"
+title = "Live tab tile: Open WebUI"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Open WebUI is the chat front end to Ollama and the agents. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container open-webui and http://127.0.0.1:4567/health. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Open WebUI", container = "open-webui", url = "http://127.0.0.1:4567/health" }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "live.service.homarr"
+title = "Live tab tile: Homarr"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Homarr is the dashboard that embeds the umbrella's widgets. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container homarr and http://127.0.0.1:7575/. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Homarr", container = "homarr", url = "http://127.0.0.1:7575/" }
+since = "2026-10-03"
+order = 6
+
+[[rule]]
+id = "live.service.uptime-kuma"
+title = "Live tab tile: Uptime Kuma"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Kuma feeds Homarr's uptime widget and receives the umbrella's push heartbeats. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container uptime-kuma and http://127.0.0.1:3011/api/entry-page. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Uptime Kuma", container = "uptime-kuma", url = "http://127.0.0.1:3011/api/entry-page" }
+since = "2026-10-03"
+order = 7
+
+[[rule]]
+id = "live.service.nextcloud"
+title = "Live tab tile: Nextcloud"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Nextcloud holds family files and sync. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container nextcloud and http://127.0.0.1:8090/status.php. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Nextcloud", container = "nextcloud", url = "http://127.0.0.1:8090/status.php" }
+since = "2026-10-03"
+order = 8
+
+[[rule]]
+id = "live.service.tunarr"
+title = "Live tab tile: Tunarr"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Tunarr turns the Plex library into live TV channels. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container tunarr-host-net and http://127.0.0.1:8000/. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Tunarr", container = "tunarr-host-net", url = "http://127.0.0.1:8000/" }
+since = "2026-10-03"
+order = 9
+
+[[rule]]
+id = "live.service.radarr"
+title = "Live tab tile: Radarr"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Radarr manages the movie library. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container Radarr and http://127.0.0.1:7878/ping. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Radarr", container = "Radarr", url = "http://127.0.0.1:7878/ping" }
+since = "2026-10-03"
+order = 10
+
+[[rule]]
+id = "live.service.sonarr"
+title = "Live tab tile: Sonarr"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Sonarr manages the TV library. The tile is a display of state, not an alert; the probe plane watches the same service and pages."
+does = "One tile of the website's Live tab, read every 30 s by homelab-maint-live: container Sonarr and http://127.0.0.1:8989/ping. The container must exist and be running (unhealthy or still starting reads degraded) and the loopback URL must answer HTTP 200-399 within 2000 ms (slower reads degraded; 5xx or a closed port reads down). Read-only; it pages nothing, the probes do."
+file = "maint.toml"
+target = "live.services[]"
+merge = "append"
+params = { name = "Sonarr", container = "Sonarr", url = "http://127.0.0.1:8989/ping" }
+since = "2026-10-03"
+order = 11
+
+[[rule]]
+id = "probe-group.umbrella"
+title = "Group Umbrella: the monitoring system watching itself"
+kind = "probe"
+why = "A monitor that cannot notice its own death is dangerous. These probes watch what the umbrella writes (status, probes, public export, live file, ring), its own services and timers and the maintenance website, from the one-minute engine, which is a different process from the check tier."
+does = "Defaults for the 17 members: class P1 (a confirmed problem is a warning), availability objective 99.5 percent, every minute, tag umbrella. Members override any of it (umbrella-tick is P0). Files are judged by age, services by systemd state, the website by its healthz."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+params = { group = "Umbrella", class = "P1", slo = 99.5, interval_s = 60, tags = ["umbrella"] }
+since = "2026-10-03"
+order = 1
+
+[[rule]]
+id = "probe.umbrella-status"
+title = "Runner status file is fresh"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "status.json is what the dashboard, the widgets and the website read. If it stops updating they show old numbers as if they were current, so this is the first sign the check tier died."
+does = "Checks the age of {STATE}/status.json: its modification time must be under 2700 s (degraded from 1800 s). Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. Pushes its result to the Kuma push monitor 'umbrella-status' (a no-op until kuma.toml holds a token)."
+applies_to = ["umbrella-status"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "umbrella-status"
+title = "Runner status fresh"
+type = "file_age"
+target = "{STATE}/status.json"
+expect = { max_age_s = 2700, warn_age_s = 1800 }
+kuma_push_key = "umbrella-status"
+
+[[rule]]
+id = "probe.umbrella-probe-plane"
+title = "Probe engine has run recently"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "probes.json is rewritten on every engine run; if it goes stale the one-minute monitoring is not running at all. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks the age of {STATE}/probes.json: its modification time must be under 2700 s (degraded from 1500 s). Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["umbrella-probe-plane"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "umbrella-probe-plane"
+title = "Probe plane running"
+type = "file_age"
+target = "{STATE}/probes.json"
+expect = { max_age_s = 2700, warn_age_s = 1500 }
+
+[[rule]]
+id = "probe.umbrella-tick"
+title = "Scheduler tick is beating"
+kind = "probe"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "The tick runs the backups, the cleaners and this very engine every minute. The timer unit can stay 'active (waiting)' while every tick fails, so unit liveness proves nothing: the beat itself, the number of loaded jobs and the count of refused job definitions are judged. A jobs.toml typo leaves the beat fresh but schedules nothing."
+does = "Reads {RUN}/tick.json as JSON; requires: t is not older than 300 s (warn from 150 s); jobs is at least 1; config_problems is at most 0. Every minute; 2 bad runs to go down, 2 good runs to recover. P0, critical: a confirmed outage pages by SMS and email. Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["umbrella-tick"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+owner_notes = "Optional until the first tick has been seen (a fresh install has no tick yet)."
+
+[rule.params]
+name = "umbrella-tick"
+title = "Scheduler tick beating"
+type = "json"
+target = "{RUN}/tick.json"
+class = "P0"
+optional = true
+
+[rule.params.expect]
+json = [
+  { path = "t", age_max_s = 300, age_warn_s = 150 },
+  { path = "jobs", min = 1 },
+  { path = "config_problems", max = 0 },
+]
+
+[[rule]]
+id = "probe.umbrella-public-export"
+title = "Public export is fresh"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "overview.json is the file the website container reads. If it goes stale the website must say so instead of showing old data as current."
+does = "Checks the age of {STATE}/public/overview.json: its modification time must be under 2700 s (degraded from 1800 s). Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["umbrella-public-export"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "umbrella-public-export"
+title = "Public export fresh"
+type = "file_age"
+target = "{STATE}/public/overview.json"
+expect = { max_age_s = 2700, warn_age_s = 1800 }
+optional = true
+
+[[rule]]
+id = "probe.umbrella-live"
+title = "Live monitor is writing live.json"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The Live tab is only as good as its file; live.json has a generated_at stamp the monitor refreshes every 5 seconds. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Reads {STATE}/public/live.json as JSON; requires: generated_at is not older than 300 s (warn from 60 s). Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["umbrella-live"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "umbrella-live"
+title = "Live monitor (live.json)"
+type = "json"
+target = "{STATE}/public/live.json"
+expect = { json = [{ path = "generated_at", age_max_s = 300, age_warn_s = 60 }] }
+optional = true
+
+[[rule]]
+id = "probe.umbrella-metrics-ring"
+title = "Metrics ring sampler is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Temperatures, fans and load history come from one sample a minute into the ring file. If it ages, the dashboard graphs and the thermal widgets go blank."
+does = "Checks the age of {STATE}/metrics-ring.json: its modification time must be under 900 s (degraded from 300 s). Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["umbrella-metrics-ring"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "umbrella-metrics-ring"
+title = "Metrics ring sampler"
+type = "file_age"
+target = "{STATE}/metrics-ring.json"
+expect = { max_age_s = 900, warn_age_s = 300 }
+optional = true
+
+[[rule]]
+id = "probe.umbrella-www"
+title = "Status server answers on :9111"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The Homarr widgets read the umbrella's JSON from this loopback server. The probe also requires that the payload says it is not stale."
+does = "GET http://127.0.0.1:9111/overview (redirects are not followed); expects HTTP 200-299; JSON: stale equals false. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["umbrella-www"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+owner_notes = "The port is written into the target, not read from [global] www_port: change both together."
+
+[rule.params]
+name = "umbrella-www"
+title = "Status server (:9111)"
+type = "http"
+target = "http://127.0.0.1:9111/overview"
+expect = { json = [{ path = "stale", equals = false }] }
+[[rule]]
+id = "probe.svc-hm-www"
+title = "Status server service is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "If the unit is down the Homarr widgets turn red. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-www.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-hm-www"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 10
+
+[rule.params]
+name = "svc-hm-www"
+title = "homelab-maint-www"
+type = "systemd"
+target = "homelab-maint-www.service"
+
+[[rule]]
+id = "probe.svc-hm-live"
+title = "Live monitor service is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "If the unit is down the Live tab stops updating. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-live.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["svc-hm-live"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 11
+owner_notes = "Optional until installed."
+
+[rule.params]
+name = "svc-hm-live"
+title = "homelab-maint-live"
+type = "systemd"
+target = "homelab-maint-live.service"
+optional = true
+
+[[rule]]
+id = "probe.svc-hm-check"
+title = "Check tier timer is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The check timer is the permanent, independent driver of the 15-minute checks. It is what notices when the scheduler tick dies."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-check.timer is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-hm-check"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+
+[rule.params]
+name = "svc-hm-check"
+title = "Check tier timer"
+type = "systemd"
+target = "homelab-maint-check.timer"
+
+[[rule]]
+id = "probe.svc-hm-daily"
+title = "Daily tier timer is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The daily timer starts the cleanup tier; if it is gone nothing is cleaned and nobody is told. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-daily.timer is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-hm-daily"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 13
+
+[rule.params]
+name = "svc-hm-daily"
+title = "Daily tier timer"
+type = "systemd"
+target = "homelab-maint-daily.timer"
+
+[[rule]]
+id = "probe.svc-hm-weekly"
+title = "Weekly tier timer is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The weekly timer starts the slow audits and C2 plans. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-weekly.timer is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-hm-weekly"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 14
+
+[rule.params]
+name = "svc-hm-weekly"
+title = "Weekly tier timer"
+type = "systemd"
+target = "homelab-maint-weekly.timer"
+
+[[rule]]
+id = "probe.svc-hm-metrics"
+title = "Metrics sampler timer is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Without it the metrics ring stops being filled. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-metrics.timer is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["svc-hm-metrics"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 15
+owner_notes = "Optional until installed."
+
+[rule.params]
+name = "svc-hm-metrics"
+title = "Metrics sampler timer"
+type = "systemd"
+target = "homelab-maint-metrics.timer"
+optional = true
+
+[[rule]]
+id = "probe.svc-hm-tick"
+title = "Scheduler tick timer is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The tick timer runs every job the umbrella owns, once a minute. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-tick.timer is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["svc-hm-tick"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 16
+owner_notes = "Optional until installed."
+
+[rule.params]
+name = "svc-hm-tick"
+title = "Scheduler tick timer"
+type = "systemd"
+target = "homelab-maint-tick.timer"
+optional = true
+
+[[rule]]
+id = "probe.svc-hm-selfhealth"
+title = "Pipeline self-health timer is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "It rewrites self.json every minute, which the website needs to say whether the monitoring pipeline is healthy. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether homelab-maint-selfhealth.timer is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["svc-hm-selfhealth"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 17
+owner_notes = "Optional until installed."
+
+[rule.params]
+name = "svc-hm-selfhealth"
+title = "Pipeline self-health timer"
+type = "systemd"
+target = "homelab-maint-selfhealth.timer"
+optional = true
+
+[[rule]]
+id = "probe-group.platform"
+title = "Group Platform (primary): Docker, Cloudflare tunnel, SSH"
+kind = "probe"
+why = "Everything else on the host stands on these. If Docker, the tunnel or SSH is down the household and the owner lose their services or their way in, so a confirmed outage is a critical page."
+does = "Defaults for 5 members: class P0 (critical when confirmed down), availability objective 99.9 percent, every minute, tag platform."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+params = { group = "Platform", class = "P0", slo = 99.9, interval_s = 60, tags = ["platform"] }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "probe.docker-daemon"
+title = "Docker daemon answers"
+kind = "probe"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "About 70 containers depend on it. This asks the daemon itself, which is different from the unit being active."
+does = "Asks the Docker daemon for its container list (`docker ps -a`); down if it does not answer. Every minute; 2 bad runs to go down, 2 good runs to recover. P0, critical: a confirmed outage pages by SMS and email. Availability objective 99.9 percent. Pushes its result to the Kuma push monitor 'docker' (a no-op until kuma.toml holds a token)."
+applies_to = ["docker-daemon"]
+file = "probes.toml"
+target = "@probe-group.platform:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "docker-daemon"
+title = "Docker daemon answers"
+type = "docker"
+target = "@daemon"
+kuma_push_key = "docker"
+
+[[rule]]
+id = "probe.svc-docker"
+title = "Docker service is running"
+kind = "probe"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "Docker is the platform for almost every service on the host; the unit state complements the daemon check. It is class P0, part of the platform everything else stands on: it is checked every minute and a confirmed outage pages by SMS as well as email."
+does = "Asks systemd (`systemctl show`) whether docker.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P0, critical: a confirmed outage pages by SMS and email. Availability objective 99.9 percent."
+applies_to = ["svc-docker"]
+file = "probes.toml"
+target = "@probe-group.platform:probes[]"
+merge = "append"
+params = { name = "svc-docker", title = "docker.service", type = "systemd", target = "docker.service" }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "probe.svc-cloudflared"
+title = "Cloudflare tunnel service is running"
+kind = "probe"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "Every public hostname (Seerr, the sites, the maintenance website) reaches the host through the tunnel. It is class P0, part of the platform everything else stands on: it is checked every minute and a confirmed outage pages by SMS as well as email."
+does = "Asks systemd (`systemctl show`) whether cloudflared.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P0, critical: a confirmed outage pages by SMS and email. Availability objective 99.9 percent."
+applies_to = ["svc-cloudflared"]
+file = "probes.toml"
+target = "@probe-group.platform:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "svc-cloudflared"
+title = "cloudflared.service"
+type = "systemd"
+target = "cloudflared.service"
+
+[[rule]]
+id = "probe.cloudflared-tunnel"
+title = "Cloudflare tunnel has live connections"
+kind = "probe"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "The service can be active with no connection to Cloudflare. cloudflared's own ready endpoint reports how many connections are up."
+does = "GET http://127.0.0.1:20241/ready (redirects are not followed); expects HTTP 200-299; JSON: readyConnections is at least 1. Every minute; 2 bad runs to go down, 2 good runs to recover. P0, critical: a confirmed outage pages by SMS and email. Availability objective 99.9 percent. Pushes its result to the Kuma push monitor 'cloudflared' (a no-op until kuma.toml holds a token)."
+applies_to = ["cloudflared-tunnel"]
+file = "probes.toml"
+target = "@probe-group.platform:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "cloudflared-tunnel"
+title = "Cloudflare tunnel connected"
+type = "http"
+target = "http://127.0.0.1:20241/ready"
+expect = { json = [{ path = "readyConnections", min = 1 }] }
+kuma_push_key = "cloudflared"
+
+[[rule]]
+id = "probe.svc-ssh"
+title = "SSH service is running"
+kind = "probe"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "SSH is the owner's way in when everything else is broken. It is class P0, part of the platform everything else stands on: it is checked every minute and a confirmed outage pages by SMS as well as email."
+does = "Asks systemd (`systemctl show`) whether ssh.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P0, critical: a confirmed outage pages by SMS and email. Availability objective 99.9 percent."
+applies_to = ["svc-ssh"]
+file = "probes.toml"
+target = "@probe-group.platform:probes[]"
+merge = "append"
+params = { name = "svc-ssh", title = "ssh.service", type = "systemd", target = "ssh.service" }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "probe-group.platform-2"
+title = "Group Platform (secondary): networking, time, GPU, SMART, cron"
+kind = "probe"
+why = "These are the supporting pieces of the host. A problem is worth an email, not a text in the night, so they are P0 by importance but severity warn."
+does = "Defaults for 16 members: class P0 with severity warn (a confirmed outage emails and only texts if it persists), availability objective 99.9 percent, every 2 minutes, tag platform. Individual members change class or interval (gpu-driver and internet are P1)."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+group = "Platform"
+class = "P0"
+severity = "warn"
+slo = 99.9
+interval_s = 120
+tags = ["platform"]
+
+[[rule]]
+id = "probe.svc-containerd"
+title = "containerd service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Docker's container runtime; a problem is worth an email, not a text. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether containerd.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-containerd"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "svc-containerd"
+title = "containerd.service"
+type = "systemd"
+target = "containerd.service"
+
+[[rule]]
+id = "probe.svc-tailscaled"
+title = "Tailscale service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Tailscale is the private remote access path. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether tailscaled.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-tailscaled"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "svc-tailscaled"
+title = "tailscaled.service"
+type = "systemd"
+target = "tailscaled.service"
+
+[[rule]]
+id = "probe.tailscale"
+title = "Tailscale is connected"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The service can run while the node is logged out or its key expired; `tailscale status` says the backend is Running. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Runs `tailscale status --json --peers=false` (no shell); the output must match /\"BackendState\":\\s*\"Running\"/. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["tailscale"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "tailscale"
+title = "Tailscale connected"
+type = "command"
+target = ["tailscale", "status", "--json", "--peers=false"]
+expect = { regex = '"BackendState":\s*"Running"' }
+
+[[rule]]
+id = "probe.svc-fail2ban"
+title = "fail2ban service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "fail2ban blocks brute-force attempts on exposed services. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether fail2ban.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-fail2ban"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+params = { name = "svc-fail2ban", title = "fail2ban.service", type = "systemd", target = "fail2ban.service" }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "probe.fail2ban"
+title = "fail2ban answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "fail2ban.log only moves when something is banned or rotated, so log age would false-alarm. Asking the daemon with `fail2ban-client ping` is exact."
+does = "Runs `fail2ban-client ping` (no shell) as root (skipped when the runner is not root); the output must match /pong/. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["fail2ban"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+owner_notes = "Needs root; skipped when the runner is not root."
+
+[rule.params]
+name = "fail2ban"
+title = "fail2ban answers"
+type = "command"
+target = ["fail2ban-client", "ping"]
+needs_root = true
+expect = { regex = "pong" }
+
+[[rule]]
+id = "probe.svc-networkmanager"
+title = "NetworkManager service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Networking for the host. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether NetworkManager.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-networkmanager"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "svc-networkmanager"
+title = "NetworkManager.service"
+type = "systemd"
+target = "NetworkManager.service"
+
+[[rule]]
+id = "probe.svc-resolved"
+title = "systemd-resolved service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "DNS for the host; without it names stop resolving. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether systemd-resolved.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-resolved"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "svc-resolved"
+title = "systemd-resolved.service"
+type = "systemd"
+target = "systemd-resolved.service"
+
+[[rule]]
+id = "probe.svc-timesyncd"
+title = "Time sync service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Age-based cleanup and every freshness check assume the clock is right; the developer cleaners check the clock is NTP-synchronised before they delete by age. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether systemd-timesyncd.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-timesyncd"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+
+[rule.params]
+name = "svc-timesyncd"
+title = "systemd-timesyncd.service"
+type = "systemd"
+target = "systemd-timesyncd.service"
+
+[[rule]]
+id = "probe.svc-cron"
+title = "cron service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Some legacy jobs and the distro cron.daily shims still use it. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether cron.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-cron"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+params = { name = "svc-cron", title = "cron.service", type = "systemd", target = "cron.service" }
+since = "2026-10-03"
+order = 9
+
+[[rule]]
+id = "probe.svc-rsyslog"
+title = "rsyslog service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The logging daemon behind syslog and the /var/log files; a dead one loses the syslog copies of what the cleaners do. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether rsyslog.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-rsyslog"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+params = { name = "svc-rsyslog", title = "rsyslog.service", type = "systemd", target = "rsyslog.service" }
+since = "2026-10-03"
+order = 10
+
+[[rule]]
+id = "probe.svc-snapd"
+title = "snapd service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Plex runs as a snap, so a dead snapd means a Plex that cannot be refreshed or restarted. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether snapd.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-snapd"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+params = { name = "svc-snapd", title = "snapd.service", type = "systemd", target = "snapd.service" }
+since = "2026-10-03"
+order = 11
+
+[[rule]]
+id = "probe.svc-smartd"
+title = "smartd is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "smartd watches the disks and raises the alert on a pre-failure sign. The canonical unit name is smartmontools.service (smartd.service is an alias)."
+does = "Asks systemd (`systemctl show`) whether smartmontools.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-smartd"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+
+[rule.params]
+name = "svc-smartd"
+title = "smartd (smartmontools.service)"
+type = "systemd"
+target = "smartmontools.service"
+
+[[rule]]
+id = "probe.svc-smart-bridge"
+title = "Disk temperature bridge is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Feeds Glances the disk temperatures; part of the alert path for hot disks. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether smart-bridge.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-smart-bridge"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 13
+
+[rule.params]
+name = "svc-smart-bridge"
+title = "smart-bridge.service (alert path)"
+type = "systemd"
+target = "smart-bridge.service"
+
+[[rule]]
+id = "probe.svc-nvidia-persistenced"
+title = "NVIDIA persistence daemon is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Keeps the GPU driver initialised between jobs; without it the first GPU job after idle can be slow to start. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Asks systemd (`systemctl show`) whether nvidia-persistenced.service is active. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["svc-nvidia-persistenced"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 14
+
+[rule.params]
+name = "svc-nvidia-persistenced"
+title = "nvidia-persistenced.service"
+type = "systemd"
+target = "nvidia-persistenced.service"
+
+[[rule]]
+id = "probe.gpu-driver"
+title = "GPU driver answers (nvidia-smi)"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Plex NVENC, Immich ML, Ollama and ComfyUI all need the driver. `nvidia-smi` hanging or failing is the early sign of a GPU fault."
+does = "Runs `nvidia-smi --query-gpu=name --format=csv,noheader` (no shell). Every 5 minutes (timeout 10 s); 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent."
+applies_to = ["gpu-driver"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 15
+owner_notes = "timeout 10 s; checked every 5 minutes."
+
+[rule.params]
+name = "gpu-driver"
+title = "GPU driver answers (nvidia-smi)"
+type = "command"
+target = ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"]
+timeout_s = 10
+interval_s = 300
+class = "P1"
+
+[[rule]]
+id = "probe.internet"
+title = "Internet is reachable"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A cheap check of the host's outside path. If it is down, the public hostnames and the alert transport (Gmail, SMS gateway) are down too."
+does = "GET the /cdn-cgi/trace page of https://1.1.1.1 (redirects are not followed); expects HTTP 200-299. Every 15 minutes; 1 bad run to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.9 percent. Carries the Uptime Kuma monitor 'Internet'. external: allowed to leave the host (GET only, nothing sent)."
+applies_to = ["internet"]
+file = "probes.toml"
+target = "@probe-group.platform-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 16
+owner_notes = "One bad run is enough (confirm = 1) because it is checked only every 15 minutes."
+
+[rule.params]
+name = "internet"
+title = "Internet reachable"
+type = "http"
+target = "https://1.1.1.1/cdn-cgi/trace"
+external = true
+interval_s = 900
+confirm = 1
+source = "kuma"
+kuma = "Internet"
+class = "P1"
+severity = "warn"
+
+[[rule]]
+id = "probe-group.media-stack"
+title = "Group Media Stack: Plex, *arr apps, downloaders (Uptime Kuma parity)"
+kind = "probe"
+why = "These are the apps that make up the media stack. Each one was an Uptime Kuma monitor, so the group keeps the same names and checks while the probe plane becomes the source of truth."
+does = "Defaults for 12 members: class P2, source kuma (carried over from Kuma), every minute, tag media. Plex, Seerr and Immich are P1 with a 99.5 percent objective. Differences from Kuma, on purpose: loopback ports instead of docker DNS names; Immich uses GET /api/server/ping because a GET-only plane must not POST; Plex is paused in Kuma (it cannot reach the snap) but probed natively here; Bazarr also accepts 401."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+params = { group = "Media Stack", class = "P2", source = "kuma", interval_s = 60, tags = ["media"] }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "probe.plex"
+title = "Plex Media Server answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Plex is what the household watches. /identity returns a MediaContainer document when the server is up, which is stricter than the port being open."
+does = "GET http://127.0.0.1:32400/identity (redirects are not followed); expects HTTP 200-299 and a body matching /MediaContainer/. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. Carries the Uptime Kuma monitor 'Plex' (paused in Kuma)."
+applies_to = ["plex"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+owner_notes = "Plex is paused in Kuma (host.docker.internal cannot reach the snap); this native probe is the only one watching it."
+
+[rule.params]
+name = "plex"
+title = "Plex Media Server"
+type = "http"
+target = "http://127.0.0.1:32400/identity"
+class = "P1"
+slo = 99.5
+kuma = "Plex"
+kuma_paused = true
+expect = { regex = "MediaContainer" }
+
+[[rule]]
+id = "probe.radarr"
+title = "Radarr answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Radarr adds and upgrades movies; /ping returns status OK when it is healthy. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:7878/ping (redirects are not followed); expects HTTP 200-299; JSON: status equals OK. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Radarr'."
+applies_to = ["radarr"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "radarr"
+title = "Radarr"
+type = "http"
+target = "http://127.0.0.1:7878/ping"
+kuma = "Radarr"
+expect = { json = [{ path = "status", equals = "OK" }] }
+
+[[rule]]
+id = "probe.sonarr"
+title = "Sonarr answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Sonarr adds and upgrades TV episodes; /ping returns status OK when healthy. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8989/ping (redirects are not followed); expects HTTP 200-299; JSON: status equals OK. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Sonarr'."
+applies_to = ["sonarr"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "sonarr"
+title = "Sonarr"
+type = "http"
+target = "http://127.0.0.1:8989/ping"
+kuma = "Sonarr"
+expect = { json = [{ path = "status", equals = "OK" }] }
+
+[[rule]]
+id = "probe.prowlarr"
+title = "Prowlarr answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Prowlarr is the indexer manager that Radarr and Sonarr search through. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:9696/ping (redirects are not followed); expects HTTP 200-299; JSON: status equals OK. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Prowlarr'."
+applies_to = ["prowlarr"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "prowlarr"
+title = "Prowlarr"
+type = "http"
+target = "http://127.0.0.1:9696/ping"
+kuma = "Prowlarr"
+expect = { json = [{ path = "status", equals = "OK" }] }
+
+[[rule]]
+id = "probe.sabnzbd"
+title = "SABnzbd answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "SABnzbd is the Usenet downloader behind the *arr apps. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8080/ (redirects are not followed); expects HTTP 200-299, 300-399. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'SABnzbd'."
+applies_to = ["sabnzbd"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "sabnzbd"
+title = "SABnzbd"
+type = "http"
+target = "http://127.0.0.1:8080/"
+kuma = "SABnzbd"
+expect = { status = ["200-299", "300-399"] }
+
+[[rule]]
+id = "probe.deluge"
+title = "Deluge answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "One of the torrent clients behind the *arr apps. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8112/ (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Deluge'."
+applies_to = ["deluge"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "deluge"
+title = "Deluge"
+type = "http"
+target = "http://127.0.0.1:8112/"
+kuma = "Deluge"
+
+[[rule]]
+id = "probe.transmission"
+title = "Transmission answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "One of the torrent clients behind the *arr apps. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:9091/transmission/web/ (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Transmission'."
+applies_to = ["transmission"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "transmission"
+title = "Transmission"
+type = "http"
+target = "http://127.0.0.1:9091/transmission/web/"
+kuma = "Transmission"
+
+[[rule]]
+id = "probe.bazarr"
+title = "Bazarr answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Bazarr fetches subtitles. It answers 401 on / when authentication is on, so 401 is the only extra accepted code."
+does = "GET http://127.0.0.1:6767/ (redirects are not followed); expects HTTP 200-299, 401. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Bazarr'."
+applies_to = ["bazarr"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+
+[rule.params]
+name = "bazarr"
+title = "Bazarr"
+type = "http"
+target = "http://127.0.0.1:6767/"
+kuma = "Bazarr"
+expect = { status = ["200-299", 401] }
+
+[[rule]]
+id = "probe.tautulli"
+title = "Tautulli answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Tautulli records Plex activity; /status answers 'success' when it is running. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8181/status (redirects are not followed); expects HTTP 200-299 and a body matching /success/. Every minute; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Tautulli'."
+applies_to = ["tautulli"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 9
+
+[rule.params]
+name = "tautulli"
+title = "Tautulli"
+type = "http"
+target = "http://127.0.0.1:8181/status"
+kuma = "Tautulli"
+expect = { regex = "success" }
+
+[[rule]]
+id = "probe.seerr"
+title = "Seerr answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Seerr is where media requests come in, so it faces people. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:5056/api/v1/status (redirects are not followed); expects HTTP 200-299; JSON: version is present. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. Carries the Uptime Kuma monitor 'Seerr'."
+applies_to = ["seerr"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 10
+
+[rule.params]
+name = "seerr"
+title = "Seerr"
+type = "http"
+target = "http://127.0.0.1:5056/api/v1/status"
+class = "P1"
+slo = 99.5
+kuma = "Seerr"
+expect = { json = [{ path = "version", exists = true }] }
+
+[[rule]]
+id = "probe.immich"
+title = "Immich answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Immich holds the photo library and backs up phones. Kuma used to POST /api/auth/validateToken; this GET-only plane uses /api/server/ping instead."
+does = "GET http://127.0.0.1:2283/api/server/ping (redirects are not followed); expects HTTP 200-299; JSON: res equals pong. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. Carries the Uptime Kuma monitor 'Immich'."
+applies_to = ["immich"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 11
+
+[rule.params]
+name = "immich"
+title = "Immich"
+type = "http"
+target = "http://127.0.0.1:2283/api/server/ping"
+class = "P1"
+slo = 99.5
+kuma = "Immich"
+expect = { json = [{ path = "res", equals = "pong" }] }
+
+[[rule]]
+id = "probe.ct-kometa"
+title = "Kometa container is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Kometa builds Plex collections and has no HTTP port, so the container state is the signal. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "Checks that container kometa is running (unhealthy is down, a health check still starting is degraded). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Carries the Uptime Kuma monitor 'Kometa'."
+applies_to = ["ct-kometa"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+
+[rule.params]
+name = "ct-kometa"
+title = "Kometa (container)"
+type = "docker"
+target = "kometa"
+interval_s = 300
+kuma = "Kometa"
+
+[[rule]]
+id = "probe-group.apps"
+title = "Group Apps (people-facing): dashboards, cloud, chat, own sites"
+kind = "probe"
+why = "These are the apps a person is waiting on, from the Homarr dashboard to the owner's own production sites, so they are P1. They are checked every minute, two bad runs make a probe down within about two minutes, and the owner is then emailed through the check tier."
+does = "Defaults for 13 members: class P1, availability objective 99.5 percent, every minute (the flashcards app every 5 minutes), tag app."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+params = { group = "Apps", class = "P1", slo = 99.5, interval_s = 60, tags = ["app"] }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "probe.homarr"
+title = "Homarr dashboard answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Homarr is the dashboard the household and the owner open first; it embeds the umbrella's widgets. HEAD is enough."
+does = "HEAD http://127.0.0.1:7575/ (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["homarr"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "homarr"
+title = "Homarr dashboard"
+type = "http"
+method = "HEAD"
+target = "http://127.0.0.1:7575/"
+
+[[rule]]
+id = "probe.uptime-kuma"
+title = "Uptime Kuma answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Kuma feeds the Homarr uptime widget and receives the umbrella's push heartbeats; its entry page returns type entryPage when it is alive. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:3011/api/entry-page (redirects are not followed); expects HTTP 200-299; JSON: type equals entryPage. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["uptime-kuma"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "uptime-kuma"
+title = "Uptime Kuma"
+type = "http"
+target = "http://127.0.0.1:3011/api/entry-page"
+expect = { json = [{ path = "type", equals = "entryPage" }] }
+
+[[rule]]
+id = "probe.immich-public-proxy"
+title = "Immich public proxy answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Shared Immich links go through this proxy; if it is down shares stop opening for the people they were sent to. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:2284/healthcheck (redirects are not followed); expects HTTP 200-299 and a body matching /ok/. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["immich-public-proxy"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "immich-public-proxy"
+title = "Immich public proxy"
+type = "http"
+target = "http://127.0.0.1:2284/healthcheck"
+expect = { regex = "ok" }
+
+[[rule]]
+id = "probe.nextcloud"
+title = "Nextcloud is installed and not in maintenance"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "status.php can answer while Nextcloud is in maintenance mode or needs a database upgrade, which is a broken service for users. All three flags are checked."
+does = "GET http://127.0.0.1:8090/status.php (redirects are not followed); expects HTTP 200-299; JSON: installed equals true; JSON: maintenance equals false; JSON: needsDbUpgrade equals false. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["nextcloud"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "nextcloud"
+title = "Nextcloud"
+type = "http"
+target = "http://127.0.0.1:8090/status.php"
+
+[rule.params.expect]
+json = [
+  { path = "installed", equals = true },
+  { path = "maintenance", equals = false },
+  { path = "needsDbUpgrade", equals = false },
+]
+
+[[rule]]
+id = "probe.openwebui"
+title = "Open WebUI answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The owner's chat front end to Ollama and the agents. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:4567/health (redirects are not followed); expects HTTP 200-299; JSON: status equals true. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["openwebui"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "openwebui"
+title = "Open WebUI"
+type = "http"
+target = "http://127.0.0.1:4567/health"
+expect = { json = [{ path = "status", equals = true }] }
+
+[[rule]]
+id = "probe.owui-public-gate"
+title = "Open WebUI public gate answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The gate fronts the public Open WebUI instance (docs/PUBLIC_INSTANCE.md). Its /api/config proves the gate and the public Open WebUI are both up."
+does = "GET http://127.0.0.1:4568/api/config (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["owui-public-gate"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "owui-public-gate"
+title = "Open WebUI public gate"
+type = "http"
+target = "http://127.0.0.1:4568/api/config"
+
+[[rule]]
+id = "probe.audiobookshelf"
+title = "Audiobookshelf answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The audiobook and podcast server. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:80/healthcheck (redirects are not followed); expects HTTP 200-299 and a body matching /OK/. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["audiobookshelf"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "audiobookshelf"
+title = "Audiobookshelf"
+type = "http"
+target = "http://127.0.0.1:80/healthcheck"
+expect = { regex = "OK" }
+
+[[rule]]
+id = "probe.searxng"
+title = "SearXNG (chat search) answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Web search for Open WebUI. When it is down the model silently answers from training data, which is why it is watched. Only /healthz is used, never a search query, so the engines are not hammered."
+does = "GET http://127.0.0.1:8888/healthz (redirects are not followed); expects HTTP 200-299 and a body matching /OK/. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["searxng"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+
+[rule.params]
+name = "searxng"
+title = "SearXNG (chat search)"
+type = "http"
+target = "http://127.0.0.1:8888/healthz"
+expect = { regex = "OK" }
+
+[[rule]]
+id = "probe.tday"
+title = "Tday answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The owner's task planner app. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:2525/health (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["tday"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+params = { name = "tday", title = "Tday", type = "http", target = "http://127.0.0.1:2525/health" }
+since = "2026-10-03"
+order = 9
+
+[[rule]]
+id = "probe.ohmz-cloud"
+title = "ohmz-cloud site answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "One of the owner's own websites. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:8095/ (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["ohmz-cloud"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+params = { name = "ohmz-cloud", title = "ohmz-cloud site", type = "http", target = "http://127.0.0.1:8095/" }
+since = "2026-10-03"
+order = 10
+
+[[rule]]
+id = "probe.omar-iqbal"
+title = "omar-iqbal site answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "One of the owner's own websites. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:8097/ (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["omar-iqbal"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+params = { name = "omar-iqbal", title = "omar-iqbal site", type = "http", target = "http://127.0.0.1:8097/" }
+since = "2026-10-03"
+order = 11
+
+[[rule]]
+id = "probe.afsaane-prod"
+title = "Afsaane (production) answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A production app of the owner. The test instance has no HTTP probe of its own; the fleet probe covers its container."
+does = "GET http://127.0.0.1:4141/ (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["afsaane-prod"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+
+[rule.params]
+name = "afsaane-prod"
+title = "Afsaane (production)"
+type = "http"
+target = "http://127.0.0.1:4141/"
+
+[[rule]]
+id = "probe.pa-driving-flashcards"
+title = "Driving flashcards app answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A small self-hosted app (driving flashcards); every 5 minutes is enough. It is class P1 (what a person is waiting on): it is checked every 5 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:8377/ (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["pa-driving-flashcards"]
+file = "probes.toml"
+target = "@probe-group.apps:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 13
+
+[rule.params]
+name = "pa-driving-flashcards"
+title = "Driving flashcards"
+type = "http"
+target = "http://127.0.0.1:8377/"
+interval_s = 300
+
+[[rule]]
+id = "probe-group.apps-2"
+title = "Group Apps (background): readers, helpers, torrent clients"
+kind = "probe"
+why = "Useful but not urgent: nobody is waiting on these minute by minute, so they are P2 and checked every 5 minutes. A 5 minute interval also keeps the engine's work and the apps' own logs small."
+does = "Defaults for 15 members: class P2, every 5 minutes, tag app. The alert cancel/pause page is raised to P1 every 2 minutes."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+params = { group = "Apps", class = "P2", interval_s = 300, tags = ["app"] }
+since = "2026-10-03"
+order = 6
+
+[[rule]]
+id = "probe.kavita"
+title = "Kavita answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Kavita serves the ebook and comic library; /api/health answers ok. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:5000/api/health (redirects are not followed); expects HTTP 200-299 and a body matching /(?i)^ok/. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["kavita"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "kavita"
+title = "Kavita"
+type = "http"
+target = "http://127.0.0.1:5000/api/health"
+expect = { regex = "(?i)^ok" }
+
+[[rule]]
+id = "probe.tunarr"
+title = "Tunarr answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Tunarr builds live TV channels from the Plex library; /api/version proves the app is running. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8000/api/version (redirects are not followed); expects HTTP 200-299; JSON: tunarr is present. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["tunarr"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "tunarr"
+title = "Tunarr"
+type = "http"
+target = "http://127.0.0.1:8000/api/version"
+expect = { json = [{ path = "tunarr", exists = true }] }
+
+[[rule]]
+id = "probe.booklore"
+title = "BookLore answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Book manager; its health endpoint reports UP when it works. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:6060/api/v1/healthcheck (redirects are not followed); expects HTTP 200-299; JSON: data.status equals UP. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["booklore"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "booklore"
+title = "BookLore"
+type = "http"
+target = "http://127.0.0.1:6060/api/v1/healthcheck"
+expect = { json = [{ path = "data.status", equals = "UP" }] }
+
+[[rule]]
+id = "probe.grimmory"
+title = "Grimmory answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Book manager; its health endpoint reports UP when it works. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:6061/api/v1/healthcheck (redirects are not followed); expects HTTP 200-299; JSON: data.status equals UP. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["grimmory"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "grimmory"
+title = "Grimmory"
+type = "http"
+target = "http://127.0.0.1:6061/api/v1/healthcheck"
+expect = { json = [{ path = "data.status", equals = "UP" }] }
+
+[[rule]]
+id = "probe.shelfmark"
+title = "Shelfmark answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Book search and download helper; /api/health answers ok. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8084/api/health (redirects are not followed); expects HTTP 200-299; JSON: status equals ok. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["shelfmark"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "shelfmark"
+title = "Shelfmark"
+type = "http"
+target = "http://127.0.0.1:8084/api/health"
+expect = { json = [{ path = "status", equals = "ok" }] }
+
+[[rule]]
+id = "probe.hometube"
+title = "HomeTube answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The video downloader front end; Streamlit's health endpoint answers ok. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8501/_stcore/health (redirects are not followed); expects HTTP 200-299 and a body matching /ok/. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["hometube"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "hometube"
+title = "HomeTube"
+type = "http"
+target = "http://127.0.0.1:8501/_stcore/health"
+expect = { regex = "ok" }
+
+[[rule]]
+id = "probe.trek"
+title = "Trek answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A self-hosted app of the owner; /api/health answers ok. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:3100/api/health (redirects are not followed); expects HTTP 200-299; JSON: status equals ok. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["trek"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "trek"
+title = "Trek"
+type = "http"
+target = "http://127.0.0.1:3100/api/health"
+expect = { json = [{ path = "status", equals = "ok" }] }
+
+[[rule]]
+id = "probe.anchor"
+title = "Anchor answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A self-hosted app of the owner (healthy container); the root page answers. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:3010/ (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["anchor"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+params = { name = "anchor", title = "Anchor", type = "http", target = "http://127.0.0.1:3010/" }
+since = "2026-10-03"
+order = 8
+
+[[rule]]
+id = "probe.saved-vault"
+title = "Saved Vault answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A self-hosted app of the owner (healthy container); the root page answers. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8187/ (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["saved-vault"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+params = { name = "saved-vault", title = "Saved Vault", type = "http", target = "http://127.0.0.1:8187/" }
+since = "2026-10-03"
+order = 9
+
+[[rule]]
+id = "probe.friendarr"
+title = "Friendarr answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Friendarr turns the Plex friends' watchlists into Radarr and Sonarr requests; its root page answers. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:5474/ (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["friendarr"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+params = { name = "friendarr", title = "Friendarr", type = "http", target = "http://127.0.0.1:5474/" }
+since = "2026-10-03"
+order = 10
+
+[[rule]]
+id = "probe.qbittorrent"
+title = "qBittorrent answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Torrent client; its web UI answers. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8093/ (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["qbittorrent"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+params = { name = "qbittorrent", title = "qBittorrent", type = "http", target = "http://127.0.0.1:8093/" }
+since = "2026-10-03"
+order = 11
+
+[[rule]]
+id = "probe.jackett"
+title = "Jackett answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Torrent indexer proxy; its UI redirects, so 3xx is accepted. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:9117/ (redirects are not followed); expects HTTP 200-299, 300-399. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["jackett"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+
+[rule.params]
+name = "jackett"
+title = "Jackett"
+type = "http"
+target = "http://127.0.0.1:9117/"
+expect = { status = ["200-299", "300-399"] }
+
+[[rule]]
+id = "probe.portainer"
+title = "Portainer answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Container management UI; handy in a Docker emergency. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:9000/ (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["portainer"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+params = { name = "portainer", title = "Portainer", type = "http", target = "http://127.0.0.1:9000/" }
+since = "2026-10-03"
+order = 13
+
+[[rule]]
+id = "probe.searxng-hermes"
+title = "SearXNG (agent search) answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The second SearXNG instance used by the agents' price monitors. Only /healthz is used, never a search."
+does = "GET http://127.0.0.1:8889/healthz (redirects are not followed); expects HTTP 200-299 and a body matching /OK/. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["searxng-hermes"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 14
+
+[rule.params]
+name = "searxng-hermes"
+title = "SearXNG (agent search)"
+type = "http"
+target = "http://127.0.0.1:8889/healthz"
+expect = { regex = "OK" }
+
+[[rule]]
+id = "probe.cancel-service"
+title = "Alert cancel/pause page answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Its title in probes.toml is 'Alert cancel/pause page' (port 8096); it is raised to P1 because it belongs to the alert path. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:8096/ (redirects are not followed); expects HTTP 200-299. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["cancel-service"]
+file = "probes.toml"
+target = "@probe-group.apps-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 15
+
+[rule.params]
+name = "cancel-service"
+title = "Alert cancel/pause page"
+type = "http"
+target = "http://127.0.0.1:8096/"
+class = "P1"
+interval_s = 120
+
+[[rule]]
+id = "probe-group.host-services"
+title = "Group Host services: Plex service, Ollama, Glances, sensors"
+kind = "probe"
+why = "Services that run on the host itself rather than in containers. Plex and Ollama are core, the sensor and monitoring daemons feed the dashboards."
+does = "Defaults for 9 members: class P1, availability objective 99.5 percent, every minute, tag host; the API probes of Glances and the sensor exporter run every 5 minutes (the exporter spawns a subprocess per GET), TeamViewer every 5 minutes, thermal-log is P2 and tagged legacy."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+params = { group = "Host services", class = "P1", slo = 99.5, interval_s = 60, tags = ["host"] }
+since = "2026-10-03"
+order = 7
+
+[[rule]]
+id = "probe.svc-plex"
+title = "Plex snap service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The snap unit behind Plex; together with the HTTP probe it tells a dead service from a hung one. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether snap.plexmediaserver.plexmediaserver.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-plex"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "svc-plex"
+title = "Plex (snap service)"
+type = "systemd"
+target = "snap.plexmediaserver.plexmediaserver.service"
+
+[[rule]]
+id = "probe.svc-ollama"
+title = "Ollama service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Ollama serves the language models for Open WebUI and the agents. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether ollama.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-ollama"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+params = { name = "svc-ollama", title = "ollama.service", type = "systemd", target = "ollama.service" }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "probe.ollama"
+title = "Ollama API answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The unit can be active while the API hangs; /api/version proves it answers. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:11434/api/version (redirects are not followed); expects HTTP 200-299; JSON: version is present. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["ollama"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "ollama"
+title = "Ollama API"
+type = "http"
+target = "http://127.0.0.1:11434/api/version"
+expect = { json = [{ path = "version", exists = true }] }
+
+[[rule]]
+id = "probe.svc-glances"
+title = "Glances service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The system monitor that Homarr reads. It is class P1 (what a person is waiting on): it is checked every minute and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether glances.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-glances"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+params = { name = "svc-glances", title = "glances.service", type = "systemd", target = "glances.service" }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "probe.glances"
+title = "Glances API answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Checks the API Homarr reads, not just the unit. It is class P1 (what a person is waiting on): it is checked every 5 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:61208/api/4/status (redirects are not followed); expects HTTP 200-299; JSON: version is present. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["glances"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "glances"
+title = "Glances API (:61208)"
+type = "http"
+target = "http://127.0.0.1:61208/api/4/status"
+interval_s = 300
+expect = { json = [{ path = "version", exists = true }] }
+
+[[rule]]
+id = "probe.svc-sensor-exporter"
+title = "Fan supervisor service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "sensor-exporter controls the fans (hardware control), so it is probed and never touched. If it dies the fans are not supervised."
+does = "Asks systemd (`systemctl show`) whether sensor-exporter.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-sensor-exporter"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "svc-sensor-exporter"
+title = "sensor-exporter.service (fan supervisor)"
+type = "systemd"
+target = "sensor-exporter.service"
+
+[[rule]]
+id = "probe.sensor-exporter"
+title = "Sensor exporter API answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Each GET makes a subprocess round of about 0.2 s on its side, so it is asked every 5 minutes. Hardware control itself is never touched."
+does = "GET http://127.0.0.1:9110/ (redirects are not followed); expects HTTP 200-299; JSON: cpu_temp is present. Every 5 minutes (timeout 8 s); 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["sensor-exporter"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "sensor-exporter"
+title = "sensor-exporter API (:9110)"
+type = "http"
+target = "http://127.0.0.1:9110/"
+interval_s = 300
+timeout_s = 8
+expect = { json = [{ path = "cpu_temp", exists = true }] }
+
+[[rule]]
+id = "probe.svc-teamviewerd"
+title = "TeamViewer service is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Remote access to the host. It is class P1 (what a person is waiting on): it is checked every 5 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Asks systemd (`systemctl show`) whether teamviewerd.service is active. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-teamviewerd"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+
+[rule.params]
+name = "svc-teamviewerd"
+title = "teamviewerd.service (remote access)"
+type = "systemd"
+target = "teamviewerd.service"
+interval_s = 300
+
+[[rule]]
+id = "probe.svc-thermal-log"
+title = "Thermal logger service is running (legacy)"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Fan-curve tuning log; the metrics ring makes it redundant, so it is P2 and tagged legacy. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "Asks systemd (`systemctl show`) whether thermal-log.service is active. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent."
+applies_to = ["svc-thermal-log"]
+file = "probes.toml"
+target = "@probe-group.host-services:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 9
+
+[rule.params]
+name = "svc-thermal-log"
+title = "thermal-log.service (legacy)"
+type = "systemd"
+target = "thermal-log.service"
+class = "P2"
+interval_s = 300
+tags = ["legacy"]
+
+[[rule]]
+id = "probe-group.ai"
+title = "Group AI: ComfyUI, Open Notebook, speech and retrieval services"
+kind = "probe"
+why = "The AI services are heavy and used on demand. They are P2 so they never page loudly, but their availability history matters for planning."
+does = "Defaults for 9 members: class P2, every 5 minutes, tag ai. ComfyUI is skipped while its container is stopped (by design)."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+params = { group = "AI", class = "P2", interval_s = 300, tags = ["ai"] }
+since = "2026-10-03"
+order = 8
+
+[[rule]]
+id = "probe.comfyui"
+title = "ComfyUI answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "ComfyUI generates images and video for Open WebUI and holds 10-16 GB of VRAM while loaded. It is stopped on purpose on this host, so the probe is skipped while the container is stopped."
+does = "GET http://127.0.0.1:8188/system_stats (redirects are not followed); expects HTTP 200-299; JSON: system is present. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Skipped while the comfyui container is stopped."
+applies_to = ["comfyui"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+owner_notes = "The comfyui container is expected to be stopped (failed_units.expected_stopped_containers); with it stopped this probe is 'skipped', not down."
+
+[rule.params]
+name = "comfyui"
+title = "ComfyUI"
+type = "http"
+target = "http://127.0.0.1:8188/system_stats"
+when_running = "comfyui"
+expect = { json = [{ path = "system", exists = true }] }
+
+[[rule]]
+id = "probe.open-notebook"
+title = "Open Notebook API answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Open Notebook is the research-notes app; its API reports healthy when it works. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:5055/health (redirects are not followed); expects HTTP 200-299; JSON: status equals healthy. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["open-notebook"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "open-notebook"
+title = "Open Notebook API"
+type = "http"
+target = "http://127.0.0.1:5055/health"
+expect = { json = [{ path = "status", equals = "healthy" }] }
+
+[[rule]]
+id = "probe.surrealdb"
+title = "SurrealDB answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Open Notebook's database. Its failure mode (a restart loop that fills the disk with WAL) hard-reset this host on 2026-09-24, so it has this probe, the container probe and the surrealdb_health task."
+does = "GET http://127.0.0.1:8002/health (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["surrealdb"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+params = { name = "surrealdb", title = "SurrealDB", type = "http", target = "http://127.0.0.1:8002/health" }
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "probe.kokoro"
+title = "Kokoro text-to-speech answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Text-to-speech service (Kokoro). It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8081/health (redirects are not followed); expects HTTP 200-299; JSON: status equals healthy. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["kokoro"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "kokoro"
+title = "Kokoro TTS"
+type = "http"
+target = "http://127.0.0.1:8081/health"
+expect = { json = [{ path = "status", equals = "healthy" }] }
+
+[[rule]]
+id = "probe.infinity-rerank"
+title = "Infinity rerank answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Reranking service for the retrieval pipeline. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:7997/health (redirects are not followed); expects HTTP 200-299; JSON: unix is present. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["infinity-rerank"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "infinity-rerank"
+title = "Infinity rerank"
+type = "http"
+target = "http://127.0.0.1:7997/health"
+expect = { json = [{ path = "unix", exists = true }] }
+
+[[rule]]
+id = "probe.omnivoice"
+title = "OmniVoice Studio answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Voice studio service (GPU). It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:3900/health (redirects are not followed); expects HTTP 200-299; JSON: status equals ok. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["omnivoice"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "omnivoice"
+title = "OmniVoice Studio"
+type = "http"
+target = "http://127.0.0.1:3900/health"
+expect = { json = [{ path = "status", equals = "ok" }] }
+
+[[rule]]
+id = "probe.speaches"
+title = "Speaches answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Speech API used by Open Notebook (container open-notebook-speaches-1). It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8969/health (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["speaches"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+params = { name = "speaches", title = "Speaches", type = "http", target = "http://127.0.0.1:8969/health" }
+since = "2026-10-03"
+order = 7
+
+[[rule]]
+id = "probe.qdrant"
+title = "Qdrant answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The vector store for retrieval; /healthz answers when it is up. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:6333/healthz (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["qdrant"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+params = { name = "qdrant", title = "Qdrant", type = "http", target = "http://127.0.0.1:6333/healthz" }
+since = "2026-10-03"
+order = 8
+
+[[rule]]
+id = "probe.tika"
+title = "Apache Tika answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Document text extraction service (Tika) for file ingestion. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:9998/tika (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["tika"]
+file = "probes.toml"
+target = "@probe-group.ai:probes[]"
+merge = "append"
+params = { name = "tika", title = "Apache Tika", type = "http", target = "http://127.0.0.1:9998/tika" }
+since = "2026-10-03"
+order = 9
+
+[[rule]]
+id = "probe-group.containers"
+title = "Group Containers (stateful stores and public Open WebUI)"
+kind = "probe"
+why = "A database or cache that dies takes its application with it, and the public Open WebUI stack has the guest quota in front of it. Each gets its own availability history."
+does = "Defaults for 8 members: class P1, docker probes every 2 minutes, tags containers and db. Each member checks that its container is running and not unhealthy."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+since = "2026-10-03"
+order = 9
+
+[rule.params]
+group = "Containers"
+type = "docker"
+class = "P1"
+interval_s = 120
+tags = ["containers", "db"]
+
+[[rule]]
+id = "probe.ct-immich-postgres"
+title = "immich_postgres container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Immich's database; if it is down Immich is down, and a corrupted store is the worst case, so it has its own history. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks that container immich_postgres is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-immich-postgres"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+params = { name = "ct-immich-postgres", title = "immich_postgres", target = "immich_postgres" }
+since = "2026-10-03"
+order = 1
+
+[[rule]]
+id = "probe.ct-immich-redis"
+title = "immich_redis container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Immich's Valkey (Redis-compatible) cache and job queue. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks that container immich_redis is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-immich-redis"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+params = { name = "ct-immich-redis", title = "immich_redis", target = "immich_redis" }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "probe.ct-nextcloud-postgres"
+title = "nextcloud_postgres container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Nextcloud's PostgreSQL database, which holds its file index and users. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks that container nextcloud_postgres is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-nextcloud-postgres"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+params = { name = "ct-nextcloud-postgres", title = "nextcloud_postgres", target = "nextcloud_postgres" }
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "probe.ct-nextcloud-redis"
+title = "nextcloud_redis container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Nextcloud's Valkey (Redis-compatible) cache and file-locking store. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks that container nextcloud_redis is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-nextcloud-redis"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+params = { name = "ct-nextcloud-redis", title = "nextcloud_redis", target = "nextcloud_redis" }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "probe.ct-tday-db"
+title = "tday_db container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Tday's PostgreSQL database, where the task planner keeps its data. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks that container tday_db is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-tday-db"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+params = { name = "ct-tday-db", title = "tday_db", target = "tday_db" }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "probe.ct-afsaane-prod-db"
+title = "afsaane-prod-db container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The production PostgreSQL database of Afsaane. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks that container afsaane-prod-db is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-afsaane-prod-db"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+params = { name = "ct-afsaane-prod-db", title = "afsaane-prod-db", target = "afsaane-prod-db" }
+since = "2026-10-03"
+order = 6
+
+[[rule]]
+id = "probe.ct-open-webui-public"
+title = "open-webui-public container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The public Open WebUI instance that guests use (docs/PUBLIC_INSTANCE.md). It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Checks that container open-webui-public is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-open-webui-public"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+params = { name = "ct-open-webui-public", title = "open-webui-public", target = "open-webui-public" }
+since = "2026-10-03"
+order = 7
+
+[[rule]]
+id = "probe.ct-owui-public-quota"
+title = "owui-public-quota container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The guest quota service of the public Open WebUI. It fails closed and invisibly: chat breaks for guests while the gate's /api/config keeps answering, so its container health is watched on its own."
+does = "Checks that container owui-public-quota is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-owui-public-quota"]
+file = "probes.toml"
+target = "@probe-group.containers:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+
+[rule.params]
+name = "ct-owui-public-quota"
+title = "owui-public-quota (guest quota)"
+target = "owui-public-quota"
+
+[[rule]]
+id = "probe-group.containers-2"
+title = "Group Containers (secondary stores)"
+kind = "probe"
+why = "Stores that matter less minute by minute: a 5 minute check is enough, and the Docker socket proxy is raised to P0 as a warning because the Homarr widgets and other tools reach Docker through it. A dead database here takes an app down, but it is not a household-facing service by itself."
+does = "Defaults for 6 members: class P2, docker probes every 5 minutes, tags containers and db. docker-socket-proxy is class P0 with severity warn every 2 minutes."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+since = "2026-10-03"
+order = 10
+
+[rule.params]
+group = "Containers"
+type = "docker"
+class = "P2"
+interval_s = 300
+tags = ["containers", "db"]
+
+[[rule]]
+id = "probe.ct-grimmory-db"
+title = "grimmory-db container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Grimmory's MariaDB database. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "Checks that container grimmory-db is running (unhealthy is down, a health check still starting is degraded). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-grimmory-db"]
+file = "probes.toml"
+target = "@probe-group.containers-2:probes[]"
+merge = "append"
+params = { name = "ct-grimmory-db", title = "grimmory-db", target = "grimmory-db" }
+since = "2026-10-03"
+order = 1
+
+[[rule]]
+id = "probe.ct-mariadb"
+title = "mariadb container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A shared MariaDB instance. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "Checks that container mariadb is running (unhealthy is down, a health check still starting is degraded). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-mariadb"]
+file = "probes.toml"
+target = "@probe-group.containers-2:probes[]"
+merge = "append"
+params = { name = "ct-mariadb", title = "mariadb", target = "mariadb" }
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "probe.ct-surrealdb"
+title = "open-notebook-surrealdb-1 container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Open Notebook's SurrealDB container. See the HTTP probe for why this database is watched closely."
+does = "Checks that container open-notebook-surrealdb-1 is running (unhealthy is down, a health check still starting is degraded). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-surrealdb"]
+file = "probes.toml"
+target = "@probe-group.containers-2:probes[]"
+merge = "append"
+params = { name = "ct-surrealdb", title = "open-notebook-surrealdb-1", target = "open-notebook-surrealdb-1" }
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "probe.ct-qdrant"
+title = "qdrant container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The container of the Qdrant vector store, which is also probed over HTTP. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "Checks that container qdrant is running (unhealthy is down, a health check still starting is degraded). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-qdrant"]
+file = "probes.toml"
+target = "@probe-group.containers-2:probes[]"
+merge = "append"
+params = { name = "ct-qdrant", title = "qdrant", target = "qdrant" }
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "probe.ct-immich-ml"
+title = "immich_machine_learning container is running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Immich's machine-learning worker (faces, search); it uses the GPU. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "Checks that container immich_machine_learning is running (unhealthy is down, a health check still starting is degraded). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-immich-ml"]
+file = "probes.toml"
+target = "@probe-group.containers-2:probes[]"
+merge = "append"
+params = { name = "ct-immich-ml", title = "immich_machine_learning", target = "immich_machine_learning" }
+since = "2026-10-03"
+order = 5
+
+[[rule]]
+id = "probe.ct-docker-socket-proxy"
+title = "docker-socket-proxy container is running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Tools pointed at the proxy instead of the raw Docker socket lose their view of Docker when it is down. It is class P0 by importance but severity warn: a night-time text would not help, so a confirmed outage emails and only texts if it persists."
+does = "Checks that container docker-socket-proxy is running (unhealthy is down, a health check still starting is degraded). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P0, warning: a confirmed outage emails (a text only if it persists)."
+applies_to = ["ct-docker-socket-proxy"]
+file = "probes.toml"
+target = "@probe-group.containers-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "ct-docker-socket-proxy"
+title = "docker-socket-proxy"
+target = "docker-socket-proxy"
+class = "P0"
+severity = "warn"
+interval_s = 120
+
+[[rule]]
+id = "probe-group.hermes"
+title = "Group Hermes: the agent harness, judged from its own files"
+kind = "probe"
+why = "Hermes carries the owner's automation and delivers the alerts. Its liveness is read from its own state files (never by importing Hermes), so Hermes can fail without the umbrella depending on it."
+does = "Defaults for 7 members: class P1, availability objective 99 percent, every 2 minutes, source hermes. The watchdog-alive and canary-alive probes are the meta checks: is stack_watchdog.py itself still running, is the search canary."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+since = "2026-10-03"
+order = 11
+
+[rule.params]
+group = "Hermes"
+source = "hermes"
+class = "P1"
+slo = 99.0
+interval_s = 120
+tags = ["hermes"]
+
+[[rule]]
+id = "probe.hermes-api"
+title = "Hermes API answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The Hermes agent harness carries the owner's automation and delivers the alerts. It is class P1 (what a person is waiting on): it is checked every 2 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "GET http://127.0.0.1:8642/health (redirects are not followed); expects HTTP 200-299; JSON: status equals ok. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.0 percent. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-api"]
+file = "probes.toml"
+target = "@probe-group.hermes:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "hermes-api"
+title = "Hermes API (:8642)"
+type = "http"
+target = "http://127.0.0.1:8642/health"
+expect = { json = [{ path = "status", equals = "ok" }] }
+
+[[rule]]
+id = "probe.hermes-gateway"
+title = "Hermes gateway is running and fresh"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The gateway can be alive as a process and dead as an API. Its own state file must say running and have been updated within 5 minutes."
+does = "Reads /home/ohmz/.hermes/gateway_state.json as JSON; requires: gateway_state equals running; updated_at is not older than 300 s (warn from 180 s). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.0 percent. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-gateway"]
+file = "probes.toml"
+target = "@probe-group.hermes:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "hermes-gateway"
+title = "Hermes gateway state"
+type = "json"
+target = "/home/ohmz/.hermes/gateway_state.json"
+
+[rule.params.expect]
+json = [{ path = "gateway_state", equals = "running" }, { path = "updated_at", age_max_s = 300, age_warn_s = 180 }]
+
+[[rule]]
+id = "probe.hermes-ticker"
+title = "Hermes cron ticker is beating"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The cron ticker is a thread inside the gateway: it can die while the process and API stay up and then no cron job fires. It writes an epoch to this file every 60 s; the watchdog's own limit is 300 s."
+does = "Checks the age of /home/ohmz/.hermes/cron/ticker_heartbeat: the epoch number written inside it must be under 300 s (degraded from 180 s). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.0 percent. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-ticker"]
+file = "probes.toml"
+target = "@probe-group.hermes:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "hermes-ticker"
+title = "Hermes cron ticker beating"
+type = "file_age"
+target = "/home/ohmz/.hermes/cron/ticker_heartbeat"
+expect = { max_age_s = 300, warn_age_s = 180, epoch_content = true }
+
+[[rule]]
+id = "probe.hermes-ticker-ok"
+title = "Hermes cron ticker is succeeding"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The ticker can run and fail every tick. ticker_last_success only moves when a tick worked."
+does = "Checks the age of /home/ohmz/.hermes/cron/ticker_last_success: the epoch number written inside it must be under 300 s (degraded from 180 s). Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.0 percent. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-ticker-ok"]
+file = "probes.toml"
+target = "@probe-group.hermes:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "hermes-ticker-ok"
+title = "Hermes cron ticker succeeding"
+type = "file_age"
+target = "/home/ohmz/.hermes/cron/ticker_last_success"
+expect = { max_age_s = 300, warn_age_s = 180, epoch_content = true }
+
+[[rule]]
+id = "probe.hermes-flightclaw"
+title = "Flightclaw MCP answers"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The flight-price MCP server; a bare GET gets 406 from a live MCP server, so 200 and 406 both mean alive. It is class P2 (useful, but nobody waits on it minute by minute), so a confirmed outage only emails the owner."
+does = "GET http://127.0.0.1:8765/mcp (redirects are not followed); expects HTTP 200, 406. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.0 percent. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-flightclaw"]
+file = "probes.toml"
+target = "@probe-group.hermes:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "hermes-flightclaw"
+title = "Flightclaw MCP (:8765)"
+type = "http"
+target = "http://127.0.0.1:8765/mcp"
+interval_s = 300
+class = "P2"
+expect = { status = [200, 406] }
+
+[[rule]]
+id = "probe.hermes-watchdog-alive"
+title = "stack-watchdog is still running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The watchdog covers the alert delivery pieces, so something must cover the watchdog. It stamps its last run and counts how often systemd killed it."
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: run.last_run_at is not older than 1200 s (warn from 600 s); run.killed_streak is at most 1. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.0 percent. Pushes its result to the Kuma push monitor 'hermes-watchdog' (a no-op until kuma.toml holds a token). Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-watchdog-alive"]
+file = "probes.toml"
+target = "@probe-group.hermes:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+owner_notes = "Pages as warn now: nothing else watches the watchdog."
+
+[rule.params]
+name = "hermes-watchdog-alive"
+title = "stack-watchdog still running"
+type = "json"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+kuma_push_key = "hermes-watchdog"
+
+[rule.params.expect]
+max_age_s = 1200
+json = [{ path = "run.last_run_at", age_max_s = 1200, age_warn_s = 600 }, { path = "run.killed_streak", max = 1 }]
+
+[[rule]]
+id = "probe.hermes-canary-alive"
+title = "search-canary is still running"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Same meta check for the SearXNG canary, which runs twice an hour, so its limits are 90 minutes. It is class P1 (what a person is waiting on): it is checked every 10 minutes and a confirmed outage emails the owner, with a text only if it persists."
+does = "Reads /home/ohmz/.hermes/search_canary_state.json as JSON (file not older than 5400 s); requires: run.last_run_at is not older than 5400 s (warn from 3600 s); run.killed_streak is at most 1. Every 10 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.0 percent. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-canary-alive"]
+file = "probes.toml"
+target = "@probe-group.hermes:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "hermes-canary-alive"
+title = "search-canary still running"
+type = "json"
+target = "/home/ohmz/.hermes/search_canary_state.json"
+interval_s = 600
+
+[rule.params.expect]
+max_age_s = 5400
+json = [{ path = "run.last_run_at", age_max_s = 5400, age_warn_s = 3600 }, { path = "run.killed_streak", max = 1 }]
+
+[[rule]]
+id = "probe-group.hermes-watchdog"
+title = "Group Hermes watchdog mirror: the watchdog's 11 checks"
+kind = "probe"
+why = "The stack watchdog already texts and emails about these checks by itself. Mirroring them gives them history, SLOs and an incident record, without sending anything twice."
+does = "Defaults for 11 members (one per check of the stack watchdog): class P2, severity info (never pages), every 5 minutes, type json reading watchdog_state.json (file not older than 1200 s), tags hermes and mirror. At the cutover of stack-watchdog, flip severity to warn and stop the legacy notification."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+owner_notes = "Flip severity = info to warn here and in the next group at the stack-watchdog / search-canary cutover (legacy-retirement.toml)."
+
+[rule.params]
+group = "Hermes watchdog"
+source = "hermes"
+type = "json"
+class = "P2"
+severity = "info"
+interval_s = 300
+tags = ["hermes", "mirror"]
+expect = { max_age_s = 1200 }
+
+[[rule]]
+id = "probe.hermes-wd-gateway"
+title = "Watchdog mirror: Hermes gateway"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: is the gateway service active?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.gateway.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-gateway"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-gateway"
+title = "Hermes gateway (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.gateway.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.gateway.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-api"
+title = "Watchdog mirror: Hermes API"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: does the API answer?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.api.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-api"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-api"
+title = "Hermes API (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.api.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.api.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-delivery"
+title = "Watchdog mirror: Delivery timer"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: is the one-minute delivery timer firing?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.delivery.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-delivery"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-delivery"
+title = "Delivery timer (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.delivery.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.delivery.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-backup"
+title = "Watchdog mirror: Stack backup freshness"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: is the nightly ai-stack backup stamp newer than 26 hours?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.backup.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-backup"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-backup"
+title = "Stack backup freshness (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.backup.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.backup.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-flightclaw"
+title = "Watchdog mirror: Flightclaw"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: is the flight MCP server up?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.flightclaw.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-flightclaw"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-flightclaw"
+title = "Flightclaw (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.flightclaw.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.flightclaw.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-pubgate"
+title = "Watchdog mirror: Public gate"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: do the public Open WebUI gate and instance answer?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.pubgate.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-pubgate"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-pubgate"
+title = "Public gate (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.pubgate.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.pubgate.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-pubquota"
+title = "Watchdog mirror: Guest quota"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: is the guest quota container healthy?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.pubquota.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-pubquota"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-pubquota"
+title = "Guest quota (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.pubquota.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.pubquota.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-ticker"
+title = "Watchdog mirror: Cron ticker"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: is the cron ticker beating and succeeding?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.ticker.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-ticker"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-ticker"
+title = "Cron ticker (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.ticker.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.ticker.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-gwrestarts"
+title = "Watchdog mirror: Gateway restarts"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: fewer than 3 gateway starts in the last 6 hours?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.gwrestarts.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-gwrestarts"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 9
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-gwrestarts"
+title = "Gateway restarts (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.gwrestarts.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.gwrestarts.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-backlog"
+title = "Watchdog mirror: Delivery backlog"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: no result left undelivered for 15 minutes?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.backlog.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-backlog"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 10
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-backlog"
+title = "Delivery backlog (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.backlog.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.backlog.last_detail"
+
+[[rule]]
+id = "probe.hermes-wd-version"
+title = "Watchdog mirror: Hermes version pin"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "stack-watchdog already alerts about this check. Mirroring it gives it history and an incident record without a second message. The watchdog's question: is the Hermes checkout still the pinned commit and the gateway on the pinned version?"
+does = "Reads /home/ohmz/.hermes/watchdog_state.json as JSON (file not older than 1200 s); requires: checks.hermesver.status is ok (a value of degraded is a warning, anything else is down). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-wd-version"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 11
+owner_notes = "severity = info while the watchdog texts by itself; flip to warn at its cutover."
+
+[rule.params]
+name = "hermes-wd-version"
+title = "Hermes version pin (watchdog)"
+target = "/home/ohmz/.hermes/watchdog_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.hermesver.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.hermesver.last_detail"
+
+[[rule]]
+id = "probe-group.hermes-watchdog-2"
+title = "Group Hermes search canary mirror"
+kind = "probe"
+why = "Same idea for the two SearXNG checks of the search canary: history without double paging. The canary runs twice an hour, so the mirror is read every 10 minutes and accepts a file up to 90 minutes old."
+does = "Defaults for 2 members: class P2, severity info, every 10 minutes, reading search_canary_state.json (not older than 5400 s), tags hermes, mirror and search."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+since = "2026-10-03"
+order = 13
+
+[rule.params]
+group = "Hermes watchdog"
+source = "hermes"
+type = "json"
+class = "P2"
+severity = "info"
+interval_s = 600
+tags = ["hermes", "mirror", "search"]
+expect = { max_age_s = 5400 }
+
+[[rule]]
+id = "probe.hermes-sc-chat"
+title = "Search canary mirror: web search for chat"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "The canary already alerts about this. A dead chat search is the failure that looks like success. The mirror adds history without a second message."
+does = "Reads /home/ohmz/.hermes/search_canary_state.json as JSON (file not older than 5400 s); requires: checks.search_chat.status is ok (a value of degraded is a warning, anything else is down). Every 10 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-sc-chat"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+owner_notes = "severity = info while the canary alerts by itself."
+
+[rule.params]
+name = "hermes-sc-chat"
+title = "Web search, chat (canary)"
+target = "/home/ohmz/.hermes/search_canary_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.search_chat.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.search_chat.last_detail"
+
+[[rule]]
+id = "probe.hermes-sc-agent"
+title = "Search canary mirror: web search for agent jobs"
+kind = "probe"
+principle = "classes of service P0-P3"
+why = "Same for the second SearXNG instance, used by price monitors. It is severity info: the source already alerts by itself, so this copy keeps the history and never pages."
+does = "Reads /home/ohmz/.hermes/search_canary_state.json as JSON (file not older than 5400 s); requires: checks.search_hermes.status is ok (a value of degraded is a warning, anything else is down). Every 10 minutes; 2 bad runs to go down, 2 good runs to recover. P2, info: never pages, only shown on the site. Judged from Hermes's own endpoints and files, never by importing Hermes."
+applies_to = ["hermes-sc-agent"]
+file = "probes.toml"
+target = "@probe-group.hermes-watchdog-2:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+owner_notes = "severity = info while the canary alerts by itself."
+
+[rule.params]
+name = "hermes-sc-agent"
+title = "Web search, agent jobs (canary)"
+target = "/home/ohmz/.hermes/search_canary_state.json"
+
+[rule.params.expect]
+json = [{ path = "checks.search_hermes.status", in = ["ok"], warn_in = ["degraded"] }]
+detail_path = "checks.search_hermes.last_detail"
+
+[[rule]]
+id = "probe-group.public"
+title = "Group Public: end-to-end through the Cloudflare tunnel"
+kind = "probe"
+why = "Checking an app on loopback does not prove the world can reach it. These two probes go out through DNS and the tunnel like a visitor would."
+does = "Defaults for 2 members: class P1, every 5 minutes, HTTP GET, external = true (the only probes allowed to leave the host), tag public."
+file = "probes.toml"
+target = "group[]"
+merge = "append"
+since = "2026-10-03"
+order = 14
+
+[rule.params]
+group = "Public"
+type = "http"
+external = true
+class = "P1"
+interval_s = 300
+tags = ["public"]
+
+[[rule]]
+id = "probe.public-seerr"
+title = "Public hostname answers: Seerr"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Proves the whole path works: DNS, Cloudflare, the tunnel and Seerr. seerr.ohmzhomelab.ca answered 200 on 2026-10-02."
+does = "GET https://seerr.ohmzhomelab.ca/ (redirects are not followed); expects HTTP 200-299. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). external: allowed to leave the host (GET only, nothing sent)."
+applies_to = ["public-seerr"]
+file = "probes.toml"
+target = "@probe-group.public:probes[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "public-seerr"
+title = "Public hostname: Seerr"
+target = "https://seerr.ohmzhomelab.ca/"
+[[rule]]
+id = "probe.ct-fleet"
+title = "All containers are running and healthy"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "With about 70 containers one probe per container would be noise. The fleet probe judges every container's state and health in a single row and names the offenders."
+does = "Looks at every container in `docker ps -a`: any that is not running, or is unhealthy, or that was established (running at least 6 h) and vanished within the last 3 days (`docker rm`, compose down) makes it down, except names matching ^comfyui$, ^maintenance-web-test-\\d+$. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Pushes its result to the Kuma push monitor 'containers' (a no-op until kuma.toml holds a token)."
+applies_to = ["ct-fleet"]
+file = "probes.toml"
+target = "probe[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+owner_notes = "comfyui (stopped by design) and the throw-away maintenance-web-test-N containers are excluded. A container that vanishes (docker rm, compose down) leaves no stopped corpse, so established ones are remembered and reported 'missing' for 3 days; `probes forget NAME` ends it."
+
+[rule.params]
+name = "ct-fleet"
+title = "All containers running and healthy"
+type = "docker"
+target = "*"
+class = "P2"
+group = "Containers"
+interval_s = 120
+tags = ["containers"]
+expect = { except = ["^comfyui$", '^maintenance-web-test-\d+$', "^maintenance-web$"] }
+kuma_push_key = "containers"
+
+[[rule]]
+id = "probes.defaults"
+title = "Probe engine defaults: 2 looks, 2 bad runs to go down, 5 minute interval"
+kind = "probe"
+principle = "classes of service P0-P3; fail closed"
+why = "A monitoring plane that cries wolf is worse than none. These defaults make a blip invisible and a real outage visible quickly: look twice, believe it after two runs, and treat a restart storm as one event."
+does = "workers = 8 threads and budget_s = 45 s per run (a probe the budget ran out before starting is first in line next tick; one that started and did not finish is a failure). timeout_s = 5 per look, interval_s = 300 per probe unless it says otherwise (the engine is called every minute and runs each probe when its own interval elapsed). confirm = 2 and recover = 2: two bad runs to go down, two good to come back. attempts = 2 looks per run, retry_s = 5 s apart, best look wins. flap_window_s = 3600 and flap_max = 4: four confirmed changes in an hour is 'flapping' (counted as warn, quiet while it keeps changing, announced anyway once a level has held for the longer of 10 minutes and two of the probe's intervals). storm_max = 8: more changes than that in one run become ONE summary event (a host stall fails everything at once). history_every_s = 300 writes the compact availability records, keep_days = 30. deadman_key = umbrella-probes is the Kuma push key of the dead-man's switch."
+file = "probes.toml"
+target = "defaults"
+since = "2026-10-03"
+owner_notes = "Availability is time-honest: when the engine itself did not run (power cut, dead tick) the missing samples are booked as failed and unobserved."
+
+[rule.params]
+workers = 8
+budget_s = 45
+timeout_s = 5
+interval_s = 300
+confirm = 2
+recover = 2
+attempts = 2
+retry_s = 5
+flap_window_s = 3600
+flap_max = 4
+storm_max = 8
+history_every_s = 300
+keep_days = 30
+deadman_key = "umbrella-probes"
+
+[[rule]]
+id = "probes.kuma"
+title = "Uptime Kuma parity: group map and ignore list"
+kind = "probe"
+principle = "one umbrella"
+why = "Uptime Kuma stays because the Homarr uptime widget reads it, but the probe plane is the source of truth. Every Kuma monitor must be carried by a probe so nothing is watched in only one place."
+does = "groups maps the Kuma group monitor 'Media Stack' to the probe group of the same name. ignore is empty. `probes kuma-diff COPY_OF_KUMA_DB` lists any Kuma monitor that no probe carries (via its `kuma` key); Kuma itself is never written to."
+file = "probes.toml"
+target = "kuma"
+params = { groups = { "Media Stack" = "Media Stack" }, ignore = [] }
+since = "2026-10-03"

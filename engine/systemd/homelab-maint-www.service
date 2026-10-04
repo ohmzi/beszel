@@ -1,0 +1,49 @@
+[Unit]
+Description=homelab-maint status server (127.0.0.1 only, read-only, feeds the Homarr widgets)
+After=network.target
+
+[Service]
+Type=simple
+# server.py serves /var/lib/homelab-maint/status.json on 127.0.0.1:<www_port> (default 9111).
+Environment=PYTHONPATH=/usr/local/lib/homelab-maint
+ExecStart=/usr/bin/python3 -B -m homelab_maint.server
+Restart=on-failure
+RestartSec=5s
+
+# It only reads world-readable files, so it gets nothing else.
+DynamicUser=yes
+ReadOnlyPaths=/var/lib/homelab-maint
+# Alert-bridge and Kuma credentials live here; the server never needs them.
+InaccessiblePaths=-/etc/homelab-maint/kuma.toml
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=128M
+TasksMax=64
+SyslogIdentifier=homelab-maint-www
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,1496 @@
+# homelab-maint rules registry: Jobs. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync).
+# job.* and external.* rules compile into jobs.toml, sched.* into its [scheduler] tables. Every job ships mode observe (the legacy driver still starts it) except probes-run and routine-run (managed) and mem-guard (retired). `destructive` marks a job whose command deletes, restarts or purges something; `severity` is what a failed run raises.
+
+meta = { category = "jobs", title = "Jobs", blurb = "Scheduled jobs and the timers the host runs." }
+
+[[rule]]
+id = "job.backup-system"
+title = "System-drive backup, Saturday 01:00"
+kind = "job"
+severity = "crit"
+principle = "protect before you clean; classes of service P0-P3"
+why = "A dead NVMe must be replaceable and the machine must boot again from the backup. This is that protection: the disk layout, the database dumps, the EFI partition and a file mirror of the root filesystem, kept with rotating snapshots on a separate disk."
+does = "Runs /usr/local/sbin/backup-system.sh as root, Saturdays 01:00 (jitter up to 15 min), class P2, heavy and backup (heavy jobs never start while a backup runs, and it takes the heavy mutex). catchup_hours 160: a missed Saturday still runs (a new one supersedes at 168 h). A busy gate or pressure may defer it for up to 12 h, then force_after_defer starts it anyway (a forced start still waits for the heavy-job mutex, the legacy-timer interlock and any pressure above level 1). No timeout (a first run copies 1.5-1.7 TB), nice 10, ionice best-effort 7, requires /mnt/backup/system to be a mountpoint. pausable = false: the global PAUSE must never silently stop a backup. A run lost to a reboot is retried once 30 minutes later. self_notifies = true: the script alerts through Hermes itself, the umbrella only reports abnormal ends. Success is judged from /var/log/backup/system-status.json (result ok, fresh within 200 h). A good run sends a maintenance message, a failure an alert, and a forced start still blocked at its limit alerts once (on_expire). Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+proof = "Same command, user, environment, nice and ionice as the legacy unit (checked by migrate's unit_equiv before cutover); the tick refuses to start it while backup-system.timer is still enabled or active, so it can never run twice."
+applies_to = ["backup-system"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+owner_notes = "Cut over last (docs/MIGRATION.md): soak every other job first. The OnFailure unit backup-failure@.service stays until the hook is verified."
+
+[rule.params]
+name = "backup-system"
+title = "System-drive backup (BK-SYSTEM)"
+command = ["/usr/local/sbin/backup-system.sh"]
+user = "root"
+schedule = "0 1 * * sat"
+jitter_s = 900
+class = "P2"
+heavy = true
+backup = true
+catchup_hours = 160
+max_defer_hours = 12
+force_after_defer = true
+timeout_s = 0
+nice = 10
+ionice_class = 2
+ionice_prio = 7
+self_notifies = true
+max_attempts = 2
+retry_on = ["lost"]
+retry_backoff_s = [1800]
+pausable = false
+retire = ["system:backup-system.timer"]
+requires_mounts = ["/mnt/backup/system"]
+mode = "observe"
+note = "Cutover last (docs/MIGRATION.md): soak every other job first. The OnFailure unit backup-failure@.service stays until the hook below is verified."
+hooks = { on_failure = ["/usr/local/sbin/backup-failed.sh", "backup-system.service"] }
+
+[rule.params.success]
+exit_codes = [0]
+status_json = "/var/log/backup/system-status.json"
+result_key = "result"
+ok_values = ["ok"]
+finished_key = "finished"
+warn_key = "warnings"
+reason_key = "reason"
+max_age_hours = 200
+summary = "{job} backup {result}: {duration_short}, {space}, {free_gb_after}G free, {snapshots_kept} snapshots"
+fail_summary = "{job} backup {result} after {duration_short}: {reason}"
+
+[rule.params.notify]
+on_failure = "alert"
+on_success = "maintenance"
+on_expire = "alert"
+detail_file = "/var/log/backup/system-detail.txt"
+title = "System-drive backup"
+
+[[rule]]
+id = "job.backup-immich"
+title = "Immich library backup, Sunday 01:00"
+kind = "job"
+severity = "crit"
+principle = "protect before you clean; classes of service P0-P3"
+why = "The photo library is irreplaceable. The files alone are not a restorable Immich (albums, faces and metadata live in Postgres), so the job dumps the database first, then mirrors the files."
+does = "Runs /usr/local/sbin/backup-immich.sh as root, Sundays 01:00 (jitter up to 15 min), class P2, heavy and backup, nice 10, ionice best-effort 7; same retry, defer, force and no-timeout policy as the system backup. It never overlaps the system backup (heavy mutex): the Sunday run just waits for a long Saturday one. requires /mnt/backup/immich and /media/Immich to be mounted. pausable = false. Success is judged from /var/log/backup/immich-status.json (fresh within 200 h); on failure its on_failure hook runs backup-failed.sh. Notifications are as for the system backup (maintenance message on success, alert on failure or on an expired deferral). Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+proof = "Same command, user and environment as the legacy unit; interlock with backup-immich.timer prevents a double run."
+applies_to = ["backup-immich"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+owner_notes = "Cut over after backup-system has soaked 14 days and the tick has recorded 2 green runs of it."
+
+[rule.params]
+name = "backup-immich"
+title = "Immich library backup (BK-IMMICH)"
+command = ["/usr/local/sbin/backup-immich.sh"]
+user = "root"
+schedule = "0 1 * * sun"
+jitter_s = 900
+class = "P2"
+heavy = true
+backup = true
+catchup_hours = 160
+max_defer_hours = 12
+force_after_defer = true
+timeout_s = 0
+nice = 10
+ionice_class = 2
+ionice_prio = 7
+self_notifies = true
+max_attempts = 2
+retry_on = ["lost"]
+retry_backoff_s = [1800]
+pausable = false
+retire = ["system:backup-immich.timer"]
+requires_mounts = ["/mnt/backup/immich", "/media/Immich"]
+mode = "observe"
+note = "Same as backup-system; the two never overlap (heavy mutex), the Sunday run simply waits for a long Saturday one."
+hooks = { on_failure = ["/usr/local/sbin/backup-failed.sh", "backup-immich.service"] }
+
+[rule.params.success]
+exit_codes = [0]
+status_json = "/var/log/backup/immich-status.json"
+result_key = "result"
+ok_values = ["ok"]
+finished_key = "finished"
+warn_key = "warnings"
+reason_key = "reason"
+max_age_hours = 200
+summary = "{job} backup {result}: {duration_short}, {space}, {free_gb_after}G free, {snapshots_kept} snapshots"
+fail_summary = "{job} backup {result} after {duration_short}: {reason}"
+
+[rule.params.notify]
+on_failure = "alert"
+on_success = "maintenance"
+on_expire = "alert"
+detail_file = "/var/log/backup/immich-detail.txt"
+title = "Immich library backup"
+
+[[rule]]
+id = "job.stack-backup"
+title = "AI-stack nightly backup, 03:30"
+kind = "job"
+severity = "crit"
+principle = "protect before you clean"
+why = "The Open WebUI database, its chats and functions, and the vector store lived on one disk with all their old backups. A nightly backup to a separate SSD protects the irreplaceable state of the AI stack."
+does = "Runs /home/ohmz/StudioProjects/ai-stack/scripts/stack_backup.sh as ohmz at 03:30 (jitter up to 5 min), class P2, heavy and backup, nice 10, ionice idle, timeout 30 min, catch-up 20 h. Success needs exit 0 and a LAST_OK file on the SanDisk SSD newer than the run's start and no older than 26 h. The script has no alert path of its own; its OnFailure unit sends today, and under the tick the umbrella alert takes over. pausable = false. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["stack-backup"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "stack-backup"
+title = "ai-stack nightly backup (SandiskSSD)"
+command = ["/home/ohmz/StudioProjects/ai-stack/scripts/stack_backup.sh"]
+user = "ohmz"
+schedule = "30 3 * * *"
+jitter_s = 300
+class = "P2"
+heavy = true
+backup = true
+catchup_hours = 20
+timeout_s = 1800
+nice = 10
+ionice_class = 3
+pausable = false
+retire = ["user:ohmz:stack-backup.timer"]
+mode = "observe"
+note = "No own alert path: today OnFailure=stack-alert@ sends it. Under the tick the umbrella alert (notify.py) takes over; stack-alert@ retires with the unit."
+success = { exit_codes = [0], touch_file = "/media/SandiskSSD/ai-stack-backups/LAST_OK", max_age_hours = 26 }
+notify = { on_failure = "alert", on_success = "none", on_expire = "alert", title = "ai-stack backup" }
+
+[[rule]]
+id = "job.stack-watchdog"
+title = "Hermes stack watchdog, every 5 minutes"
+kind = "job"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The pieces that deliver alerts had no alarm covering them. This watchdog checks the gateway, API, delivery timer, backup stamp, ticker and public gate, and alerts by itself."
+does = "Runs stack_watchdog.py as ohmz at :03, :08 ... every 5 minutes, class P1, monitor (ignores PAUSE, freeze, pressure and the heavy mutex), timeout 120 s. It alerts through health_alert.py (2 runs to confirm, damping, reminders), so self_notifies = true and the umbrella adds scheduling, a timeout and the run log. fail_status warn: exit 1 means 'alerting failed', visible but not a page. Read-only toward the stack. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["stack-watchdog"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "stack-watchdog"
+title = "Hermes stack watchdog"
+command = ["/usr/bin/python3", "/home/ohmz/StudioProjects/ai-stack/scripts/stack_watchdog.py"]
+user = "ohmz"
+schedule = "3-58/5 * * * *"
+class = "P1"
+monitor = true
+timeout_s = 120
+catchup_hours = 0.1
+fail_status = "warn"
+self_notifies = true
+retire = ["user:ohmz:stack-watchdog.timer"]
+mode = "observe"
+env = { HOME = "/home/ohmz" }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.search-canary"
+title = "SearXNG search canary, twice an hour"
+kind = "job"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "A web-search outage looks like success: the model just answers from training data with no citations. The canary is the alarm for that."
+does = "Runs search_canary.py as ohmz at :29 and :59 (jitter up to 3 min), class P1, monitor, timeout 300 s. One GET /search per SearXNG instance (:8888 chat, :8889 agent jobs) and one /config; alerts through health_alert.py itself (self_notifies = true). Never polled faster than every 30 minutes because the search engines suspend an instance that is queried too hard. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["search-canary"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "search-canary"
+title = "SearXNG search canary"
+command = ["/usr/bin/python3", "/home/ohmz/StudioProjects/ai-stack/scripts/search_canary.py"]
+user = "ohmz"
+schedule = "29,59 * * * *"
+jitter_s = 180
+class = "P1"
+monitor = true
+timeout_s = 300
+catchup_hours = 0.5
+fail_status = "warn"
+self_notifies = true
+retire = ["user:ohmz:search-canary.timer"]
+mode = "observe"
+note = "Never poll SearXNG faster than every 30 min: engines suspend when queried too hard."
+env = { HOME = "/home/ohmz" }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.bazarr-rules"
+title = "Bazarr nightly subtitle rules, 02:30"
+kind = "job"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "Subtitles for unmonitored episodes and movies would otherwise be missed; the script syncs Bazarr with Sonarr and Radarr and fetches what is missing. It was a crontab line with no timeout and no alert; under the tick it gets a timeout, a run log and an alert on failure."
+does = "Runs bazarr_subtitle_rules.py as ohmz at 02:30 daily, class P3, timeout 3 h (cron had none; a hung API call must not hold the slot forever). Its output is also appended to the log in the Bazarr config dir (tee_to). Success is exit 0; the 'Workflow complete' line is the summary. fail_status is the default crit, so a failed run is a critical alert (SMS and email) although the job is class P3. It replaces the crontab line bazarr-nightly-subtitle-rule at cutover. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["bazarr-rules"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "bazarr-rules"
+title = "Bazarr nightly subtitle rules"
+command = ["/usr/bin/python3", "/home/ohmz/StudioProjects/docker-bazarr/bazarr_subtitle_rules.py"]
+user = "ohmz"
+schedule = "30 2 * * *"
+class = "P3"
+catchup_hours = 20
+timeout_s = 10800
+tee_to = "/home/ohmz/StudioProjects/docker-bazarr/data/bazarr/config/log/bazarr_subtitle_rules.log"
+retire = ["cron:ohmz:bazarr-nightly-subtitle-rule"]
+mode = "observe"
+success = { exit_codes = [0], summary_regex = '(Workflow complete\..*)$' }
+notify = { on_failure = "alert", on_success = "none", title = "Bazarr subtitle rules" }
+
+[[rule]]
+id = "job.tunarr-sync"
+title = "Tunarr weekly channel sync, Monday 04:15"
+kind = "job"
+severity = "crit"
+principle = "classes of service P0-P3"
+why = "Tunarr channels must follow changes in the Plex library; a weekly rebuild keeps them in step. It was a crontab line; under the tick it gets a timeout, the real exit code and an alert on failure."
+does = "Runs /home/ohmz/StudioProjects/tunarr-sync/run.sh as ohmz on Mondays 04:15, class P3, heavy (it rebuilds every channel from Plex inside the Plex butler window), timeout 2 h. run.sh always exits 0, so the job reads the real exit code from the '===== exit=N' line it appends to logs/sync-DATE.log. fail_status is the default crit, so a failed run is a critical alert (SMS and email). Replaces the tunarr-weekly-channel-sync cron line at cutover. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["tunarr-sync"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "tunarr-sync"
+title = "Tunarr weekly channel sync"
+command = ["/home/ohmz/StudioProjects/tunarr-sync/run.sh"]
+user = "ohmz"
+schedule = "15 4 * * mon"
+class = "P3"
+heavy = true
+catchup_hours = 24
+timeout_s = 7200
+retire = ["cron:ohmz:tunarr-weekly-channel-sync"]
+mode = "observe"
+note = "run.sh sends its output to logs/sync-DATE.log and exits with the status of its last pipeline, so its own exit code is always 0: the real one is the `exit=N` line it appends."
+notify = { on_failure = "alert", on_success = "none", title = "Tunarr channel sync" }
+
+[rule.params.success]
+exit_codes = [0]
+summary_file = "/home/ohmz/StudioProjects/tunarr-sync/logs/sync-%Y-%m-%d.log"
+exit_regex = '^===== exit=(\d+) '
+
+[[rule]]
+id = "job.docker-prune"
+title = "Weekly Docker cleanup (legacy script), Sunday 04:00"
+kind = "job"
+severity = "crit"
+destructive = true
+principle = "in-use proof before deletion; dry-run first"
+why = "The old script prunes Docker in one go. It is replaced by the native cleaners (build cache, unused images, long-stopped containers) that know what must be kept; until they are proven the legacy command is described here."
+does = "Would run /usr/local/sbin/docker-prune.sh as root Sundays 04:00 (jitter 15 min), class P3, heavy, gated by docker_build (never while an image is being built), timeout 3 h. The script removes containers stopped for over 7 days, then `image prune --all` for images no container references that are older than 7 days (a stopped container's image is released by step one), then prunes the build cache of every buildx builder (7 days, 20 GB ceiling). It never prunes volumes. replaced_by docker_cache + docker_images (+ docker_containers_prune). Success summary is the 'after:' line of /var/log/docker-prune.log; a good run sends a maintenance message and a failed one is a critical alert (default fail_status). Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+proof = "Not started by the tick while docker-prune.timer is enabled or active. docker_prune_parity must be green before cutover, and docker_prune_exposure pages while the legacy timer is on and would delete something the natives keep."
+applies_to = ["docker-prune"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+owner_notes = "docker-prune.timer was DISABLED by the owner on 2026-10-02 because it would have removed ComfyUI's stopped container and then its 14.9 GiB image. Nothing in install.sh enables it and this rule must not either."
+
+[rule.params]
+name = "docker-prune"
+title = "Weekly Docker cleanup"
+command = ["/usr/local/sbin/docker-prune.sh"]
+user = "root"
+schedule = "0 4 * * sun"
+jitter_s = 900
+class = "P3"
+heavy = true
+gates = ["docker_build"]
+catchup_hours = 72
+timeout_s = 10800
+retire = ["system:docker-prune.timer"]
+replaced_by = "docker_cache + docker_images (+ docker_containers_prune)"
+mode = "observe"
+env = { DOCKER_CONFIG = "/home/ohmz/.docker" }
+success = { exit_codes = [0], summary_file = "/var/log/docker-prune.log", summary_regex = "after: (.*)$" }
+notify = { on_failure = "alert", on_success = "maintenance", title = "Docker cleanup" }
+
+[[rule]]
+id = "job.prune-openwebui-media"
+title = "Open WebUI media prune (legacy script), daily 04:00"
+kind = "job"
+severity = "crit"
+destructive = true
+principle = "in-use proof before deletion"
+why = "Every image and video generated through Open WebUI stays on disk. A week is long enough; the script removes generated media only and leaves user uploads alone."
+does = "Would run /usr/local/bin/prune-openwebui-media.sh as root daily at 04:00 (jitter up to 30 min), class P3, nice 10, ionice idle, timeout 1 h, RETENTION_DAYS=7. It deletes ComfyUI outputs named owui_*.png and owui_vid_*.webm and generated-media patterns in Open WebUI's uploads folder that are older than 7 days. A failed run is a critical alert (default fail_status). Replaced by the openwebui_media_prune task (report mode). Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+proof = "Allow-listed name patterns in two directories only, files older than RETENTION_DAYS; the native replacement adds the caps and the audit log."
+applies_to = ["prune-openwebui-media"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 9
+
+[rule.params]
+name = "prune-openwebui-media"
+title = "Open WebUI media prune"
+command = ["/usr/local/bin/prune-openwebui-media.sh"]
+user = "root"
+schedule = "0 4 * * *"
+jitter_s = 1800
+class = "P3"
+catchup_hours = 20
+nice = 10
+ionice_class = 3
+timeout_s = 3600
+retire = ["system:prune-openwebui-media.timer"]
+replaced_by = "openwebui_media_prune"
+mode = "observe"
+env = { RETENTION_DAYS = "7" }
+success = { exit_codes = [0], summary_regex = '(pruned \d+ media file\(s\) older than \d+ day\(s\))' }
+notify = { on_failure = "alert", on_success = "none", title = "Open WebUI media prune" }
+
+[[rule]]
+id = "job.comfyui-idle-vram"
+title = "ComfyUI idle-VRAM reclaim (legacy script), every 5 minutes"
+kind = "job"
+severity = "warn"
+destructive = true
+principle = "throttle before kill; in-use proof before deletion"
+why = "ComfyUI keeps its model in VRAM between jobs, so 10-16 GB sit unused while Plex NVENC and Immich ML want the GPU. Restarting it when it is idle frees the memory."
+does = "Would run /usr/local/bin/comfyui-idle-vram.sh as root every 5 minutes, class P3, quiet (only failures are recorded), timeout 10 min. pressure_max 5: it frees GPU memory, so pressure is a reason to run it, not to wait. It restarts the comfyui container only when the queue is empty (an error counts as busy) AND the process holds more than 3000 MB on two consecutive checks. A failure alerts after 3 confirmations. Replaced by the comfyui_idle_reclaim task. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+proof = "Two-strike rule with the strike kept in /run; queue error is treated as busy so a running job is never interrupted."
+applies_to = ["comfyui-idle-vram"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 10
+owner_notes = "ComfyUI is stopped by design on this host (expected_stopped_containers); with it stopped the script has nothing to restart."
+
+[rule.params]
+name = "comfyui-idle-vram"
+title = "ComfyUI idle-VRAM reclaim"
+command = ["/usr/local/bin/comfyui-idle-vram.sh"]
+user = "root"
+schedule = "1-56/5 * * * *"
+class = "P3"
+pressure_max = 5
+quiet = true
+timeout_s = 600
+catchup_hours = 0.1
+fail_status = "warn"
+retire = ["system:comfyui-idle-vram.timer"]
+replaced_by = "comfyui_idle_reclaim"
+mode = "observe"
+note = "Two-strike rule keeps its strike file in /run; the port keeps strikes in task state."
+notify = { on_failure = "alert", on_success = "none", confirm = 3 }
+
+[[rule]]
+id = "job.notebook-db-alert"
+title = "Open Notebook SurrealDB watch (legacy script), every 15 minutes"
+kind = "job"
+severity = "crit"
+principle = "detect by saturation, not size"
+why = "SurrealDB's failure mode (a restart loop that fills the disk with WAL) hard-reset this host on 2026-09-24. This watch looks at the leading indicators and alerts before the disk fills."
+does = "Runs /usr/local/sbin/notebook-db-alert.sh as root at :10, :25, :40, :55, class P1, monitor, timeout 2 min. It checks WAL size, store size, free disk, OOM kills and the container's restart count and alerts through the Hermes bridge itself (self_notifies = true); it restarts nothing. The umbrella sends no page for it (on_failure none); a failed run only turns its status row red (default fail_status crit). Replaced by the surrealdb_health task. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["notebook-db-alert"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 11
+
+[rule.params]
+name = "notebook-db-alert"
+title = "Open Notebook SurrealDB watch"
+command = ["/usr/local/sbin/notebook-db-alert.sh"]
+user = "root"
+schedule = "10-55/15 * * * *"
+class = "P1"
+monitor = true
+timeout_s = 120
+catchup_hours = 0.5
+self_notifies = true
+retire = ["system:notebook-db-alert.timer"]
+replaced_by = "surrealdb_health"
+mode = "observe"
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.immich-server-recycle"
+title = "Immich server recycle (legacy unit), every 2 hours"
+kind = "job"
+severity = "warn"
+destructive = true
+principle = "throttle before kill; classes of service P0-P3"
+why = "The Immich server grows in memory over hours; a restart every two hours keeps it bounded, but only when nobody is using it. Restarting at the wrong moment would interrupt an upload or a job, which is why it goes through the Immich gate and waits out the evening freeze."
+does = "Would run `docker restart immich_server` as root every 2 hours (:24), class P2, disruptive (waits out the evening freeze), gated by immich-recycle (busy means defer, idle means restart), max_defer 12 h then force_after_defer, pressure_max 3 (the restart relieves memory, so only a real stall waits), timeout 5 min. A failure alerts. Replaced by the immich_recycle task. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+proof = "Only runs when the Immich gate says idle: no backup or prune unit active, and immich_server, immich_machine_learning and immich_postgres each under 15 percent of one core over 10 s (the CPU stands in for running jobs; the job queues are not read). After 12 h of deferral a forced start beats the gate and the freeze but still waits while the pressure gate level is above 3 (its own pressure_max raises the forced-start limit of 1 to 3) and while a backup runs."
+applies_to = ["immich-server-recycle"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+owner_notes = "At cutover the drop-in /etc/systemd/system/immich-server-recycle.service.d/10-homelab-gate.conf must be retired too."
+
+[rule.params]
+name = "immich-server-recycle"
+title = "Immich server recycle"
+command = ["/usr/bin/docker", "restart", "immich_server"]
+user = "root"
+schedule = "24 */2 * * *"
+class = "P2"
+disruptive = true
+gates = ["immich-recycle"]
+max_defer_hours = 12
+force_after_defer = true
+pressure_max = 3
+catchup_hours = 12
+timeout_s = 300
+fail_status = "warn"
+retire = ["system:immich-server-recycle.timer"]
+replaced_by = "immich_recycle"
+mode = "observe"
+note = "At cutover also retire the drop-in /etc/systemd/system/immich-server-recycle.service.d/10-homelab-gate.conf."
+notify = { on_failure = "alert", on_success = "none", title = "Immich server recycle" }
+
+[[rule]]
+id = "job.mem-guard"
+title = "mem-guard (retired): dry run every 3 hours"
+kind = "job"
+principle = "never kill by size; detect by saturation, not size; throttle before kill"
+why = "mem-guard.py restarts containers and kills host processes that merely hold more than a memory threshold, the kill-by-size behaviour this project rejects in favour of detecting saturation. The timer only ever ran it with --dry-run, and the pressure ladder with the stuck detector replaces it. It stays listed so the schedule is complete."
+does = "mode = retired: the tick never runs it. The recorded command is mem-guard.py --threshold-gib 5 --dry-run every 3 hours, class P3; without --dry-run the script would `docker restart` containers over 5 GiB and send SIGTERM then SIGKILL to other processes not on its protected list. replaced_by pressure_state + stuck_detector. The legacy mem-guard.timer is to be retired at cutover."
+applies_to = ["mem-guard"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 13
+
+[rule.params]
+name = "mem-guard"
+title = "mem-guard (retired)"
+command = ["/usr/local/sbin/mem-guard.py", "--threshold-gib", "5", "--dry-run"]
+user = "root"
+schedule = "0 */3 * * *"
+class = "P3"
+retire = ["system:mem-guard.timer"]
+replaced_by = "pressure_state + stuck_detector"
+mode = "retired"
+note = "Dry-run only and superseded by the pressure ladder; documented here so the schedule is complete, never run by the tick."
+
+[[rule]]
+id = "job.tier-check"
+title = "Check tier: every 15 minutes"
+kind = "job"
+severity = "warn"
+principle = "one umbrella; classes of service P0-P3"
+why = "The 15-minute checks are the umbrella's eyes. They keep their own systemd timer on purpose, because that is what notices when the one-minute tick dies."
+does = "Runs `homelab-maint run --tier check --apply` as root every 15 minutes (jitter 60 s), class P1, monitor, timeout 14 min, nice 10, ionice idle, oom_score_adj 500 (given up first if memory runs out). --apply only PERMITS mutation: C0 checks stay read-only and every C1 task still needs mode = apply (only the pressure ladder's reclaim rung ships on). Exit 1 (a task errored) is a warn. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["tier-check"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 14
+owner_notes = "Stays observe on purpose: homelab-maint-check.timer is the permanent driver of this tier. Keep the command equal to systemd/homelab-maint-check.service."
+
+[rule.params]
+name = "tier-check"
+title = "Health checks (check tier)"
+command = ["{self}", "run", "--tier", "check", "--apply"]
+user = "root"
+schedule = "*/15 * * * *"
+jitter_s = 60
+source = "native"
+class = "P1"
+monitor = true
+timeout_s = 840
+nice = 10
+ionice_class = 3
+oom_score_adj = 500
+catchup_hours = 0.5
+fail_status = "warn"
+retire = ["system:homelab-maint-check.timer"]
+mode = "observe"
+success = { exit_codes = [0], warn_exit_codes = [1] }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.tier-daily"
+title = "Daily tier: safe cleaners at 07:30"
+kind = "job"
+severity = "warn"
+principle = "dry-run first; classes of service P0-P3"
+why = "Starts the daily cleanup runner; the routine then decides what each cleaner may do inside its window. The tick starts the runner, the routine decides what each task may do, and every cleaner stays in report mode until the owner enables it (dry-run first)."
+does = "Runs `homelab-maint run --tier daily --apply` as root daily at 07:30 (jitter up to 20 min), class P3, heavy, timeout 3 h, nice 10, ionice idle, catch-up 20 h. --apply only permits mutation; every cleaner still needs mode = apply in maint.toml, and ships in report mode, so today it computes and reports. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["tier-daily"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 15
+
+[rule.params]
+name = "tier-daily"
+title = "Daily tier (safe cleaners)"
+command = ["{self}", "run", "--tier", "daily", "--apply"]
+user = "root"
+schedule = "30 7 * * *"
+jitter_s = 1200
+source = "native"
+class = "P3"
+heavy = true
+catchup_hours = 20
+timeout_s = 10800
+nice = 10
+ionice_class = 3
+oom_score_adj = 500
+fail_status = "warn"
+retire = ["system:homelab-maint-daily.timer"]
+mode = "observe"
+success = { exit_codes = [0], warn_exit_codes = [1] }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.tier-weekly"
+title = "Weekly tier: C2 plans and slow audits, Wednesday 07:45"
+kind = "job"
+severity = "warn"
+principle = "dry-run first; classes of service P0-P3"
+why = "The slow audits (disk walks, C2 plans, backup verification) run once a week after the daily tier. It runs after the daily tier so the two heavy walks never fight over the disk."
+does = "Runs `homelab-maint run --tier weekly --apply` as root Wednesdays 07:45, class P3, heavy, `after` tier-daily (never overlaps it), timeout 3 h, nice 10, ionice idle, catch-up 96 h. C2 plans are only applied with `homelab-maint approve TASK HASH`. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["tier-weekly"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 16
+
+[rule.params]
+name = "tier-weekly"
+title = "Weekly tier (C2 plans, slow audits)"
+command = ["{self}", "run", "--tier", "weekly", "--apply"]
+user = "root"
+schedule = "45 7 * * wed"
+source = "native"
+class = "P3"
+heavy = true
+after = ["tier-daily"]
+catchup_hours = 96
+timeout_s = 10800
+nice = 10
+ionice_class = 3
+oom_score_adj = 500
+fail_status = "warn"
+retire = ["system:homelab-maint-weekly.timer"]
+mode = "observe"
+success = { exit_codes = [0], warn_exit_codes = [1] }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.metrics-sample"
+title = "Temperature, fan and load sampler, every minute"
+kind = "job"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The dashboard's seven-day temperature and load history comes from one sample a minute, written to a small ring file. A sampler that runs every minute must cost almost nothing, which is why it runs at nice 15 with idle IO."
+does = "Runs `python3 -m homelab_maint.metrics_ring sample` as root every minute, class P1, monitor, timeout 20 s, nice 15, ionice idle; a missed minute is not caught up. Reads sensors only; writes metrics-ring.json. Ships mode = observe: the legacy driver still starts it and the tick only shows its next run and last result (from the job's own status)."
+applies_to = ["metrics-sample"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 17
+
+[rule.params]
+name = "metrics-sample"
+title = "Temperature / fan / load sampler"
+command = ["/usr/bin/python3", "-B", "-m", "homelab_maint.metrics_ring", "sample"]
+user = "root"
+schedule = "* * * * *"
+source = "native"
+class = "P1"
+monitor = true
+timeout_s = 20
+nice = 15
+ionice_class = 3
+oom_score_adj = 500
+catchup_hours = 0.05
+fail_status = "warn"
+retire = ["system:homelab-maint-metrics.timer"]
+mode = "observe"
+env = { PYTHONPATH = "/usr/local/lib/homelab-maint" }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.probes-run"
+title = "Monitoring probes: the one-minute engine"
+kind = "job"
+severity = "warn"
+principle = "one umbrella; classes of service P0-P3"
+why = "All monitoring (services, containers, endpoints, files) goes through one engine so a failed thing is noticed within minutes and not within the 15-minute check tier. It runs every minute because detection must not wait for the 15-minute check tier."
+does = "Runs `python3 -m homelab_maint.probes run --notify` as root every minute, class P1, monitor, timeout 90 s (the engine's own budget is 45 s); each probe keeps its own interval, so an idle run costs about 10 ms. --notify delivers per-probe events only when [tasks.probes] alert_mode = events; with the shipped task mode the check tier pages. There is no legacy driver, so it ships managed (the tick runs it). The check tier's probes task also calls the engine, so monitoring continues if the tick stops."
+applies_to = ["probes-run"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 18
+
+[rule.params]
+name = "probes-run"
+title = "Monitoring probes (one-minute engine)"
+command = ["/usr/bin/python3", "-B", "-m", "homelab_maint.probes", "run", "--notify"]
+user = "root"
+schedule = "* * * * *"
+source = "native"
+class = "P1"
+monitor = true
+timeout_s = 90
+oom_score_adj = 500
+catchup_hours = 0.05
+fail_status = "warn"
+mode = "managed"
+env = { PYTHONPATH = "/usr/local/lib/homelab-maint" }
+success = { exit_codes = [0], summary_regex = '^(ran \d+/\d+ probes in [\d.]+s)' }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.routine-run"
+title = "Routine tick: due steps, retries and catch-up"
+kind = "job"
+severity = "warn"
+principle = "dry-run first; classes of service P0-P3"
+why = "The monthly window has no timer, a busy gate defers steps, and a host that was off must catch up. One job every 15 minutes covers all three."
+does = "Runs `python3 -m homelab_maint.routine run --apply` as root at :07, :22, :37, :52, class P3, heavy (steps may clean, so never during a backup), quiet (96 runs a day, almost all 'nothing due'), timeout 3 h, nice 10, ionice idle. --apply only permits a task to apply when its own mode is apply (all report today) and only inside its window and freeze rules; whoever runs a step first marks it so tiers and this job never repeat one. Exit 1 means a step failed. Ships managed: no legacy driver exists."
+applies_to = ["routine-run"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 19
+
+[rule.params]
+name = "routine-run"
+title = "Routine tick (due steps, retries, catch-up)"
+command = ["/usr/bin/python3", "-B", "-m", "homelab_maint.routine", "run", "--apply"]
+user = "root"
+schedule = "7-52/15 * * * *"
+source = "native"
+class = "P3"
+heavy = true
+quiet = true
+timeout_s = 10800
+nice = 10
+ionice_class = 3
+oom_score_adj = 500
+catchup_hours = 0.25
+fail_status = "warn"
+mode = "managed"
+env = { PYTHONPATH = "/usr/local/lib/homelab-maint" }
+success = { exit_codes = [0], warn_exit_codes = [1] }
+notify = { on_failure = "none", on_success = "none" }
+
+[[rule]]
+id = "job.purge-public-guests"
+title = "Purge idle public Open WebUI guest accounts, daily 05:20"
+kind = "job"
+severity = "warn"
+destructive = true
+principle = "in-use proof before deletion; dry-run first"
+why = "Every visit to the public instance mints a user row and nothing prunes them, so the database grows with traffic. This script removes guest accounts idle for a day."
+does = "Would run purge_public_guests.py --yes as ohmz daily at 05:20 (jitter 10 min), class P3, timeout 5 min. It deletes only accounts whose email is exactly guest-<32 hex>@public.ohmz.cloud and idle for more than 24 h, through Open WebUI's own DELETE API (which also refuses to touch the admin or the caller). It was never scheduled before (a gap, not a retirement). exit 1 means the admin door was unreachable (warn). Ships observe; `migrate cutover purge-public-guests` adopts it."
+proof = "Narrow email pattern, 24 h idle limit, deletion through the application's API. The script is a dry run unless --yes is given; the job's command carries --yes, but an observe job is never started by the tick, so nothing is deleted until `migrate cutover purge-public-guests` adopts it."
+applies_to = ["purge-public-guests"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-03"
+order = 20
+
+[rule.params]
+name = "purge-public-guests"
+title = "Purge idle public Open WebUI guest accounts"
+command = ["/usr/bin/python3", "/home/ohmz/StudioProjects/ai-stack/scripts/purge_public_guests.py", "--yes"]
+user = "ohmz"
+schedule = "20 5 * * *"
+jitter_s = 600
+source = "native"
+class = "P3"
+catchup_hours = 6
+timeout_s = 300
+fail_status = "warn"
+mode = "observe"
+notify = { on_failure = "alert", on_success = "none", title = "Public guest purge" }
+
+[rule.params.success]
+exit_codes = [0]
+summary_regex = '(\d+ guest account\(s\) (?:deleted|found)|no guest accounts idle .*)'
+
+[[rule]]
+id = "external.apt-daily"
+title = "OS timer: apt package lists refresh (06:00 and 18:00)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Package lists must be fresh for security updates to be found. It belongs to the distro, so the script only checks that it ran; stale package lists would hide security updates."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 36 h). apt-daily.timer runs at 06:00 and 18:00 with up to 12 h random delay."
+applies_to = ["apt-daily"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+name = "apt-daily"
+title = "apt package lists refresh"
+kind = "os"
+unit = "apt-daily.timer"
+schedule = "06:00 and 18:00, random delay up to 12 h"
+note = "distro; verified by os_jobs"
+
+[[rule]]
+id = "external.apt-daily-upgrade"
+title = "OS timer: unattended security upgrades (06:00)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Security updates must keep installing without anyone asking, so this timer is observed and never replaced. Replacing it with a script of ours would put security patching at risk, so os_jobs only verifies that it ran."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 36 h). apt-daily-upgrade.timer runs at 06:00 daily with up to 60 min random delay, before the 07:30 cleaning window."
+applies_to = ["apt-daily-upgrade"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+name = "apt-daily-upgrade"
+title = "unattended security upgrades"
+kind = "os"
+unit = "apt-daily-upgrade.timer"
+schedule = "06:00 daily, random delay up to 60 min"
+note = "distro: security updates must keep working; verified by os_jobs"
+
+[[rule]]
+id = "external.fstrim"
+title = "OS timer: weekly SSD trim"
+kind = "schedule"
+principle = "one umbrella"
+why = "Trim keeps SSD performance; the distro schedules it weekly. The script does not run trims itself; os_jobs only warns if the weekly one stopped happening."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 200 h). fstrim.timer runs weekly with up to 100 min random delay."
+applies_to = ["fstrim"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 3
+
+[rule.params]
+name = "fstrim"
+title = "SSD trim"
+kind = "os"
+unit = "fstrim.timer"
+schedule = "weekly, random delay up to 100 min"
+note = "distro; verified by os_jobs"
+
+[[rule]]
+id = "external.logrotate"
+title = "OS timer: daily log rotation (00:00)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Log rotation is the first line of defence against growing logs; the cleaners only handle what it leaves. The script never replaces it; os_jobs only warns if it did not run within 36 hours."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 36 h). logrotate.timer runs at 00:00."
+applies_to = ["logrotate"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+name = "logrotate"
+title = "log rotation"
+kind = "os"
+unit = "logrotate.timer"
+schedule = "daily 00:00"
+note = "distro; verified by os_jobs"
+
+[[rule]]
+id = "external.man-db"
+title = "OS timer: man page index"
+kind = "schedule"
+principle = "one umbrella"
+why = "Distro housekeeping with no effect on the services here. It is cosmetic for this host, so it is only observed."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 48 h). man-db.timer runs daily with up to 12 h random delay."
+applies_to = ["man-db"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+name = "man-db"
+title = "man page index"
+kind = "os"
+unit = "man-db.timer"
+schedule = "daily, random delay up to 12 h"
+note = "distro"
+
+[[rule]]
+id = "external.e2scrub-all"
+title = "OS timer: ext4 online scrub (Sunday 03:10)"
+kind = "schedule"
+principle = "one umbrella"
+why = "The scrub checks ext4 metadata of snapshot-capable volumes; it causes IO so it is accounted for. It is a distro job; the script only checks that it ran recently."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 200 h). e2scrub_all.timer runs Sundays 03:10."
+applies_to = ["e2scrub-all"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 6
+
+[rule.params]
+name = "e2scrub-all"
+title = "ext4 online scrub"
+kind = "os"
+unit = "e2scrub_all.timer"
+schedule = "Sun 03:10"
+note = "distro; verified by os_jobs"
+
+[[rule]]
+id = "external.sysstat-collect"
+title = "OS timer: sysstat activity collector (every 10 minutes)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Provides sar history for after-the-fact analysis of load. It runs every 10 minutes, so os_jobs allows only 2 hours of silence."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 2 h). sysstat-collect.timer runs every 10 minutes."
+applies_to = ["sysstat-collect"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 7
+
+[rule.params]
+name = "sysstat-collect"
+title = "sysstat activity collector"
+kind = "os"
+unit = "sysstat-collect.timer"
+schedule = "every 10 min"
+note = "distro; verified by os_jobs"
+
+[[rule]]
+id = "external.sysstat-summary"
+title = "OS timer: sysstat daily summary (00:07)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Rolls the day's samples into the daily sysstat summary. It is read-only housekeeping, so it is only observed."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 36 h). sysstat-summary.timer runs at 00:07 daily."
+applies_to = ["sysstat-summary"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 8
+
+[rule.params]
+name = "sysstat-summary"
+title = "sysstat daily summary"
+kind = "os"
+unit = "sysstat-summary.timer"
+schedule = "00:07 daily"
+note = "distro"
+
+[[rule]]
+id = "external.systemd-tmpfiles-clean"
+title = "OS timer: temporary file cleanup"
+kind = "schedule"
+principle = "one umbrella"
+why = "Removes old files from /tmp and /var/tmp by the age rules of tmpfiles.d, which are 30 days on this host. The script never overrides them; config_drift only reports it when the first /tmp rule would keep files longer than the agreed 30 days, or when there is none."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 36 h). systemd-tmpfiles-clean.timer runs 15 minutes after boot, then daily."
+applies_to = ["systemd-tmpfiles-clean"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 9
+
+[rule.params]
+name = "systemd-tmpfiles-clean"
+title = "temporary file cleanup"
+kind = "os"
+unit = "systemd-tmpfiles-clean.timer"
+schedule = "15 min after boot, then daily"
+note = "distro; verified by os_jobs"
+
+[[rule]]
+id = "external.fwupd-refresh"
+title = "OS timer: firmware metadata refresh"
+kind = "schedule"
+principle = "one umbrella"
+why = "Keeps the firmware update list current; it only downloads metadata. It is read-only metadata, so it is only observed."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 12 h). fwupd-refresh.timer runs hourly with up to 1 h random delay."
+applies_to = ["fwupd-refresh"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 10
+
+[rule.params]
+name = "fwupd-refresh"
+title = "firmware metadata refresh"
+kind = "os"
+unit = "fwupd-refresh.timer"
+schedule = "hourly, random delay up to 1 h"
+note = "distro; verified by os_jobs"
+
+[[rule]]
+id = "external.dpkg-db-backup"
+title = "OS timer: dpkg database backup (00:00)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Distro housekeeping that protects the package database. The script never touches it; it is listed so the OS timers are all accounted for."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 36 h). dpkg-db-backup.timer runs at 00:00 daily."
+applies_to = ["dpkg-db-backup"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 11
+
+[rule.params]
+name = "dpkg-db-backup"
+title = "dpkg database backup"
+kind = "os"
+unit = "dpkg-db-backup.timer"
+schedule = "daily 00:00"
+note = "distro"
+
+[[rule]]
+id = "external.certbot"
+title = "OS timer: certificate renewal check"
+kind = "schedule"
+principle = "one umbrella"
+why = "Let's Encrypt certificates must renew; the monthly expiry review reads their dates. The script does not renew anything itself; it only reads the certificate dates once a month."
+does = "Display only: the tick never starts it and nothing here changes it. certbot.timer runs at 00:00 and 12:00 with up to 12 h random delay. Not covered by os_jobs; routine_expiry looks at the certificate files."
+applies_to = ["certbot"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 12
+
+[rule.params]
+name = "certbot"
+title = "certificate renewal check"
+kind = "os"
+unit = "certbot.timer"
+schedule = "00:00 and 12:00, random delay up to 12 h"
+note = "distro"
+
+[[rule]]
+id = "external.snapd-refresh"
+title = "snapd: refresh four times a day"
+kind = "schedule"
+principle = "one umbrella"
+why = "Snap packages (Plex among them) update by snapd's own schedule; the script only keeps two revisions. snapd refreshes Plex among others on its own, and os_jobs warns if no refresh has happened in 26 hours."
+does = "Display only: the tick never starts it and nothing here changes it. The os_jobs check verifies it ran and succeeded recently (limit 26 h). snapd's own timer fires 4 times a day. snap_revisions keeps refresh.retain at 2."
+applies_to = ["snapd-refresh"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 13
+
+[rule.params]
+name = "snapd-refresh"
+title = "snap refresh"
+kind = "os"
+unit = "snapd"
+schedule = "00:00~24:00/4 (snapd's own timer, 4 times a day)"
+note = "snapd; verified by os_jobs; keeps `refresh.retain` as set by snap_revisions"
+
+[[rule]]
+id = "external.anacron"
+title = "OS timer: anacron catch-up of cron.daily"
+kind = "schedule"
+principle = "one umbrella"
+why = "Runs the cron.daily shims (apport, apt-compat, dpkg, logrotate, man-db, sysstat) that a laptop-style schedule would miss. The script does not run or change it; it is listed so every scheduler on the host is accounted for in one place."
+does = "Display only: the tick never starts it and nothing here changes it. anacron.timer runs hourly at :30 between 07:00 and 23:30."
+applies_to = ["anacron"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 14
+
+[rule.params]
+name = "anacron"
+title = "anacron catch-up"
+kind = "os"
+unit = "anacron.timer"
+schedule = "hourly at :30 between 07:00 and 23:30"
+note = "distro; runs the cron.daily shims (apport, apt-compat, dpkg, logrotate, man-db, sysstat)"
+
+[[rule]]
+id = "external.motd-news"
+title = "OS timer: MOTD news"
+kind = "schedule"
+principle = "one umbrella"
+why = "Distro housekeeping with no effect on the services here. Nothing here depends on it; it is listed for completeness."
+does = "Display only: the tick never starts it and nothing here changes it. motd-news.timer runs at 00:00 and 12:00 with up to 12 h random delay."
+applies_to = ["motd-news"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 15
+
+[rule.params]
+name = "motd-news"
+title = "MOTD news"
+kind = "os"
+unit = "motd-news.timer"
+schedule = "00:00 and 12:00, random delay up to 12 h"
+note = "distro"
+
+[[rule]]
+id = "external.nvidia-tdp"
+title = "Boot unit: GPU power limit"
+kind = "schedule"
+principle = "one umbrella"
+why = "Sets the GPU power limit once after boot; it is host configuration, not maintenance. It is hardware configuration the script must never alter, so it is only listed."
+does = "Display only: the tick never starts it and nothing here changes it. nvidia-tdp.timer fires once, 5 seconds after boot."
+applies_to = ["nvidia-tdp"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 16
+
+[rule.params]
+name = "nvidia-tdp"
+title = "GPU power limit at boot"
+kind = "os"
+unit = "nvidia-tdp.timer"
+schedule = "once, 5 s after boot"
+note = "sets the GPU power limit; not a maintenance job"
+
+[[rule]]
+id = "external.hermes-delivery"
+title = "Hermes delivery watcher (user timer, every minute)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Hermes plumbing that delivers its cron results. It is left alone, but the stack watchdog checks that it keeps firing."
+does = "Display only: the tick never starts it and nothing here changes it. hermes-delivery.timer runs every minute as ohmz; its liveness is the watchdog's 'delivery' check."
+applies_to = ["hermes-delivery"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 17
+
+[rule.params]
+name = "hermes-delivery"
+title = "Hermes delivery watcher"
+kind = "user"
+user = "ohmz"
+unit = "hermes-delivery.timer"
+schedule = "every minute"
+note = "Hermes app plumbing, not maintenance: left alone; its liveness is probed (stack-watchdog 'delivery' check)"
+
+[[rule]]
+id = "external.launchpadlib-cache-clean"
+title = "User timer: Launchpadlib cache cleanup"
+kind = "schedule"
+principle = "one umbrella"
+why = "A distro package's own user timer; observed only. It is not ours to change; it is listed so nothing on the host is unaccounted for."
+does = "Display only: the tick never starts it and nothing here changes it. launchpadlib-cache-clean.timer runs daily as ohmz."
+applies_to = ["launchpadlib-cache-clean"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 18
+
+[rule.params]
+name = "launchpadlib-cache-clean"
+title = "Launchpadlib cache cleanup"
+kind = "user"
+user = "ohmz"
+unit = "launchpadlib-cache-clean.timer"
+schedule = "daily (5 min after login, then every 24 h)"
+note = "distro package user timer: observe"
+
+[[rule]]
+id = "external.firmware-notifier"
+title = "User timer: firmware updater notifier"
+kind = "schedule"
+principle = "one umbrella"
+why = "A snap's own user timer; observed only. It is not maintenance of ours and is left alone, but it is listed so nothing on the host is unaccounted for."
+does = "Display only: the tick never starts it and nothing here changes it. snap.firmware-updater.firmware-notifier.timer runs every 3 hours as ohmz."
+applies_to = ["firmware-notifier"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 19
+
+[rule.params]
+name = "firmware-notifier"
+title = "Firmware updater notifier"
+kind = "user"
+user = "ohmz"
+unit = "snap.firmware-updater.firmware-notifier.timer"
+schedule = "every 3 h (00:00, 03:00 ... 21:00)"
+note = "snap user timer: observe"
+
+[[rule]]
+id = "external.smart-alert"
+title = "Event hook: smartd alert script"
+kind = "schedule"
+principle = "one umbrella"
+why = "smartd runs this script on a disk event. It is being replaced by `homelab-maint smart-event` so disk alerts use the one notification path."
+does = "Display only: the tick never starts it and nothing here changes it. Event driven (smartd calls /usr/local/sbin/smart-alert.sh). The replacement exits silently on any error so smartd never sees a hook failure, and falls back to the legacy script."
+applies_to = ["smart-alert"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 20
+
+[rule.params]
+name = "smart-alert"
+title = "smartd alert hook"
+kind = "hook"
+unit = "smartd -> /usr/local/sbin/smart-alert.sh"
+schedule = "event driven (smartd)"
+note = "becomes `homelab-maint smart-event` (S9)"
+
+[[rule]]
+id = "external.backup-failure"
+title = "Event hook: OnFailure of the backup units"
+kind = "schedule"
+principle = "one umbrella"
+why = "The old backup failure hook; the backup jobs carry the same command as their own on_failure hook. It stays in place until the same hook is verified on the backup jobs, so a failed backup is always reported by one of the two."
+does = "Display only: the tick never starts it and nothing here changes it. backup-failure@.service runs when a backup unit fails. Replaced by jobs.hooks.on_failure on the backup jobs after cutover."
+applies_to = ["backup-failure"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 21
+
+[rule.params]
+name = "backup-failure"
+title = "backup OnFailure hook"
+kind = "hook"
+unit = "backup-failure@.service"
+schedule = "event driven (OnFailure of the backup units)"
+note = "replaced by jobs.hooks.on_failure on the backup jobs"
+
+[[rule]]
+id = "external.stack-alert"
+title = "Event hook: Hermes unit-failure alert"
+kind = "schedule"
+principle = "one umbrella"
+why = "Alerts for failures of the Hermes user units until the umbrella alert takes over at cutover. It is replaced at cutover, after the umbrella alert has proven itself, so a Hermes unit failure always reaches the owner by one path or the other."
+does = "Display only: the tick never starts it and nothing here changes it. stack-alert@.service runs as ohmz when a Hermes user unit fails."
+applies_to = ["stack-alert"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 22
+
+[rule.params]
+name = "stack-alert"
+title = "Hermes unit-failure alert"
+kind = "hook"
+user = "ohmz"
+unit = "stack-alert@.service"
+schedule = "event driven (OnFailure of the Hermes user units)"
+note = "replaced by the umbrella alert at cutover"
+
+[[rule]]
+id = "external.sensor-exporter"
+title = "Daemon: fan supervisor and sensor exporter"
+kind = "schedule"
+principle = "one umbrella"
+why = "This daemon controls the fans (hardware). Two programs driving the same PWM outputs would be dangerous, so it is never touched."
+does = "Display only: the tick never starts it and nothing here changes it. sensor-exporter.service is always on; the monitoring plane probes it. fancontrol.service must stay unconfigured."
+applies_to = ["sensor-exporter"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 23
+owner_notes = "Never retire sensor-exporter and never create /etc/fancontrol."
+
+[rule.params]
+name = "sensor-exporter"
+title = "Fan supervisor / sensor exporter"
+kind = "daemon"
+unit = "sensor-exporter.service"
+schedule = "always on"
+note = "hardware control: never touched, probed for liveness"
+
+[[rule]]
+id = "external.smartd"
+title = "Daemon: SMART disk monitor"
+kind = "schedule"
+principle = "one umbrella"
+why = "smartd watches the disks and calls the alert hook; smart_trend reads its attribute logs. It is a distro daemon the script only probes (svc-smartd) and reads the logs of; its alerts go through the alert script."
+does = "Display only: the tick never starts it and nothing here changes it. smartmontools.service (smartd) is always on with its own self-test schedule; the probe plane checks it."
+applies_to = ["smartd"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 24
+
+[rule.params]
+name = "smartd"
+title = "SMART disk monitor"
+kind = "daemon"
+unit = "smartd.service"
+schedule = "always on (its own self-test schedule; alerts through smart-alert.sh)"
+note = "distro daemon, probed; smart_trend reads its attribute logs"
+
+[[rule]]
+id = "external.smart-bridge"
+title = "Daemon: disk temperature bridge for Glances"
+kind = "schedule"
+principle = "one umbrella"
+why = "Feeds disk temperatures to Glances in the hddtemp wire format. It is probed for liveness (svc-smart-bridge) because a dead bridge blinds the disk temperature tiles."
+does = "Display only: the tick never starts it and nothing here changes it. smart-bridge.service is always on and probed for liveness."
+applies_to = ["smart-bridge"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 25
+
+[rule.params]
+name = "smart-bridge"
+title = "Disk temperature bridge for Glances"
+kind = "daemon"
+unit = "smart-bridge.service"
+schedule = "always on"
+note = "feeds Glances (hddtemp wire format); probed for liveness"
+
+[[rule]]
+id = "external.glances"
+title = "Daemon: Glances system monitor (loopback :61208)"
+kind = "schedule"
+principle = "one umbrella"
+why = "The dashboard source for Homarr. The monitoring plane probes both the unit and the API, because Homarr's system tiles go blank without it."
+does = "Display only: the tick never starts it and nothing here changes it. glances.service is always on and probed (unit and API)."
+applies_to = ["glances"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 26
+
+[rule.params]
+name = "glances"
+title = "Glances system monitor (loopback :61208)"
+kind = "daemon"
+unit = "glances.service"
+schedule = "always on"
+note = "dashboard source for Homarr; probed"
+
+[[rule]]
+id = "external.thermal-log"
+title = "Daemon: thermal and fan CSV logger (legacy)"
+kind = "schedule"
+principle = "one umbrella"
+why = "Fan-curve tuning log; the seven-day ring from metrics-sample covers the dashboard, so it may be retired. It is probed as P2 and tagged legacy, and `migrate` may retire it once the ring has proven itself."
+does = "Display only: the tick never starts it and nothing here changes it. thermal-log.service is always on and probed with class P2."
+applies_to = ["thermal-log"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 27
+
+[rule.params]
+name = "thermal-log"
+title = "Thermal and fan CSV logger"
+kind = "daemon"
+unit = "thermal-log.service"
+schedule = "always on"
+note = "fan-curve tuning log; the 7-day ring (metrics-sample) covers the dashboard, so `migrate` may retire this one"
+
+[[rule]]
+id = "external.tunarr-autostart"
+title = "Boot unit: start the Tunarr container"
+kind = "schedule"
+principle = "one umbrella"
+why = "Tunarr's container must come back after a reboot. It is not scheduled maintenance, but if it does not run Tunarr stays down after a reboot, so it is listed."
+does = "Display only: the tick never starts it and nothing here changes it. tunarr-autostart.service runs `docker start` once at boot."
+applies_to = ["tunarr-autostart"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 28
+
+[rule.params]
+name = "tunarr-autostart"
+title = "Start the tunarr-host-net container at boot"
+kind = "daemon"
+unit = "tunarr-autostart.service"
+schedule = "once at boot"
+note = "boot oneshot (docker start), not scheduled maintenance"
+
+[[rule]]
+id = "external.nvidia-cdi-refresh"
+title = "Boot unit: regenerate the NVIDIA CDI spec"
+kind = "schedule"
+principle = "one umbrella"
+why = "GPU containers need an up-to-date CDI spec before Docker starts. It is GPU container plumbing at boot; if it fails GPU containers may not start, so it is listed even though it is not scheduled work."
+does = "Display only: the tick never starts it and nothing here changes it. nvidia-cdi-refresh.service runs once at boot before docker."
+applies_to = ["nvidia-cdi-refresh"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 29
+
+[rule.params]
+name = "nvidia-cdi-refresh"
+title = "Regenerate the NVIDIA CDI spec at boot"
+kind = "daemon"
+unit = "nvidia-cdi-refresh.service"
+schedule = "once at boot (before docker)"
+note = "boot oneshot, GPU container plumbing"
+
+[[rule]]
+id = "external.homelab-maint-www"
+title = "Daemon: status server for Homarr widgets"
+kind = "schedule"
+principle = "one umbrella"
+why = "Serves the read-only JSON the Homarr widgets read, on loopback only. Both the unit (svc-hm-www) and the endpoint (umbrella-www) are probed, because a running unit can still serve nothing."
+does = "Display only: the tick never starts it and nothing here changes it. homelab-maint-www.service is always on (127.0.0.1:9111) and probed by umbrella-www and svc-hm-www."
+applies_to = ["homelab-maint-www"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 30
+
+[rule.params]
+name = "homelab-maint-www"
+title = "Status server (Homarr widgets)"
+kind = "daemon"
+unit = "homelab-maint-www.service"
+schedule = "always on"
+note = "umbrella daemon"
+
+[[rule]]
+id = "external.homelab-maint-live"
+title = "Daemon: live monitor, 5 second sampling"
+kind = "schedule"
+principle = "one umbrella"
+why = "Feeds the website's Live tab. The unit is probed (svc-hm-live) and the file it writes is checked for freshness (umbrella-live)."
+does = "Display only: the tick never starts it and nothing here changes it. homelab-maint-live.service is always on; it rewrites public/live.json every 5 seconds."
+applies_to = ["homelab-maint-live"]
+file = "jobs.toml"
+target = "external[]"
+merge = "append"
+since = "2026-10-03"
+order = 31
+
+[rule.params]
+name = "homelab-maint-live"
+title = "Live monitor"
+kind = "daemon"
+unit = "homelab-maint-live.service"
+schedule = "always on (5 s sampling)"
+note = "umbrella daemon"
+
+[[rule]]
+id = "job.container-audit"
+title = "Container health + log error audit"
+kind = "job"
+severity = "warn"
+principle = "one umbrella; classes of service P0-P3"
+why = "Every container was restarted and recreated onto new bind-mount roots during the /home/ohmz migration (2026-10-04). This is the standing version of the check run by hand at the end of that migration, so a container wedged by a path move is caught without anyone looking."
+does = "Runs /usr/local/sbin/container-audit.py --quiet as root every 6 h, class P1, monitor, timeout 600 s. Read-only: state, health, restart count and a log error scan; it never restarts anything. Containers listed in /etc/homelab-maint/container-audit.ignore may be stopped without alerting. There is no legacy driver, so it ships managed (the tick runs it, no retire interlock)."
+applies_to = ["container-audit"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-04"
+order = 32
+
+[rule.params]
+name = "container-audit"
+title = "Container health + log error audit"
+command = ["/usr/bin/python3", "/usr/local/sbin/container-audit.py", "--quiet"]
+user = "root"
+schedule = "every 6h"
+source = "native"
+class = "P1"
+monitor = true
+quiet = true
+timeout_s = 600
+mode = "managed"
+note = "Containers listed in /etc/homelab-maint/container-audit.ignore may be stopped without alerting."
+success = { status_json = "/var/lib/homelab-maint/container-audit.json", result_key = "result", ok_values = ["ok"], finished_key = "finished" }
+notify = { on_failure = "alert" }
+
+[[rule]]
+id = "sched.settings"
+title = "Scheduler limits: 3 at once, 6 h catch-up, evening freeze, forced-start pressure"
+kind = "schedule"
+principle = "classes of service P0-P3"
+why = "One tick starts everything on a schedule, so it needs a few global limits that keep the host usable: not too many things at once, no catching up on ancient runs, no disruptive starts at peak hours, and no forced start while the host is under pressure. The values are deliberately conservative: a job that cannot run now can usually run later, and a backup is the exception handled by force_after_defer."
+does = "max_concurrent = 3 non-monitor jobs at the same time. catchup_hours = 6: a missed or deferred occurrence older than this is skipped, not run (a job may set its own). freeze = [18:00-23:30]: disruptive jobs wait it out; this list applies only when routine.toml has no [freeze] table (routine.toml is the first choice). forced_pressure_max = 1: a job started by force_after_defer (backups, the Immich recycle) still waits while the pressure gate level is above 1, or above its own pressure_max when that is higher (the Immich recycle sets 3). Other limits (tick budget 40 s, defer retry 120 s, gate timeout 20 s, 20 logs kept per job) are built-in defaults."
+file = "jobs.toml"
+target = "scheduler"
+params = { max_concurrent = 3, catchup_hours = 6, freeze = ["18:00-23:30"], forced_pressure_max = 1 }
+since = "2026-10-03"
+
+[[rule]]
+id = "sched.pressure_max"
+title = "Highest pressure level at which each class may start a job"
+kind = "schedule"
+principle = "classes of service P0-P3; detect by saturation, not size"
+why = "Classes of service in action: interactive and monitoring work (P0, P1) starts even under pressure because it helps diagnose it, while batch work (P2, P3) must not add load to a host that is already stalling. Detection is by saturation (memory and CPU stalls), not by how much memory is in use."
+does = "A job of class P0 or P1 may start at any pressure level up to 5; P2 and P3 only up to level 1, so they are deferred at level 2 and above. The level is pressure_state's gate_level (memory and CPU only): this host holds IO pressure at level 3 for hours every night and that must not defer a backup. A job may override it with its own pressure_max (the ComfyUI reclaim and the Immich recycle do, because they relieve memory)."
+file = "jobs.toml"
+target = "scheduler.pressure_max"
+params = { P0 = 5, P1 = 5, P2 = 1, P3 = 1 }
+since = "2026-10-03"

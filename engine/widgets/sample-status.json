@@ -1,0 +1,915 @@
+{
+ "generated_at": 1790881920,
+ "host": "ohmz-ai",
+ "overall": "warn",
+ "paused": false,
+ "reclaimed_log": [
+  {
+   "bytes": 6657199308,
+   "t": 1790840010,
+   "task": "docker_cache"
+  },
+  {
+   "bytes": 1503238553,
+   "t": 1790840070,
+   "task": "snap_revisions"
+  },
+  {
+   "bytes": 5153960755,
+   "t": 1790753610,
+   "task": "docker_cache"
+  },
+  {
+   "bytes": 966367641,
+   "t": 1790667240,
+   "task": "apt_clean"
+  },
+  {
+   "bytes": 12455405158,
+   "t": 1790408220,
+   "task": "docker_images"
+  },
+  {
+   "bytes": 2469606195,
+   "t": 1789112220,
+   "task": "retention"
+  }
+ ],
+ "schema": 1,
+ "tasks": {
+  "alert_path_health": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "bridge_ok": true,
+    "notify_fail_24h": 0,
+    "smart_fail_24h": 3
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "warn",
+   "summary": "alert path: smart hook: 3 sends failed in 24h, last 06:12 rc=1: smtp auth",
+   "tier": "check",
+   "title": "Alert path"
+  },
+  "apt_clean": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "0 B",
+    "mode": "report",
+    "protected": 0,
+    "selected": 1,
+    "selected_h": "819.2 MiB"
+   },
+   "mode": "dry-run",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "report: would free 819.2 MiB (1 files)",
+   "tier": "daily",
+   "title": "APT package cache"
+  },
+  "backup_freshness": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "backups": [
+     {
+      "age": "2d",
+      "age_h": 54.2,
+      "level": "ok",
+      "limit_h": 200,
+      "name": "backup-system",
+      "result": "ok"
+     },
+     {
+      "age": "9d",
+      "age_h": 210.0,
+      "level": "warn",
+      "limit_h": 200,
+      "name": "backup-immich",
+      "result": "ok"
+     },
+     {
+      "age": "10h",
+      "age_h": 9.5,
+      "level": "ok",
+      "limit_h": 26,
+      "name": "stack-backup",
+      "result": "ok"
+     }
+    ],
+    "failed": 0,
+    "level": "warn"
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "warn",
+   "summary": "warn: backup-immich 9d old (limit 200h)",
+   "tier": "check",
+   "title": "Backups"
+  },
+  "c2_candidates": {
+   "alert": false,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C2",
+   "last_run": 1790773920,
+   "metrics": {
+    "candidates": 6,
+    "mode": "report",
+    "plan_hash": "0e2ce0975085",
+    "total_h": "53.2 GiB"
+   },
+   "mode": "dry-run",
+   "plan": {
+    "items": [
+     {
+      "bytes": 9985798963,
+      "name": "android-fold-avd",
+      "needs_manual_check": false
+     },
+     {
+      "bytes": 2362232012,
+      "name": "cursor-worktrees",
+      "needs_manual_check": true
+     },
+     {
+      "bytes": 19864223744,
+      "name": "hermes-genesis-gguf",
+      "needs_manual_check": true
+     },
+     {
+      "bytes": 12133282611,
+      "name": "home-venv",
+      "needs_manual_check": false
+     },
+     {
+      "bytes": 11596411699,
+      "name": "kometa-backup-tarball",
+      "needs_manual_check": false
+     },
+     {
+      "bytes": 1181116006,
+      "name": "orphan-docker-plex-config",
+      "needs_manual_check": false
+     }
+    ],
+    "total_bytes": 57123065035
+   },
+   "plan_hash": "0e2ce0975085",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "6 candidates, 53.2 GiB; plan 0e2ce0975085",
+   "tier": "weekly",
+   "title": "Cleanup candidates"
+  },
+  "caps": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "0 B",
+    "mode": "report",
+    "protected": 0,
+    "selected": 0,
+    "selected_h": "0 B"
+   },
+   "mode": "dry-run",
+   "reclaimed_bytes": 0,
+   "status": "ok",
+   "summary": "report: would free 0 B (0 containers)",
+   "tier": "daily",
+   "title": "Container memory ceilings"
+  },
+  "config_drift": {
+   "alert": false,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790773920,
+   "metrics": {},
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "2 drift(s): journald SystemMaxUse unset; tune2fs reserved blocks 5%",
+   "tier": "weekly",
+   "title": "Config drift"
+  },
+  "disk_forecast": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [
+    {
+     "days_h": "12 d",
+     "free_h": "183.2 GiB",
+     "level": "warn",
+     "mount": "/",
+     "used_pct": 90
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "714.9 GiB",
+     "level": "ok",
+     "mount": "/media/SandiskSSD",
+     "used_pct": 61
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "1.1 TiB",
+     "level": "ok",
+     "mount": "/mnt/backup/system",
+     "used_pct": 78
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "5.4 TiB",
+     "level": "ok",
+     "mount": "/mnt/backup/immich",
+     "used_pct": 33
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "843.2 GiB",
+     "level": "ok",
+     "mount": "/media/Immich",
+     "used_pct": 77
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "905.9 GiB",
+     "level": "ok",
+     "mount": "/media/nextcloud",
+     "used_pct": 1
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "670.6 GiB",
+     "level": "info",
+     "mount": "/media/seagate18tb",
+     "used_pct": 96
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "1.3 TiB",
+     "level": "info",
+     "mount": "/media/seagate16tb",
+     "used_pct": 91
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "1.3 TiB",
+     "level": "info",
+     "mount": "/media/toshiba12tb",
+     "used_pct": 88
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "20.5 GiB",
+     "level": "info",
+     "mount": "/media/WD22TB",
+     "used_pct": 99.9
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "1005.8 GiB",
+     "level": "info",
+     "mount": "/media/WD18TB",
+     "used_pct": 94
+    },
+    {
+     "days_h": "n/a",
+     "free_h": "1.1 TiB",
+     "level": "info",
+     "mount": "/media/western18to14tb",
+     "used_pct": 93
+    }
+   ],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "mounts": [
+     {
+      "days": 12.3,
+      "days_h": "12 d",
+      "free": 196709502156,
+      "free_h": "183.2 GiB",
+      "info": false,
+      "level": "warn",
+      "mount": "/",
+      "used_pct": 90
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 767585817722,
+      "free_h": "714.9 GiB",
+      "info": false,
+      "level": "ok",
+      "mount": "/media/SandiskSSD",
+      "used_pct": 61
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 1204265880125,
+      "free_h": "1.1 TiB",
+      "info": false,
+      "level": "ok",
+      "mount": "/mnt/backup/system",
+      "used_pct": 78
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 5889065882746,
+      "free_h": "5.4 TiB",
+      "info": false,
+      "level": "ok",
+      "mount": "/mnt/backup/immich",
+      "used_pct": 33
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 905357631160,
+      "free_h": "843.2 GiB",
+      "info": false,
+      "level": "ok",
+      "mount": "/media/Immich",
+      "used_pct": 77
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 972649031270,
+      "free_h": "905.9 GiB",
+      "info": false,
+      "level": "ok",
+      "mount": "/media/nextcloud",
+      "used_pct": 1
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 720008317501,
+      "free_h": "670.6 GiB",
+      "info": true,
+      "level": "info",
+      "mount": "/media/seagate18tb",
+      "used_pct": 96
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 1440081059512,
+      "free_h": "1.3 TiB",
+      "info": true,
+      "level": "info",
+      "mount": "/media/seagate16tb",
+      "used_pct": 91
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 1440016635002,
+      "free_h": "1.3 TiB",
+      "info": true,
+      "level": "info",
+      "mount": "/media/toshiba12tb",
+      "used_pct": 88
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 22000969973,
+      "free_h": "20.5 GiB",
+      "info": true,
+      "level": "info",
+      "mount": "/media/WD22TB",
+      "used_pct": 99.9
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 1080012476252,
+      "free_h": "1005.8 GiB",
+      "info": true,
+      "level": "info",
+      "mount": "/media/WD18TB",
+      "used_pct": 94
+     },
+     {
+      "days": null,
+      "days_h": "n/a",
+      "free": 1260014555627,
+      "free_h": "1.1 TiB",
+      "info": true,
+      "level": "info",
+      "mount": "/media/western18to14tb",
+      "used_pct": 93
+     }
+    ],
+    "root_days": 12.3,
+    "root_free_h": "183.2 GiB"
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "warn",
+   "summary": "/ 90% used, ~12 d to full",
+   "tier": "check",
+   "title": "Disk space"
+  },
+  "docker_cache": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "6.2 GiB",
+    "mode": "apply",
+    "protected": 0,
+    "selected": 2,
+    "selected_h": "6.2 GiB"
+   },
+   "mode": "apply",
+   "reclaimed_bytes": 6657199308,
+   "status": "ok",
+   "summary": "freed 6.2 GiB (2 builders)",
+   "tier": "daily",
+   "title": "Docker build cache"
+  },
+  "docker_df": {
+   "alert": false,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "build_cache_gib": 31.2,
+    "build_cache_h": "31.2 GiB",
+    "build_cache_reclaim_h": "22.1 GiB",
+    "containers_h": "2.1 GiB",
+    "images_gib": 142.3,
+    "images_h": "142.3 GiB",
+    "images_reclaim_h": "38.8 GiB",
+    "level": "warn",
+    "safe_reclaim_h": "60.9 GiB",
+    "volumes_h": "611.8 GiB"
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "warn",
+   "summary": "warn: build cache 31.2 GiB (>= 25 GiB)",
+   "tier": "check",
+   "title": "Docker disk"
+  },
+  "docker_images": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "0 B",
+    "mode": "report",
+    "protected": 0,
+    "selected": 6,
+    "selected_h": "14.9 GiB"
+   },
+   "mode": "dry-run",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "report: would free 14.9 GiB (6 images)",
+   "tier": "daily",
+   "title": "Unused Docker images"
+  },
+  "failed_units": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "containers_total": 71,
+    "exited_unexpected": 0,
+    "failed_units": 1,
+    "failed_units_stale": 1,
+    "level": "warn",
+    "restarting": 0,
+    "unhealthy": 0
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "warn",
+   "summary": "warn: 1 failed unit(s): nginx.service",
+   "tier": "check",
+   "title": "Services & containers"
+  },
+  "gradle_reaper": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "0 B",
+    "mode": "report",
+    "protected": 0,
+    "selected": 2,
+    "selected_h": "1.9 GiB"
+   },
+   "mode": "dry-run",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "report: would free 1.9 GiB (2 daemons)",
+   "tier": "daily",
+   "title": "Idle Gradle/Kotlin daemons"
+  },
+  "growth_watch": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [
+    {
+     "level": "ok",
+     "limit": "0.5 GiB/d",
+     "path": "/var/lib/docker/containers",
+     "rate": "+0.08 GiB/d",
+     "size": "4.1 GiB"
+    },
+    {
+     "level": "ok",
+     "limit": "0.5 GiB/d",
+     "path": "/var/log",
+     "rate": "+0.03 GiB/d",
+     "size": "2.4 GiB"
+    },
+    {
+     "level": "ok",
+     "limit": "0.5 GiB/d",
+     "path": "/volume1/docker/kavita/config/logs",
+     "rate": "+0.00 GiB/d",
+     "size": "120.0 MiB"
+    },
+    {
+     "level": "info",
+     "limit": "0.5 GiB/d",
+     "path": "/var/log/journal",
+     "rate": "n/a",
+     "size": "n/a"
+    }
+   ],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "n_over": 0,
+    "paths": [
+     {
+      "level": "ok",
+      "limit": "0.5 GiB/d",
+      "path": "/var/lib/docker/containers",
+      "rate": "+0.08 GiB/d",
+      "size": "4.1 GiB"
+     },
+     {
+      "level": "ok",
+      "limit": "0.5 GiB/d",
+      "path": "/var/log",
+      "rate": "+0.03 GiB/d",
+      "size": "2.4 GiB"
+     },
+     {
+      "level": "ok",
+      "limit": "0.5 GiB/d",
+      "path": "/volume1/docker/kavita/config/logs",
+      "rate": "+0.00 GiB/d",
+      "size": "120.0 MiB"
+     },
+     {
+      "level": "info",
+      "limit": "0.5 GiB/d",
+      "path": "/var/log/journal",
+      "rate": "n/a",
+      "size": "n/a"
+     }
+    ]
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "ok",
+   "summary": "growth ok: 3 paths, fastest docker/containers +0.08 GiB/d",
+   "tier": "check",
+   "title": "Growth watch"
+  },
+  "image_ledger": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "referenced": 58,
+    "tracked": 412
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "ok",
+   "summary": "58 images in use, 38 unreferenced on host, ledger 412 entries",
+   "tier": "check",
+   "title": "Image usage ledger"
+  },
+  "memory_health": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "mem_available_h": "70.1 GiB",
+    "oom_kills_delta": 0,
+    "oom_kills_total": 4,
+    "psi_io_some60": 1.2,
+    "psi_mem_full60": 0.0,
+    "swap_in_pps": 0,
+    "swap_used_h": "25.0 GiB"
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "ok",
+   "summary": "ok: 70.1 GiB avail; cache 60.4 GiB is reclaimable; swap 25.0 GiB used is harmless alone; mem stall 0.0%",
+   "tier": "check",
+   "title": "Memory pressure"
+  },
+  "orphan_report": {
+   "alert": false,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "findings": 3,
+    "gradle_idle": 2
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "2 idle gradle daemons, 1 stray server (1.9 GiB anon)",
+   "tier": "check",
+   "title": "Orphaned processes"
+  },
+  "plex_media_mount_check": {
+   "alert": false,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "media_size_root_gib": 47.0,
+    "mounted": false,
+    "source": ""
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "info: Plex not migrated yet (no bind mount, no /media/SandiskSSD/plex)",
+   "tier": "check",
+   "title": "Plex Media mount"
+  },
+  "retention": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "0 B",
+    "mode": "report",
+    "protected": 0,
+    "selected": 214,
+    "selected_h": "3.6 GiB"
+   },
+   "mode": "dry-run",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "report: would free 3.6 GiB (214 files)",
+   "tier": "daily",
+   "title": "Retention rules"
+  },
+  "smart_trend": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "devices": [
+     {
+      "crc": 0,
+      "dev": "nvme0n1",
+      "level": "ok",
+      "model": "Samsung 990 PRO 2TB",
+      "note": "",
+      "pending": 0,
+      "power_on_h": 9120,
+      "realloc": 0,
+      "temp_c": 47
+     },
+     {
+      "crc": 0,
+      "dev": "nvme1n1",
+      "level": "ok",
+      "model": "WD Black SN850X",
+      "note": "",
+      "pending": 0,
+      "power_on_h": 6410,
+      "realloc": 0,
+      "temp_c": 52
+     },
+     {
+      "crc": 0,
+      "dev": "sda",
+      "level": "ok",
+      "model": "ST18000NM000J",
+      "note": "",
+      "pending": 0,
+      "power_on_h": 31240,
+      "realloc": 0,
+      "temp_c": 34
+     },
+     {
+      "crc": 0,
+      "dev": "sdb",
+      "level": "ok",
+      "model": "WDC WD240EDGZ",
+      "note": "realloc stable",
+      "pending": 0,
+      "power_on_h": 40110,
+      "realloc": 8,
+      "temp_c": 38
+     }
+    ],
+    "hottest_c": 52,
+    "hottest_dev": "nvme1n1",
+    "n_disks": 4,
+    "n_problems": 0
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "ok",
+   "summary": "SMART ok: 4 disks, no 5/197/198/CRC growth, hottest nvme1n1 52C",
+   "tier": "check",
+   "title": "SMART trend"
+  },
+  "snap_revisions": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "1.4 GiB",
+    "mode": "apply",
+    "protected": 0,
+    "selected": 2,
+    "selected_h": "1.4 GiB"
+   },
+   "mode": "apply",
+   "reclaimed_bytes": 1503238553,
+   "status": "ok",
+   "summary": "freed 1.4 GiB (2 revisions)",
+   "tier": "daily",
+   "title": "Old snap revisions"
+  },
+  "spike_sampler": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "anon_total_gib": 23.1,
+    "anon_total_h": "23.1 GiB",
+    "containers": 71,
+    "largest": [
+     {
+      "anon_h": "9.8 GiB",
+      "name": "ollama"
+     },
+     {
+      "anon_h": "3.2 GiB",
+      "name": "immich_machine_learning"
+     },
+     {
+      "anon_h": "2.4 GiB",
+      "name": "comfyui"
+     }
+    ],
+    "skipped": 0
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "ok",
+   "summary": "71 containers, 23.1 GiB anon; top: ollama 9.8G, immich_machine_learning 3.2G",
+   "tier": "check",
+   "title": "Memory spike sampler"
+  },
+  "stuck_detector": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [
+    {
+     "anon_h": "14.2 GiB",
+     "busy": "",
+     "cpu_pct": 0.1,
+     "growth_gib_h": 0.8,
+     "io_kib_min": 3,
+     "name": "tunarr-host-net",
+     "protected": true,
+     "reason": "leak/runaway: memory growing with no CPU or IO progress",
+     "swap_h": "0 B"
+    },
+    {
+     "anon_h": "5.1 GiB",
+     "busy": "",
+     "cpu_pct": 0.0,
+     "growth_gib_h": 0.0,
+     "io_kib_min": 0,
+     "name": "some-app",
+     "protected": false,
+     "reason": "idle but holding: large and flat, no CPU or IO progress",
+     "swap_h": "0 B"
+    }
+   ],
+   "klass": "C0",
+   "last_run": 1790881920,
+   "metrics": {
+    "actionable": 1,
+    "candidates": 2,
+    "enforce": false,
+    "pressure": "none",
+    "samples": 12,
+    "window_min": 165
+   },
+   "mode": "check",
+   "reclaimed_bytes": 0,
+   "status": "warn",
+   "summary": "2 candidate(s), 1 actionable: some-app 5.1 GiB idle but holding",
+   "tier": "check",
+   "title": "Stuck containers"
+  },
+  "trash": {
+   "alert": true,
+   "duration_s": 1.4,
+   "items": [],
+   "klass": "C1",
+   "last_run": 1790839920,
+   "metrics": {
+    "failed": 0,
+    "freed_h": "0 B",
+    "mode": "report",
+    "protected": 0,
+    "selected": 38,
+    "selected_h": "1.1 GiB"
+   },
+   "mode": "dry-run",
+   "reclaimed_bytes": 0,
+   "status": "info",
+   "summary": "report: would free 1.1 GiB (38 entries)",
+   "tier": "daily",
+   "title": "Trash"
+  }
+ },
+ "tier_runs": {
+  "check": {
+   "dry_run": true,
+   "last_run": 1790881920
+  },
+  "daily": {
+   "dry_run": false,
+   "last_run": 1790839920
+  },
+  "weekly": {
+   "dry_run": false,
+   "last_run": 1790773920
+  }
+ }
+}

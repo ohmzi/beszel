@@ -1,0 +1,20 @@
+[Unit]
+Description=homelab-maint check tier (health checks, sensors, the pressure ladder)
+# Ordering only: the checks fail closed when Docker is down, so no Requires=/Wants=.
+After=docker.service
+
+[Service]
+Type=oneshot
+# --apply only PERMITS mutation. C0 tasks (the checks) are forced read-only whatever the flag. The few C1 tasks in this tier
+# (pressure_response, comfyui_idle_reclaim, immich_recycle) act only when their own mode is "apply" in maint.toml: shipped
+# pressure_response.reclaim = "apply" (unload idle models, and only at pressure level 2+), everything else "report". Without
+# the flag even that reclaim rung would be report-only. /etc/homelab-maint/PAUSE[.task] overrides both.
+ExecStart=/usr/local/sbin/homelab-maint run --tier check --apply
+Nice=10
+IOSchedulingClass=idle
+# If the host ever runs out of memory, give this job up first.
+OOMScoreAdjust=500
+MemoryMax=2G
+# Shorter than the 15 min cadence; an overlapping run would just skip itself (tier lock).
+TimeoutStartSec=14min
+SyslogIdentifier=homelab-maint

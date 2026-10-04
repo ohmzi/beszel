@@ -1,0 +1,39 @@
+# homelab-maint rules registry: Safety limits. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync).
+# Both rules compile into maint.toml. config.caps is the per-run budget every deleting task works inside; its hard ceilings live in the release floor (registry.py) and 00-baseline-invariants.toml.
+
+meta = { category = "safety", title = "Safety limits", blurb = "Global limits and settings." }
+
+[[rule]]
+id = "config.global"
+title = "Runner settings: alert debounce, reminders, bridge, Kuma, status port"
+kind = "policy"
+principle = "one umbrella"
+why = "The runner needs a few host-wide facts that no single task owns: who gets the messages, how many bad runs make a page, how often a still-broken thing repeats, and where the local status server listens. They live in one place so there is one source of truth, and notify.toml inherits the handle and bridge from here (one umbrella). Debouncing (2 bad runs before a page) is what keeps a one-run blip from texting the owner."
+does = "bridge and notify_handle name the legacy Hermes bridge script and the contact handle ohmz; notify.py takes them as the transport's bridge/handle when notify.toml leaves them empty. alert_confirm_runs = 2: a task must sit at the same new level for 2 consecutive runs (30 min on the 15-minute check tier) before the first page (the pager only reads this global value; incidents.py lets a task or playbooks.toml override it for the incident ledger). alert_reminder_hours = 24: a still-failing confirmed problem pages again every 24 h. kuma_url is the base URL for the GET-only Uptime Kuma push heartbeats (a no-op until /etc/homelab-maint/kuma.toml holds a token for the key). www_port = 9111 is the loopback port of `homelab-maint serve` (read-only JSON for the Homarr widgets). alert_daily_budget = 8 only caps pages in core.Notifier's own bridge fallback, which runs when notify.py cannot be imported; the budget that applies normally is notify.toml [budget] (alert = 8 per day, 30 total, 40 hard cap)."
+file = "maint.toml"
+target = "global"
+since = "2026-10-03"
+owner_notes = "alert_daily_budget has no effect on the normal path (only the notify.py-is-broken fallback reads it); the live budget is notify.toml [budget]. www_port is also hard-coded in the umbrella-www probe target (http://127.0.0.1:9111/overview): change both together. [global] audit_dry_sample (default 20, read by core.Ctx) has no rule."
+
+[rule.params]
+bridge = "/usr/local/sbin/backup-notify-hermes.py"
+notify_handle = "ohmz"
+kuma_url = "http://127.0.0.1:3011"
+www_port = 9111
+alert_confirm_runs = 2
+alert_reminder_hours = 24
+alert_daily_budget = 8
+
+[[rule]]
+id = "config.caps"
+title = "Per-run caps: 40 GiB and 500 actions for any cleaner"
+kind = "safety"
+principle = "protect before you clean; dry-run first"
+why = "A cleaner that deletes too much in one run cannot be undone, so every task that deletes something works inside a budget per run: protect before you clean, and bound the damage of a wrong selector or a bad path. The shipped caps are deliberately small compared with the disks (tens of TiB), so a runaway rule is stopped long before it matters."
+does = "Every task gets a budget of 40 GiB and 500 actions per run (a task may set a lower max_gib_per_run / max_items_per_run of its own). Ctx.act counts each real action before it runs: if the next one would pass either number it is refused (audit row refused-cap), the task stops with a cap error, and what was done stays done. Report-only (dry-run) decisions are not counted. The routine's canary runs the first apply of each cleaner with 10 percent of these caps. `rules check` blocks any value above 100 GiB or 2000 items, and any task-level cap above the same limits."
+proof = "Hard ceilings of 100 GiB and 2000 items are pinned twice: in the release floor inside registry.py and in 00-baseline-invariants.toml. A larger value is a validation error and the sync keeps the last good config."
+file = "maint.toml"
+target = "caps"
+params = { max_gib_per_run = 40, max_items_per_run = 500 }
+since = "2026-10-03"

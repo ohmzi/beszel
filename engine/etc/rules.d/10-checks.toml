@@ -1,0 +1,730 @@
+# homelab-maint rules registry: Health checks. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync). Every rule here is a read-only check (class C0): none deletes, restarts or
+# kills anything, so none carries a `proof`. `severity` is the worst status the check can report; a check with alert = false in its code
+# (docker_df, config_drift, docker_prune_parity, legacy_audit) shows on the dashboard and never pages whatever its severity says.
+
+[meta]
+category = "checks"
+title = "Health checks"
+blurb = "What the script verifies and when it complains."
+
+[[rule]]
+id = "task.disk_forecast"
+title = "Disk space and days until full"
+kind = "check"
+why = """\
+A full disk stops this host in ways that are hard to undo: Docker, the databases and the journal all fail together. \
+Free percent alone only warns when little time is left, so this rule also forecasts the days until each disk is full \
+from its recent trend, which leaves time to plan a cleanup or a bigger disk instead of reacting at 0 percent. The \
+eight big media archive disks are shown on the dashboard but never page: most of them are already 93 to 100 percent \
+full, so a page could never clear."""
+does = """\
+Every 15 minutes, for each path in `watch` that is a real mount point (/, /media/SandiskSSD, /mnt/backup/system, \
+/mnt/backup/immich, /media/Immich, /media/nextcloud) it reads free space the way df does (ext4 reserved blocks are not \
+counted as free) and appends one sample to the runner's history. The level is crit at 6 percent free or less, or when \
+the forecast says full within 7 days; warn at 12 percent or 21 days; otherwise ok. The forecast takes hourly medians \
+over the last 168 hours (it needs at least 6 hourly points spanning 6 hours in each window), drops one-off jumps of 3 percent of \
+capacity or more in an hour (a bulk copy, an image pull), and fits a robust slope over the whole window and over the \
+last 48 hours; it only forecasts when both are still falling and uses the slower one. A watch path that is not a mount \
+point is skipped, never reported as the parent disk. The check warns only when no configured mount at all (watch or \
+`info_only`) is mounted; with only `info_only` disks mounted it reports ok and 'no watched mounts available'. The \
+`info_only` disks are listed with their free space and never alert. A problem pages after 2 consecutive runs."""
+applies_to = ["disk_forecast"]
+file = "maint.toml"
+target = "tasks.disk_forecast"
+severity = "crit"
+destructive = false
+principle = "capacity planning"
+owner_notes = """\
+Free space is what df shows, after the ext4 reserved blocks; those are kept at 1 percent by owner decision (tune2fs -m \
+1, see task.config_drift). The daily, weekly and monthly routines re-run this check after their disruptive steps \
+(post_check), so a cleaning run that leaves a disk worse is noticed."""
+since = "2026-10-03"
+
+[rule.params]
+watch = ["/", "/media/SandiskSSD", "/mnt/backup/system", "/mnt/backup/immich", "/media/Immich", "/media/nextcloud"]
+info_only = [
+  "/media/seagate18tb", "/media/seagate16tb", "/media/toshiba12tb", "/media/WD22TB",
+  "/media/WD18TB", "/media/western18to14tb", "/media/western18to4tb", "/media/WD24to10TB",
+]
+warn_free_pct = 12
+crit_free_pct = 6
+warn_days = 21
+crit_days = 7
+trend_window_hours = 168
+
+[[rule]]
+id = "task.failed_units"
+title = "Services and containers"
+kind = "check"
+why = """\
+A dead service or a crash-looping container is the most common way this homelab breaks quietly: the host stays up, so \
+nothing else notices. One check covers the system units and the roughly 70 containers and names what is wrong and for \
+how long, so the alert says where to look. Containers that are stopped on purpose are listed in \
+expected_stopped_containers so they do not page every 15 minutes."""
+does = """\
+Every 15 minutes it runs `systemctl --failed` (system units only) and `docker ps -a`. It warns about: a unit that has \
+been failed for more than 30 minutes (an unknown age counts as old; nginx.service and plexmediaserver.service carry a \
+note that they are known on this host but are still reported); a container that is exited or dead and not in \
+`expected_stopped_containers`; a container whose status says unhealthy; a container that is restarting now or whose \
+restart count grew in the last 6 hours (a restart is held for 6 hours so the 2-run confirmation can still see a \
+one-off). If systemctl or docker cannot be queried it warns that the probe failed instead of reporting ok. \
+`ignore_units` (empty) hides units by exact name. `expected_stopped_containers` is also read by \
+docker_containers_prune, docker_prune_parity and docker_prune_exposure as the list of containers to keep."""
+applies_to = ["failed_units"]
+file = "maint.toml"
+target = "tasks.failed_units"
+params = { ignore_units = [], expected_stopped_containers = ["comfyui"] }
+severity = "warn"
+destructive = false
+principle = "blind is not healthy: a probe that cannot run is reported, not assumed fine"
+owner_notes = """\
+comfyui is stopped on purpose and is the only entry in expected_stopped_containers. Its stopped container and its 14.9 \
+GiB hand-built image are what the legacy docker-prune.timer would have deleted (timer disabled 2026-10-02, see \
+task.docker_prune_exposure). The maintenance-web container reports unhealthy when overview.json is older than 45 \
+minutes, which this check then reports."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.backup_freshness"
+title = "Backups are recent and succeeded"
+kind = "check"
+why = """\
+Every other safety net on this host (cleanup, restore, rebuilding a container) assumes the backups exist and are \
+recent. The weekly system and Immich backups and the nightly ai-stack backup each leave a status file or a stamp, and \
+this check turns a failed run or a silent stop into an alert. It reads the backups' own result and never the FAILED \
+marker files, which stay on disk long after the failure they record."""
+does = """\
+Every 15 minutes it reads each /var/log/backup/*-status.json (today system-status.json and immich-status.json). A \
+result other than ok is crit; a finish time older than the limit is warn (200 hours for backup-system and \
+backup-immich, which run weekly; 200 is also the default for a file with no entry); an unreadable file is warn. It \
+also reads the modification time of the ai-stack backup's stamp /media/SandiskSSD/ai-stack-backups/LAST_OK, written by \
+the nightly run: older than 26 hours, or missing, is warn. It warns 'no backup status files found' only when it has \
+no row at all (no status file and no stamp configured); with the shipped stamp configured, vanished status files \
+are not reported by themselves. The FAILED-*.txt marker \
+files are never read. When more than 3 backups are late the alert names three and counts the rest. The daily and \
+weekly routines re-run it as a post-check."""
+applies_to = ["backup_freshness"]
+file = "maint.toml"
+target = "tasks.backup_freshness"
+severity = "crit"
+destructive = false
+principle = "verify the safety net: a backup that quietly stopped is a failure nobody sees"
+owner_notes = """\
+Limits: 200 hours is a weekly job plus about a day of slack (backup-system runs Saturday 01:00, backup-immich Sunday \
+01:00); 26 hours is the nightly 03:30 stack backup plus slack. A FAILED-backup-system.service.txt marker exists at the \
+time of writing and is deliberately ignored. Found 2026-10-03 (run against a scratch stamp): with the stamp fresh and \
+no *-status.json file at all the check is ok, so a deleted or renamed status file goes unnoticed here. \
+routine_backup_verify walks the same glob and has the same blind spot, but its weekly look at the database dumps \
+(older than 10 days is flagged) would still catch a system backup that stopped."""
+since = "2026-10-03"
+
+[rule.params]
+status_glob = "/var/log/backup/*-status.json"
+max_age_hours = { backup-system = 200, backup-immich = 200 }
+stack_backup_last_ok = "/media/SandiskSSD/ai-stack-backups/LAST_OK"
+stack_backup_max_hours = 26
+
+[[rule]]
+id = "task.docker_df"
+title = "Docker disk use"
+kind = "check"
+why = """\
+Docker's build cache and unused images are the largest things on this host that grow without anyone touching them (the \
+build cache once reached 46 GB in the owner's own builder while the old prune job reported success). This check shows \
+the numbers and warns when they cross a limit, but it is housekeeping and not an emergency: the daily cleaners own the \
+cleanup and disk_forecast pages if a disk is really filling."""
+does = """\
+Every 15 minutes it runs `docker system df --format json` and, for every non-default buildx builder, `docker buildx \
+du` as the user in buildx_user (default: notify_handle, ohmz; builders are stored per user and the check runs as root, \
+which would only see the default one). It warns when the build cache (default plus extra builders) is 25 GiB or more, \
+or when reclaimable images are 40 GiB or more. Volumes are shown but are never counted as reclaimable and never \
+suggested for pruning. The result is dashboard only (alert = false): it never pages. If docker cannot be queried the \
+check is skipped quietly, because failed_units already complains when docker is down; if a builder cannot be read the \
+summary says the total is an undercount."""
+applies_to = ["docker_df"]
+file = "maint.toml"
+target = "tasks.docker_df"
+params = { build_cache_warn_gib = 25, images_reclaimable_warn_gib = 40 }
+severity = "warn"
+destructive = false
+principle = "capacity planning"
+owner_notes = """\
+docker_cache trims the cache from 15 GiB (high_gib) to 8 GiB once the owner enables apply; it ships report-only, so \
+the 25 GiB here is the backstop until then."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.memory_health"
+title = "Memory pressure"
+kind = "check"
+why = """\
+On this 94 GiB host a large page cache or some swap in use is normal and harmless. What hurts is work stalling for \
+memory, so the check judges saturation (how long tasks wait for memory, how little is really available, whether the \
+kernel kills processes) and never how big a process or the cache is. Acting on size is the failure mode this homelab \
+rejects: the retired mem-guard restarted containers by RSS."""
+does = """\
+Every 15 minutes it reads /proc/pressure/memory, io and cpu, /proc/meminfo and /proc/vmstat, and takes a 5 second live \
+sample of swap-in. Crit when memory stall (PSI full, 60 second average) is 15 percent or more, or MemAvailable is \
+under 4 GiB. Warn at 5 percent stall, under 10 GiB available, a swap-in rate of 2000 pages per second or more (the \
+5 second live burst counts only when the average since the last run is at least a tenth of that, or when there is \
+no earlier run to average over), or any OOM kill in the last 6 hours (held 6 hours so the 2-run confirmation can see \
+a one-off kill). Cache and swap in use are reported as harmless and never trigger \
+it. IO and CPU pressure are shown for context and have no threshold here; the graded response to pressure belongs to \
+pressure_state and pressure_response."""
+applies_to = ["memory_health"]
+file = "maint.toml"
+target = "tasks.memory_health"
+severity = "crit"
+destructive = false
+principle = "detect by saturation, not size"
+owner_notes = """\
+Thresholds are absolute GiB, not percentages of the 94 GiB host. The daily, weekly and monthly routines re-run this \
+check as a post-check."""
+since = "2026-10-03"
+
+[rule.params]
+psi_mem_full_warn = 5.0
+psi_mem_full_crit = 15.0
+mem_available_warn_gib = 10
+mem_available_crit_gib = 4
+swap_in_pages_per_s_warn = 2000
+
+[[rule]]
+id = "task.smart_trend"
+title = "Disk health (SMART) trend"
+kind = "check"
+why = """\
+A disk usually shows wear before it fails: reallocated or pending sectors that keep growing, CRC errors on the cable, \
+or sustained heat. One SMART reading says little, so this check compares today's raw values with those of a week ago \
+and warns when they rose. It reads the logs smartd already writes, so it needs no root and never runs smartctl."""
+does = """\
+Every 15 minutes it reads smartd's attribute logs (/var/lib/smartmontools/attrlog.*.csv, one row about every 30 \
+minutes) for each SATA disk and compares the newest row with the row closest to 7 days earlier, once the file spans at \
+least 24 hours. It warns when attribute 5 (reallocated), 197 (pending), 198 (offline uncorrectable) or 199 (CRC, \
+always added) increased, when the temperature is 70 C or more, or when smartd's data is more than 6 hours old. NVMe \
+drives have no attribute log: their hwmon temperature is compared with 70 C. No SMART logs at all is a warn. It only \
+ever warns, never crit, although the option is called crit_attrs (it only chooses which attributes are watched)."""
+applies_to = ["smart_trend"]
+file = "maint.toml"
+target = "tasks.smart_trend"
+severity = "warn"
+destructive = false
+principle = "watch the trend, not the snapshot"
+owner_notes = """\
+Temperature limit 70 C for both kinds (the code default is 65): SATA SSDs here run 57 to 64 C under load and smartd's \
+own 55 C trigger was noise. The acknowledgement key is per disk (model and serial tail), not the sdX name, which can \
+change between boots."""
+since = "2026-10-03"
+
+[rule.params]
+attrlog_dir = "/var/lib/smartmontools"
+crit_attrs = [5, 197, 198]
+nvme_temp_warn_c = 70
+ata_temp_warn_c = 70
+
+[[rule]]
+id = "task.alert_path_health"
+title = "Alert path works"
+kind = "check"
+why = """\
+Every check on this page is worthless if the message never arrives. This check watches the delivery chain itself: the \
+SMS and email bridge, the smartd hook and the recent send history. A broken transport then shows on the dashboard \
+instead of as silence when something real fails. If the transport is what is broken the page may not arrive either, \
+which is why self_health also watches delivery."""
+does = """\
+Every 15 minutes, and it sends nothing. It checks that the bridge file ([global] bridge, \
+/usr/local/sbin/backup-notify-hermes.py) exists and is executable (missing is crit), that /etc/smartd.conf has a `-M \
+exec` hook and that script is executable (otherwise warn), and then reads the last 24 hours of \
+/var/log/smart-alert.log (the smartd hook's own record; the smart_log option) and of the runner's audit log \
+(notification sends). A source is broken when it has a failed send in the window and no success since: warn, with the \
+error text with addresses and tokens removed. Failures followed by a success are shown as recovered; alerts dropped \
+because the daily budget was used up are shown as info."""
+applies_to = ["alert_path_health"]
+file = "maint.toml"
+target = "tasks.alert_path_health"
+params = { smart_log = "/var/log/smart-alert.log" }
+severity = "crit"
+destructive = false
+principle = "blind is not healthy: the alarm itself is monitored"
+owner_notes = """\
+The smartd hook smart-alert.sh was patched on 2026-10-01 to read the SMARTD_* variables; its log format is what this \
+check parses."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.growth_watch"
+title = "Growth watch"
+kind = "check"
+why = """\
+A runaway is caught earlier by its speed than by its size: the Kavita debug log once wrote about 1 GiB a day, which no \
+free-space threshold notices until the disk is nearly full. This task measures how fast chosen directories grow and \
+warns when one passes its daily limit, so a bad log setting or a stuck writer is found in days. The directories it \
+watches are the growth.* rules that follow."""
+does = """\
+This task-level rule carries no parameters of its own: each growth.* rule adds one path to its list, in order. Every \
+15 minutes it walks each path (no device crossing, symlinks not followed) and, once it has 12 hours of history, \
+compares the larger of two figures with the path's limit: net growth (size now minus size about 24 hours ago) and \
+bytes written in the last 24 hours (a per-file ledger of files of 1 MiB or more, keyed by inode, where deletions never \
+subtract, so a cleaner or log rotation that removes data as fast as it arrives cannot hide a runaway writer; a path \
+holding more than 4000 such files gets no written figure, only the net growth). A path that cannot be measured (missing, no access, or the walk was cut off; all paths share a 90 second budget) is never \
+rated from an old value: it is shown as unmeasured and warns once it has been blind for 24 hours. Reading \
+/var/lib/docker/containers needs root, which the check tier has. With no paths the task is skipped. Optional keys \
+(defaults shown, none set here): warn_gib_per_day 0.5, min_span_hours 12, unmeasured_warn_hours 24, walk_budget_s 90."""
+applies_to = ["growth_watch"]
+file = "maint.toml"
+target = "tasks.growth_watch"
+params = {}
+severity = "warn"
+destructive = false
+principle = "capacity planning: watch the rate of growth, not the size"
+owner_notes = "migrated from maint.toml [tasks.growth_watch]"
+since = "2026-10-03"
+
+[[rule]]
+id = "growth.-volume1-docker-kavita-config-logs"
+title = "Growth limit: Kavita logs"
+kind = "check"
+why = """\
+The Kavita debug log once grew about 1 GiB a day and was noticed late. This is the path that made growth_watch \
+necessary, so it is watched at half a GiB per day."""
+does = """\
+Adds /volume1/docker/kavita/config/logs to growth_watch with a limit of 0.5 GiB per day: warn when either the net \
+growth or the bytes written to the directory in the last 24 hours is above that. retention.kavita-logs (report-only \
+until the owner enables apply) removes kavita*.log files older than 3 days from the same directory; because the \
+written figure ignores deletions, that cleanup cannot hide a writer that is out of control."""
+applies_to = ["growth_watch"]
+file = "maint.toml"
+target = "tasks.growth_watch.paths[]"
+merge = "append"
+params = { path = "/volume1/docker/kavita/config/logs", warn_gib_per_day = 0.5 }
+severity = "warn"
+destructive = false
+principle = "capacity planning: watch the rate of growth, not the size"
+owner_notes = "Added after the Kavita debug-log runaway of about 1 GiB a day. The 0.5 GiB limit equals the task default."
+since = "2026-10-03"
+order = 1
+
+[[rule]]
+id = "growth.-var-log"
+title = "Growth limit: /var/log"
+kind = "check"
+why = """\
+/var/log holds the system and service logs, the journal and the backup logs, so a service that starts logging heavily \
+shows up here first. More than half a GiB a day is treated as a runaway."""
+does = """\
+Adds /var/log to growth_watch with a limit of 0.5 GiB per day (net growth or bytes written in 24 hours, whichever is \
+larger). It includes /var/log/journal, which is also watched on its own row. log_compress (report-only until enabled) \
+gzips rotated logs over 50 MiB here, which lowers the net figure but not the written one."""
+applies_to = ["growth_watch"]
+file = "maint.toml"
+target = "tasks.growth_watch.paths[]"
+merge = "append"
+params = { path = "/var/log", warn_gib_per_day = 0.5 }
+severity = "warn"
+destructive = false
+principle = "capacity planning: watch the rate of growth, not the size"
+owner_notes = "migrated from maint.toml [[tasks.growth_watch.paths]] #2 /var/log"
+since = "2026-10-03"
+order = 2
+
+[[rule]]
+id = "growth.-var-lib-docker-containers"
+title = "Growth limit: Docker container logs"
+kind = "check"
+why = """\
+Every container's console log is a JSON file under /var/lib/docker/containers and grows without limit unless the \
+container was created with a max-size log option. With about 70 containers, one noisy container can quietly eat the \
+root disk."""
+does = """\
+Adds /var/lib/docker/containers to growth_watch with a limit of 0.5 GiB per day over the whole tree (all containers \
+together). Reading it needs root: a manual run as a normal user shows it as unmeasured (no access). config_drift lists \
+containers that were created without a log size limit."""
+applies_to = ["growth_watch"]
+file = "maint.toml"
+target = "tasks.growth_watch.paths[]"
+merge = "append"
+params = { path = "/var/lib/docker/containers", warn_gib_per_day = 0.5 }
+severity = "warn"
+destructive = false
+principle = "capacity planning: watch the rate of growth, not the size"
+owner_notes = "migrated from maint.toml [[tasks.growth_watch.paths]] #3 /var/lib/docker/containers"
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "growth.-var-log-journal"
+title = "Growth limit: system journal"
+kind = "check"
+why = """\
+journald is capped at 1 GiB, so its size cannot show a flood of log lines: the cap just deletes the old ones. Watching \
+how much is written per day shows a service that logs far too much even while the journal stays under its cap."""
+does = """\
+Adds /var/log/journal to growth_watch with a limit of 0.5 GiB per day (net growth or bytes written in 24 hours). The \
+directory is inside /var/log, so its growth also counts in that row. Because the written figure ignores deletions, the \
+journal's own size cap does not hide the growth."""
+applies_to = ["growth_watch"]
+file = "maint.toml"
+target = "tasks.growth_watch.paths[]"
+merge = "append"
+params = { path = "/var/log/journal", warn_gib_per_day = 0.5 }
+severity = "warn"
+destructive = false
+principle = "capacity planning: watch the rate of growth, not the size"
+owner_notes = """\
+journald settings (drop-in /etc/systemd/journald.conf.d/10-homelab.conf, owner decision 2026-10-01): SystemMaxUse=1G, \
+SystemKeepFree=5G, MaxRetentionSec=1month. It replaced the weekly journalctl --vacuum cron; config_drift checks the \
+cap."""
+since = "2026-10-03"
+order = 4
+
+[[rule]]
+id = "growth.-home-ohmz-studioprojects-tunarr-.docker-data-tunarr-cac-54cece"
+title = "Growth limit: Tunarr subtitle cache"
+kind = "check"
+why = """\
+Tunarr's subtitle cache is a cache that nothing bounds on its own: it holds tens of thousands of small files (about \
+22,000 and 1.5 GiB when this was written), which is why app_cache_trim exists for it. This watch shows how fast it \
+grows and whether the trim keeps up."""
+does = """\
+Adds the cache directory (tunarr/.docker-data/tunarr/cache/subtitles under StudioProjects) to growth_watch with a \
+limit of 0.5 GiB per day (net growth or bytes written in 24 hours). app_cache_trim (report-only until enabled) removes \
+files older than 30 days from this directory; the written figure ignores those deletions, so the trim cannot hide a \
+fast writer."""
+applies_to = ["growth_watch"]
+file = "maint.toml"
+target = "tasks.growth_watch.paths[]"
+merge = "append"
+severity = "warn"
+destructive = false
+principle = "capacity planning: watch the rate of growth, not the size"
+owner_notes = """\
+The trim judges age by modification time, never access time: atimes were reset because readers touch them, so atime \
+says nothing about how old a subtitle is. The container is tunarr-host-net."""
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles"
+warn_gib_per_day = 0.5
+
+[[rule]]
+id = "task.plex_media_mount_check"
+title = "Plex Media mount"
+kind = "check"
+why = """\
+Plex's Media folder (its generated metadata such as thumbnails) was moved onto the SanDisk SSD and is bind-mounted \
+back to where the Plex snap expects it. If that mount is missing after a reboot or a disk problem, Plex silently \
+starts regenerating the folder on the root disk and fills it with data meant for the SSD. This check notices the \
+missing mount within 15 minutes."""
+does = """\
+Every 15 minutes it reads /proc/self/mountinfo and looks for a mount at `mount_point` (the snap's Plex Media \
+Server/Media directory). Ok when it is a mount whose backing directory is under /media/SandiskSSD/plex. Warn when it \
+is mounted from somewhere else, crit when that is the root disk's own device. Crit when it is not a mount point \
+although /media/SandiskSSD/plex exists, or the mount was seen before (the check remembers that until the owner sets \
+expect_mounted = false): the alert then says how many GiB of Media are already on the root disk (a walk of at most 10 \
+seconds, refreshed every 6 hours at most). Info, not an alert, when nothing was ever migrated (no mount and no SSD \
+path) or expect_mounted is false. It is read-only and never mounts or moves anything. All routines re-run it as a \
+post-check."""
+applies_to = ["plex_media_mount_check"]
+file = "maint.toml"
+target = "tasks.plex_media_mount_check"
+severity = "crit"
+destructive = false
+principle = "capacity planning: keep Plex's generated data off the root disk"
+owner_notes = """\
+Plex Media is bind-mounted from the SanDisk SSD (/media/SandiskSSD/plex). If the bind mount is rolled back on purpose, \
+set expect_mounted = false in [tasks.plex_media_mount_check] or this check stays crit."""
+since = "2026-10-03"
+
+[rule.params]
+mount_point = "/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server/Media"
+expected_source_prefix = "/media/SandiskSSD/plex"
+
+[[rule]]
+id = "task.config_drift"
+title = "Config drift"
+kind = "check"
+why = """\
+Several host settings replaced old cron jobs and were agreed by the owner: a journald size cap, the /tmp cleanup age, \
+Docker log rotation, the number of kept snap revisions and low ext4 reserved space. Settings like these drift silently \
+after an OS upgrade or a hand edit, and nobody notices until a disk fills. This weekly check compares the live host \
+with the agreed values and names the fix; it changes nothing and never pages."""
+does = """\
+Weekly, and as a step of the monthly routine; read-only. Six comparisons, each giving a drift item with its fix: (1) \
+journald SystemMaxUse is 1G (the effective value after drop-ins); (2) root's crontab has no active line with \
+`journalctl --vacuum`, `find /tmp` or `logrotate` (root only); (3) snap refresh.retain equals \
+tasks.snap_revisions.retain (2); (4) /etc/docker/daemon.json sets log-opts max-size and no existing container uses \
+json-file without max-size; (5) the first /tmp rule in systemd-tmpfiles has an age of 30 days or less; (6) every ext4 \
+filesystem keeps reserved blocks at 1 percent or less (0.05 tolerance; root only, via tune2fs -l). A comparison that \
+cannot run (not root, tool missing) is listed as skipped, never as ok or as drift. The result is ok when nothing \
+drifted and info when something did, always with alert = false: dashboard only."""
+applies_to = ["config_drift"]
+file = "maint.toml"
+target = "tasks.config_drift"
+params = { expect_journald_system_max_use = "1G", expect_tmp_age_days = 30, expect_reserved_pct = 1.0 }
+severity = "none"
+destructive = false
+principle = "one umbrella: agreed host settings are checked, not assumed"
+owner_notes = """\
+Agreed values (owner): journald SystemMaxUse=1G; /tmp age 30 days (what systemd-tmpfiles uses on this host; the code \
+default is 7, and the root cron `find /tmp -atime +7` was retired 2026-10-01); ext4 reserved blocks 1 percent (tune2fs \
+-m 1, instead of the 5 percent mkfs default)."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.os_jobs"
+title = "OS maintenance timers"
+kind = "check"
+why = """\
+The distro's own timers (apt updates, unattended security upgrades, logrotate, fstrim, tmp cleanup, snap refresh) stay \
+with the OS so security updates keep working, but a timer that stopped or fails every night is invisible. This check \
+observes them and never replaces them, so the one place that lists what runs on this host also says whether the OS \
+jobs really ran."""
+does = """\
+Every 15 minutes it asks systemd (`list-timers`, `show`) and snapd about 13 jobs, each with the longest allowed age of \
+its last run: apt-daily, apt-daily-upgrade, logrotate, systemd-tmpfiles-clean, dpkg-db-backup and sysstat-summary (36 \
+hours); fstrim and e2scrub_all (200 hours); fwupd-refresh (12 hours); man-db (48 hours); sysstat-collect (2 hours); \
+snapd's refresh (26 hours, read from snapd's own API); and unattended-upgrades, which is a daemon, so the check looks \
+for ERROR lines in its log in the last 36 hours. The verdict is the service's Result, not its exit code (fwupd-refresh \
+exits 2 with Result=success). Warn for failed, overdue (last run older than the limit, or never ran although the timer \
+has been active longer than the limit), an inactive timer, or unknown (systemctl could not answer). A job that is not \
+installed (absent) or whose timer just started (waiting) never alerts. Options, none set here: jobs, extra_jobs, \
+ignore."""
+applies_to = ["os_jobs"]
+file = "maint.toml"
+target = "tasks.os_jobs"
+params = {}
+severity = "warn"
+destructive = false
+principle = "one umbrella: observe what the OS schedules, never replace it"
+owner_notes = """\
+Distro timers stay with the OS on purpose; etc/jobs.toml lists them as managed externally and verified by this check."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.docker_prune_parity"
+title = "docker-prune.sh parity"
+kind = "check"
+why = """\
+The legacy docker-prune.sh is being replaced by native tasks that are safer: they keep containers stopped on purpose \
+and prune by age and by cap. Before the old timer is retired this check proves, behaviour by behaviour, that nothing \
+the script did is left uncovered. It is the gate that `migrate cutover docker-prune` waits for."""
+does = """\
+Weekly, read-only, dashboard only (alert = false). It parses /usr/local/sbin/docker-prune.sh (or its archived copy; \
+168 hours and 20 GB are used if neither can be read) and compares it with the native tasks' settings and the live \
+containers: stopped containers (the script counts from creation, the native task from when it stopped, 7 days, and \
+keeps protected and expected-stopped ones), unused images (script 168 hours by build date, native 14 days by last \
+use), the build cache cap (script 20 GB per builder, native high_gib), the cache age filter, builder discovery (the \
+owner's buildx builders under /home/ohmz/.docker against the ones the root runner can see), volumes (neither prunes \
+them) and the schedule. Each row is same, differs (documented), gap or exposed. The status is warn only when there is \
+a gap; info when there is no gap but docker-prune.timer is still on and would delete something the natives keep; \
+otherwise ok. metrics.cutover reads ready, blocked: gaps, or blocked: natives not in apply mode."""
+applies_to = ["docker_prune_parity"]
+file = "maint.toml"
+target = "tasks.docker_prune_parity"
+params = {}
+severity = "warn"
+destructive = false
+principle = "prove the replacement before the cutover (dry-run first)"
+owner_notes = """\
+The retirement gate accepts ok or info only, so the exposure never blocks the cutover that would end it \
+(docker_prune_exposure pages it). The classic gap is builder discovery. The legacy timer was disabled by the owner on \
+2026-10-02; nothing in homelab-maint enables it."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.legacy_audit"
+title = "Unaccounted schedulers"
+kind = "check"
+why = """\
+The migration to this tool rests on one promise: everything that schedules itself on this host is listed in one \
+inventory. A timer, cron line or cron.d file added later would break that promise silently. This weekly audit finds \
+any scheduler the inventory does not account for."""
+does = """\
+Weekly, read-only, dashboard only (alert = false). It lists the systemd timer unit files of the system and of the user \
+ohmz, every active line of root's and ohmz's crontabs (NAME=value lines are not jobs) and every file in /etc/cron.d, \
+cron.hourly, cron.daily, cron.weekly and cron.monthly, and warns when one is not named by any item of \
+etc/legacy-retirement.toml, the migration inventory. Info when something could not be read; ok when everything is \
+accounted for. `homelab-maint migrate audit` prints the same list."""
+applies_to = ["legacy_audit"]
+file = "maint.toml"
+target = "tasks.legacy_audit"
+params = {}
+severity = "warn"
+destructive = false
+principle = "one umbrella: everything that schedules itself is in the inventory"
+owner_notes = "migrated from maint.toml [tasks.legacy_audit]"
+since = "2026-10-03"
+
+[[rule]]
+id = "task.docker_prune_exposure"
+title = "docker-prune.timer exposure"
+kind = "check"
+why = """\
+The legacy docker-prune.sh removes every stopped container created more than a week ago, whether or not it was stopped \
+on purpose, and then the images only those containers used. On this host that means the stopped comfyui container and \
+its 14.9 GiB hand-built image, which nobody can rebuild from a Dockerfile. This check notices at once if that timer is \
+on while something it would delete is stopped, so the owner can act before the next Sunday 04:00 run. It changes \
+nothing itself."""
+does = """\
+Every 15 minutes, read-only. It asks systemd whether docker-prune.timer is enabled or active (unknown counts as on) \
+and only then lists containers and images with docker. It works out which stopped containers the script would remove \
+(created 168 hours ago or more; it ignores every protection list) that docker_containers_prune would keep (protected, \
+or listed in expected_stopped_containers), and which images become unused once they are gone. If there are any: crit \
+when the timer fires within 72 hours or its next run is unknown, otherwise warn. It pages at the first run that sees \
+it, with three ways out (start the container, stop the timer, or cut over), once more when the run is within 6 hours, \
+and again when the set of exposed items changes. When the timer is disabled, masked or absent it says so and is ok \
+without asking docker."""
+applies_to = ["docker_prune_exposure"]
+file = "maint.toml"
+target = "tasks.docker_prune_exposure"
+params = { crit_within_h = 72, imminent_h = 6 }
+severity = "crit"
+destructive = false
+principle = "protect before you clean: the legacy prune ignores what was stopped on purpose"
+owner_notes = """\
+docker-prune.timer was disabled by the owner on 2026-10-02 because it would remove ComfyUI's stopped container and \
+then its image, so while it stays disabled this check is ok (the legacy prune cannot run). Nothing in homelab-maint \
+enables the timer. If it is re-enabled while a container is stopped this pages (crit inside 72 hours); see the README \
+section on re-enabling docker-prune safely. crit_within_h 72 and imminent_h 6 equal the code defaults."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.surrealdb_health"
+title = "SurrealDB (Open Notebook)"
+kind = "check"
+why = """\
+SurrealDB, the database behind Open Notebook, showed a failure mode that hard-reset this host on 2026-09-24: a growing \
+write-ahead log (WAL) while the container restarts in a loop until the disk fills. This check watches the leading \
+indicators of that (WAL size, store size, free disk, out-of-memory kills, restarts) so the owner hears about it long \
+before the disk is full. It is the port of the old notebook-db-alert.sh script."""
+does = """\
+Every 15 minutes, read-only. For the container open-notebook-surrealdb-1 it resolves the store's host directory from \
+the container's /mydata bind mount (an explicit data_dir option in the config wins; the code falls back to \
+/home/ohmz/docker-container-data/open-notebook/surreal_data) and measures the WAL \
+(the *.log files in mydatabase.db), the store size, the free space of the store's filesystem, the cgroup's oom_kill \
+counter and the restart count. Crit when the WAL is over 1024 MB, the store over 25 GB, free space under 40 GB, any \
+OOM kill, or more than 3 restarts. A stopped container with no problems is info. It pages at the first run that sees a \
+problem (first_sight_page) with every failing check and the current values, and again when the set of failing checks \
+changes (signature_alerts); both shipped values equal the defaults and only matter if set to false. The page uses the \
+same dedupe key as the runner's own alert, so the alert that follows two runs later for the same problem does not page \
+again. The recovery is announced too, which the legacy script never did (a bug). It never reads the container's \
+command line or environment, which carry the database password."""
+applies_to = ["surrealdb_health"]
+file = "maint.toml"
+target = "tasks.surrealdb_health"
+params = { signature_alerts = true, first_sight_page = true }
+severity = "crit"
+destructive = false
+principle = "capacity planning: leading indicators before the disk fills"
+owner_notes = """\
+Cannot be acknowledged: no acknowledgement key rule exists for it and [ack] require_rule refuses the number-blind \
+fallback. The limits are the legacy script's own; tune them with wal_max_mb, db_max_gb, disk_min_gb and restart_gt \
+(not set here)."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.self_health"
+title = "Monitoring pipeline"
+kind = "check"
+why = """\
+Every other check says whether the host is fine; this one says whether the thing that tells you so still works. If the \
+runner, the publisher or the website stops, the dashboard would show old numbers as if they were current, which is \
+worse than no dashboard. This check turns each stage of the pipeline into a row and gives one verdict (ok, degraded or \
+down), which the website shows as a strip in its top bar."""
+does = """\
+Runs in the check tier every 15 minutes, and public/self.json is rewritten every minute by \
+homelab-maint-selfhealth.timer. It judges 14 parts, each ok, degraded, down, info (not deployed) or unknown: runner \
+(last check run against the 15 minute interval: late after 1.5 times it plus 2 minutes, down after 3 times), publish \
+(manifest age, export errors), scheduler tick (late after 5 minutes), daily (30 hours) and weekly (9 days) runs, live \
+monitor (90 seconds), sensor ring (5 minutes), rules registry (applied and in sync, generated files not hand edited), \
+runner errors over 24 hours, state directory (free space, size, growth), acknowledge inbox backlog, alert delivery \
+(transport breaker, outbox), the website container and its /healthz on loopback, and the Kuma heartbeat keys. Verdict \
+down is crit and degraded is warn. It is read-only and imports only the core module, so nothing it watches is needed \
+to report that it is down. It asks docker only when the daemon is demonstrably running, because docker is \
+socket-activated and a connect would start it."""
+applies_to = ["self_health"]
+file = "maint.toml"
+target = "tasks.self_health"
+params = {}
+severity = "crit"
+destructive = false
+principle = "one umbrella: the monitor is monitored"
+owner_notes = """\
+Never acknowledge self_health: it would hide a blind monitor (it has an explicit issue key, the set of failing parts, \
+so the system would allow it). The refresher is a timer on purpose and not a tick job, because this check is the \
+dead-man of the tick. Every option is optional; the shipped table is empty and the defaults apply (web_container \
+maintenance-web, web_port 8098)."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.stuck_scans"
+title = "Runaway filesystem scans (find, du or grep -r left behind)"
+kind = "check"
+why = """\
+A directory walk such as find / over a 24 TB disk full of backup snapshots reads millions of small metadata blocks. A \
+spinning disk then shows as 100 percent busy at only a few MiB/s, and everything else on that disk (Nextcloud data, \
+the backups, the archive) slows down, while nobody is waiting for the answer when the walk was left behind by a \
+closed terminal or a finished session. The size or duration of a scan proves nothing on its own, so the rule is \
+about abandonment and cost: it looks for a scan that nobody is waiting for and that is really using the disk."""
+does = """\
+Every check run it lists the running filesystem scans (find, bfs, fd, locate, updatedb, du, ncdu, tree, rg, ag, ack \
+and grep with -r), reading each program name from argv[0] (not the kernel name, which can be misleading) and skipping \
+scans inside containers. It reads each scan's disk reads twice, sample_s (4) seconds apart. A scan is a runaway when \
+it is orphaned (re-parented to init or to a systemd user manager, and not a service unit's own job), is older than \
+orphan_min_age_min (20) and reads at least min_read_kib_s (256) KiB/s: that is warn and a page, and the summary \
+names the program, pid, age, the one directory it walks, the I/O stall and the exact kill command. A scan that still \
+has a live parent (someone may be waiting) is only listed as a long scan, without a page, after \
+attached_min_age_min (180). An old scan that is not reading is info. Nothing is ever signalled: stopping it is the \
+owner's decision. Items and the summary never carry a command line, only program, pid, age and directory, because \
+the status JSON is served by the website."""
+applies_to = ["stuck_scans"]
+file = "maint.toml"
+target = "tasks.stuck_scans"
+params = { orphan_min_age_min = 20, attached_min_age_min = 180, min_read_kib_s = 256, sample_s = 4 }
+severity = "warn"
+destructive = false
+principle = "detect by abandonment and cost, never by size; report first, the owner decides"
+owner_notes = """\
+Added after a find / left behind by an agent session read the backup disk at 4.9 MiB/s for over three hours, which made \
+the Live tab show Disk I/O as critical while Ubuntu's System Monitor showed nothing unusual. The live monitor's \
+top-reader line names the same process while it runs. Acknowledging this check suppresses that program and directory \
+pair for 90 days."""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.swap_audit"
+title = "Swap: who holds it and whether it matters"
+kind = "check"
+why = """\
+A full swap is not a fault: the kernel parks pages nobody has touched for a while there, for example an idle model \
+server or a closed IDE, to keep RAM for the page cache. What matters is churn (pages going in and out while work \
+waits for them) and having no free swap left while RAM is short, because then the next spike ends in the OOM killer \
+instead of a slowdown. So the verdict follows the kernel's own swap-in and swap-out rates and the memory stall, never \
+how full the swap is, and the report always says who holds it so that the number can be acted on."""
+does = """\
+Every check run it samples swap-in and swap-out over sample_s (3) seconds, the memory stall (PSI) and the swap held by \
+every cgroup that has processes (cgroup v2 memory.swap.current, which is exact; summing per-process figures counts \
+pages shared by forked workers again and again). State is idle, cold (a lot held, nothing reads it), active (swap-in \
+at least active_in_mib_s, 1), or thrashing (swap-in at least thrash_in_mib_s, 16, together with a memory stall of \
+thrash_psi_full, 3 percent, or in plus out above thrash_total_mib_s, 64). Thrashing, and no free swap left (under \
+min_free_swap_pct, 5 percent) while available RAM is under scarce_ram_pct (20 percent), warn and page; full but cold \
+swap is warn without a page when no free swap is left and info otherwise. It also says whether the relief \
+(swapoff then swapon) looks feasible: enough free RAM to take the pages back with relief_headroom_gib (16 GiB, or 15 \
+percent of RAM) to spare, a calm memory stall (relief_psi_full), and every holder's memory.max large enough for its \
+resident plus swapped memory within relief_cap_margin (0.9), because pages swapped back in are charged to the \
+holder's cap and a cap that is too small would turn the swap-in into an OOM kill. The task changes nothing; the busy \
+gates and the swap disk's load are checked at the moment the owner runs homelab-maint swap relieve. Each holder is also marked cold (refaulting fewer than cold_refault_pps, 5, pages per second: idle) or active, with how long it has been cold, from the cgroup refault counter. If /etc/fstab lists swap but nothing is swapped on and no relief is running, it warns and pages (an interrupted relief; the fix is sudo swapon -a)."""
+applies_to = ["swap_audit"]
+file = "maint.toml"
+target = "tasks.swap_audit"
+params = { sample_s = 3, cold_refault_pps = 5.0, active_in_mib_s = 1.0, thrash_in_mib_s = 16.0, thrash_total_mib_s = 64.0, thrash_psi_full = 3.0, full_pct = 90.0, min_free_swap_pct = 5.0, scarce_ram_pct = 20.0, relief_min_used_gib = 1.0, relief_headroom_gib = 16.0, relief_cap_margin = 0.9, relief_disk_busy_pct = 40.0, relief_psi_full = 1.0 }
+severity = "warn"
+destructive = false
+principle = "act on saturation (churn), never on size; relieve only without hurting work in progress"
+owner_notes = """\
+The relief is a command the owner runs on purpose: homelab-maint swap relieve is a dry run, and with --apply (root) it \
+re-checks every precondition, runs swapoff, aborts it if available RAM or the memory stall turns \
+bad (the area then stays in service), and always runs swapon again. The relief_* options of this rule are the safety limits of EVERY relief: swap_audit's feasibility, the automatic relief (task.swap_auto_relief) and homelab-maint swap relieve all read them here."""
+since = "2026-10-03"

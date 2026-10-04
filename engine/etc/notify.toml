@@ -1,0 +1,177 @@
+# homelab-maint: notification routes, budgets and templates (read by homelab_maint/notify.py).
+#
+# Installed to /etc/homelab-maint/notify.toml ONLY IF ABSENT. Every key is optional: a missing key falls back to the
+# built-in default in notify.py (DEFAULTS), which this file mirrors (tests/test_notify.py keeps the two in step). A broken
+# file means the defaults are used and the delivery log says so: an alert path that stops because of a typo is worse.
+#
+# ONE path: every message the umbrella sends (core.Notifier alerts/recoveries, jobs, the daily digest, the weekly report,
+# incidents, smart_event) goes through notify.send and then through the owner's existing Hermes transports (SMS via the
+# carrier gateway, Gmail via alert_transports). No credentials live here or anywhere in homelab-maint: they stay in
+# ~ohmz/.hermes/alert_transports.env and alert_contacts.json, and the root process calls Hermes as user ohmz.
+#
+# What one message looks like:
+#   SMS    one ASCII segment, at most 130 characters, never a link/address:   homelab: CRIT Disk space / 4% free
+#   email  HTML in the "Ohmz Cloud" palette (same family as the backup reports) + a plain-text part,
+#          with facts, what was done, what to do (the task's playbook), and a link to the dashboard.
+# State and the delivery log live in /var/lib/homelab-maint; when that is read-only or the disk is full they fall back to /run/homelab-maint (a user
+# unit: $XDG_RUNTIME_DIR/homelab-maint), so budgets, dedupe and the hard cap never stop working. Hooks that should share root's budgets run as root.
+# Kill switch: an empty file /etc/homelab-maint/NOTIFY_MUTE silences everything except critical alerts and incidents.
+# `homelab-maint notify-test` sends one clearly labelled TEST of each kind, routed exactly like the real thing.
+
+mute_file = "NOTIFY_MUTE"        # kill switch file, relative to /etc/homelab-maint (top-level key: it must precede the first [table])
+
+[transport]
+kind = "hermes"                  # hermes (Hermes send_report as ohmz, bridge as fallback) | bridge (legacy script only) | none (log only)
+# Left unset on purpose: the single source of truth is [global] in maint.toml (notify_handle = "ohmz", bridge = ".../backup-notify-hermes.py").
+# handle = "ohmz"                # Hermes contact handle; the address and phone are resolved by Hermes, not here
+# user = "ohmz"                  # the account Hermes runs as (root jobs use `runuser -u`); default = the handle; must match [a-z_][a-z0-9_-]*
+scripts_dir = "/home/ohmz/StudioProjects/ai-stack/scripts"          # where alert_transports.py lives (read and imported by the child, as the owner)
+# bridge = "/usr/local/sbin/backup-notify-hermes.py" # fallback: plain text, both channels. Same file the backups use.
+fallback = "bridge"              # "bridge" | "none": what to try if the primary broke BEFORE any channel reported
+timeout_s = 90
+fallback_timeout_s = 20          # the legacy bridge is the second chance, not a second 90 s wait
+breaker_s = 300                  # the transport itself failed (nothing reported, or a timeout): do not try it again for this long, so a Gmail/DNS outage
+                                 # costs one timeout per window instead of one per pending message; callers get skipped = "breaker" and retry later
+
+[site]
+url = "https://maintenance.ohmzhomelab.ca"           # links appear in email only, never in SMS (the carrier drops them)
+host_label = ""                  # empty = this machine's hostname
+sms_prefix = "homelab"
+subject_prefix = "[homelab] "
+masthead = "Maintenance"         # the amber word after "Ohmz" in the email header
+
+# ------------------------------------------------------------------------------------------------ routes
+# Value: "sms" | "email" | "both" | "none" (or a list such as ["sms", "email"]).  A table is keyed by severity
+# (ok | info | warn | crit | default).  Kinds: alert, recovery, maintenance, digest_daily, report_weekly,
+# incident_open, incident_resolved, test.
+[routes]
+recovery = "both"                # sms short + email; the text is dropped if the problem itself was never texted (see [escalation])
+maintenance = "email"            # + sms when the event says facts.significant (see [significant])
+digest_daily = "email"
+report_weekly = "email"
+incident_resolved = "both"
+ack_expired = "email"            # the one notice when an acknowledgement ends ("still failing" or "no longer occurring"); never texts
+test = "mirror"                  # "mirror" = route a test exactly like the kind it imitates
+
+[routes.alert]
+crit = "both"
+warn = "email"                   # a warning only texts once it persisted (see [escalation])
+info = "email"
+
+[routes.incident_open]
+crit = "both"
+warn = "email"
+info = "email"
+
+[significant]
+maintenance = "both"             # added to the maintenance route when facts.significant is true (a cutover, a restart, a big cleanup)
+
+# Per-task override for alert/incident_open. An explicit route is final: it is never escalated and is the one
+# way to silence a noisy check without disabling it. Example:  docker_df = "email"   noisy_check = "none"
+[task_routes]
+
+# Fallback "what to do" lines for tasks that have no playbook. Normally the lines come from etc/playbooks.toml (the same
+# text as the Incidents tab); this table wins over it for the named task:   [todo]  my_task = ["First check ...", "..."]
+[todo]
+
+# ------------------------------------------------------------------------------------------------ policy
+[escalation]
+warn_sms_after = 2               # a warning is email-only until it has been notified this many times (it survived a reminder); 0 = never
+recovery_sms_only_if_texted = true
+episode_ttl_h = 72               # forget an unresolved problem's escalation state after this long without news
+
+[dedupe]
+cover_window_s = 1800            # the alert pager and the incident ledger describe one problem: the first covers the other
+[dedupe.window_s]                # same kind + severity + key inside the window is not sent twice (seconds)
+alert = 21600
+recovery = 3600
+maintenance = 3600
+digest_daily = 72000
+report_weekly = 432000
+incident_open = 21600
+incident_resolved = 3600
+ack_expired = 604800             # one notice per acknowledgement (its dedupe key is the fingerprint); 7 days is as long as the state remembers
+test = 0
+[dedupe.covered_by]
+alert = ["incident_open"]
+incident_open = ["alert"]
+recovery = ["incident_resolved"]
+incident_resolved = ["recovery"]
+
+[budget]                         # rolling 24 h; failed deliveries do not count; critical bypasses the per-kind and total caps
+total_per_day = 30
+hard_cap_per_day = 40            # nothing passes this, critical included (a runaway loop must not flood the phone)
+sms_per_day = 10                 # beyond this a message goes by email only
+crit_sms_reserve = 5             # extra texts only a critical alert can use
+crit_bypass = true
+[budget.per_day]
+alert = 8
+recovery = 8
+maintenance = 6
+digest_daily = 2
+report_weekly = 2
+incident_open = 6
+incident_resolved = 6
+ack_expired = 10                 # (several acknowledgements made on one day end on one day)
+test = 20
+
+[quiet_hours]                    # non-critical SMS waits for the morning (the email is still sent); critical is never held
+enabled = true
+window = "23:30-07:00"           # HH:MM-HH:MM, may cross midnight
+tz = ""                          # empty = the host's local time (America/Toronto here)
+suppress = ["sms"]               # channels dropped during quiet hours; add "email" to hold those too
+
+[retry]                          # a CRITICAL page that reached the inbox but not the phone: the text alone is retried (the email is never re-sent)
+sms_attempts = 3                 # in all, the first included
+sms_window_s = 3000              # give up this long after the first attempt
+sms_gap_s = 300                  # at least this far apart (the periodic run and every later send call `flush_pending`)
+# A critical alert/incident that could not be delivered AT ALL (transport down, circuit open) is not lost: a sanitised copy waits in the
+# outbox (notify-state.json) and is replayed, oldest first, through the same routing/dedupe/budget as a fresh send. A page the owner has
+# meanwhile got another way is held by policy, not sent twice. A hook (`notify send`) exits 0 when its page is queued.
+outbox_ttl_s = 43200             # give up (log + audit "outbox-expired") this long after the first attempt
+outbox_gap_s = 300               # wait before the next attempt; doubles after each failed one, at most an hour
+outbox_max = 10                  # pages kept (oldest dropped first, non-critical before critical, audited as "outbox-overflow")
+notices_max = 20                 # expiry notices (ack_expired) kept on their own: a flood of them can never push a queued page out
+
+# ------------------------------------------------------------------------------------------------ acknowledged issues (SPEC5)
+# "I understand this error and I'm okay with it": alert emails carry an Acknowledge button/link. It opens a REVIEW-AND-CONFIRM page on the
+# maintenance site (a GET never acknowledges anything: mail scanners and prefetchers follow links); only the button on that page records the
+# acknowledgement, which the runner applies within a minute. For the next `days` days (etc/ack.toml [ack] days is the rule) that exact error
+# (same fingerprint at the same or a lower severity) sends no SMS and no email, recoveries included, and stays listed as an acknowledged
+# issue on the site. A worse severity still alerts. When it ends ONE ack_expired email says so (a fresh button if it is still failing; three or
+# more ending together are ONE email listing them) and, if it is still failing, the next check run alerts again like any other problem.
+# Un-acknowledging (CLI or site) also alerts again at the next check run: a held alert is not remembered as "already sent".
+# The link is  <base_url>/ack?id=<issue id>&t=<token>&d=<days>&s=<warn|crit>  and the email prints the same "Issue ID". The token is 256
+# random bits, single use; only its SHA-256 is stored anywhere, and the token appears in the email bodies and nowhere else (not in logs, audit,
+# exports, state, SMS, or the legacy bridge fallback). No acks module / enabled = false / any doubt: alerts go out as before.
+#
+# WHICH TASKS. Only an alert whose fingerprint names the ERROR is offered a button or held: a task that sets Result.issue_key, or has a
+# [key.<task>] rule in etc/ack.toml (a unit name, a mount, a probe), or is listed in allow_tasks. Every other task falls back to the
+# number-blind text of its summary, which keeps the SAME fingerprint (and severity) while a WAL, a disk or a failure count grows tenfold: an
+# acknowledgement would silence the worsening for the whole period. So those tasks (and the smart_event hook, the scheduler's job:* keys) get
+# no button and no Issue ID and are never held. Even a ruled task is number-blind about SIZE by design (the accepted trade-off: you
+# acknowledge "this error", not "at this size"; only a worse SEVERITY re-alerts). To opt a number-blind task in on purpose: allow_tasks.
+[ack]
+enabled = true                   # false: no button and nothing is ever held (a kill switch that can only make alerts MORE frequent)
+button = "auto"                  # "auto": the button/link appears once STATE_DIR/ack/web_ready exists (the site serves /ack: ack_web's deploy creates it);
+                                 # true: always; false: never. Until then an email carries only the "Issue ID" line (and `homelab-maint ack add <id>` works)
+base_url = "https://maintainer.ohmzhomelab.ca"      # the link is <base_url>/ack?...; empty = [site] url
+token_ttl_days = 30              # how long a link in an email works (single use)
+days = 90                        # the promise ("Acknowledge for 90 days", `d=` in the link; the site accepts 7 / 30 / 90 / 365 and a value in between
+                                 # is rounded DOWN, and never above the runner's own etc/ack.toml [ack] max_days: if no allowed length fits there is no link,
+                                 # only the Issue ID line). Keep equal to etc/ack.toml [ack] days (a test checks it)
+mint_url = "http://127.0.0.1:8088/api/beszel/maintenance/ack/mint"   # Ohmz: the NEW site mints the token (signed with ack/web.key)
+button_text = "Acknowledge for {days} days"          # the one placeholder is {days}
+escalation_breaks = true         # wording only ("if it gets worse you are told again"): keep equal to etc/ack.toml [ack] escalation_breaks
+suppress_kinds = ["alert", "recovery", "incident_open", "incident_resolved"]   # hard whitelist: digests, reports, maintenance, ack_expired and tests are never held
+button_kinds = ["alert", "incident_open", "ack_expired"]                       # which emails carry the button (ack_expired only when it is still failing)
+require_rule = true              # DEPRECATED (kept equal to ack.toml; a test compares the shipped files). etc/ack.toml [ack] decides which tasks may be
+allow_tasks = []                 # acknowledged, for the pager too (acks.ackable). These four keys only apply when the acks module is missing or too old.
+deny_tasks = ["smart_event"]     # never offered, never held (beats rules and allow_tasks): the smartd hook's text carries the severity in its numbers
+deny_prefixes = ["job:"]         # same for these task-name prefixes (the scheduler's jobs: a failure's exit code is the whole message)
+notice_group_over = 2            # more expiry notices than this in one run become ONE "N acknowledgements ended" email
+
+[log]                            # STATE_DIR/notifications.jsonl: ts, kind, severity, title, channels, ok, note, dedupe_key. No bodies, no addresses.
+keep_days = 90
+max_bytes = 2097152
+max_lines = 5000

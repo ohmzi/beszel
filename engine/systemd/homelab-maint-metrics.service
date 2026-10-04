@@ -1,0 +1,42 @@
+[Unit]
+Description=homelab-maint metrics sampler (temperatures, fans, load -> 7-day ring)
+
+[Service]
+Type=oneshot
+# Root, because /var/lib/homelab-maint (the ring file and its lock) is root-owned like the rest of the runner state;
+# the sandbox below stops the unit writing anywhere else. A sample takes well under a second, 20 s is only the hang guard.
+User=root
+Environment=PYTHONPATH=/usr/local/lib/homelab-maint
+# A bare sampler on purpose: no publish here (`homelab-maint metrics-sample` is sample + publish, for use by hand). A publish costs ~0.4 s of
+# CPU, ~40 MB and several systemctl calls, which would run inside this 256 MB / 20 s sandbox and could cost a sample. public/metrics.json is
+# refreshed by every tier run instead (at most 15 min old); the Live tab and the Homarr /thermal and /load widgets read the ring directly.
+ExecStart=/usr/bin/python3 -B -m homelab_maint.metrics_ring sample
+Nice=15
+IOSchedulingClass=idle
+OOMScoreAdjust=500
+MemoryMax=256M
+TasksMax=64
+TimeoutStartSec=20
+# After the start timeout systemd SIGTERMs, then SIGKILLs the cgroup. The default 90 s stop timeout would leave a child stuck
+# in uninterruptible sleep (nvidia-smi on a GPU that fell off the bus) holding the unit in "deactivating" for minutes.
+TimeoutStopSec=5
+SyslogIdentifier=homelab-maint-metrics
+
+# Read-only everywhere except the ring file and its lock. Deliberately NOT PrivateDevices=: nvidia-smi needs /dev/nvidia*.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/homelab-maint
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+# The only network access is the sensor-exporter on 127.0.0.1:9110.
+IPAddressDeny=any
+IPAddressAllow=localhost
+# The ring and the lock must be world-readable (the web/publish side reads them as another user).
+UMask=0022

@@ -1,0 +1,503 @@
+# homelab-maint main configuration.
+#
+# SHIPPED STATE: EVERY CLEANER (C1) IS mode = "report" (it computes and shows what it WOULD remove, but removes nothing),
+# the same for every port of a legacy script (comfyui_idle_reclaim, immich_recycle, openwebui_media_prune, docker_containers_prune)
+# and for the spike ladder's throttle / restart / emergency rungs. Turning cleanup on is the OWNER's decision, one task at a time.
+# The only things that ship on: the spike ladder's non-destructive reclaim rung (unload idle models at pressure level 2+, SPEC3) and the
+# read-only checks.
+# To enable a cleaner: set its `mode = "apply"` below. A task only mutates when BOTH its mode is
+# "apply" AND the run was started with --apply (the check, daily and weekly systemd services and the routine tick all pass it).
+# `unprotect = [regex, ...]` on a task exempts those names from the global protected.toml patterns
+# for that task only (e.g. `caps` exists to bound tunarr, which the global list protects from kills).
+# C0 tasks never mutate. C2 tasks only produce plans; apply with `homelab-maint approve TASK HASH`.
+# Kill switch: `homelab-maint pause [TASK]` (PAUSE / PAUSE.TASK in /etc/homelab-maint).
+#
+# Install-if-absent: an upgrade never rewrites this file. install.sh saves the shipped copy as maint.toml.dist and lists the
+# [tasks.X] tables your copy lacks; merge them by hand (a missing table means defaults: mode "report", except pressure_response).
+
+[global]
+bridge = "/usr/local/sbin/backup-notify-hermes.py"   # existing Hermes SMS+email bridge (run via runuser); notify.toml inherits it
+notify_handle = "ohmz"                               # likewise: the one source of truth for who gets the messages
+kuma_url = "http://127.0.0.1:3011"
+www_port = 9111
+alert_confirm_runs = 2        # a problem must persist this many runs before it pages
+alert_reminder_hours = 24
+alert_daily_budget = 8        # hard cap on pages per rolling 24 h (core.Notifier); notify.toml [budget.per_day] alert = 8 is the same cap in the new path
+
+[caps]                        # per task, per run; override in [tasks.X] with max_gib_per_run / max_items_per_run
+max_gib_per_run = 40
+max_items_per_run = 500
+
+# ------------------------------------------------------------------ C0: checks (every 15 min)
+[tasks.disk_forecast]
+watch = ["/", "/media/SandiskSSD", "/mnt/backup/system", "/mnt/backup/immich", "/media/Immich", "/media/nextcloud"]
+info_only = ["/media/seagate18tb", "/media/seagate16tb", "/media/toshiba12tb", "/media/WD22TB", "/media/WD18TB", "/media/western18to14tb", "/media/western18to4tb", "/media/WD24to10TB"]
+warn_free_pct = 12
+crit_free_pct = 6
+warn_days = 21
+crit_days = 7
+trend_window_hours = 168
+
+[tasks.failed_units]
+ignore_units = []
+expected_stopped_containers = ["comfyui"]
+
+[tasks.backup_freshness]
+status_glob = "/var/log/backup/*-status.json"
+max_age_hours = { "backup-system" = 200, "backup-immich" = 200 }
+stack_backup_last_ok = "/media/SandiskSSD/ai-stack-backups/LAST_OK"
+stack_backup_max_hours = 26
+
+[tasks.docker_df]
+build_cache_warn_gib = 25
+images_reclaimable_warn_gib = 40
+
+[tasks.memory_health]
+psi_mem_full_warn = 5.0
+psi_mem_full_crit = 15.0
+mem_available_warn_gib = 10
+mem_available_crit_gib = 4
+swap_in_pages_per_s_warn = 2000
+
+[tasks.smart_trend]
+attrlog_dir = "/var/lib/smartmontools"
+crit_attrs = [5, 197, 198]
+nvme_temp_warn_c = 70
+ata_temp_warn_c = 70          # SATA SSDs here run 57-64 C under load; page only on sustained real heat
+
+[tasks.alert_path_health]
+smart_log = "/var/log/smart-alert.log"
+
+[tasks.growth_watch]
+paths = [
+  { path = "/volume1/docker/kavita/config/logs", warn_gib_per_day = 0.5 },
+  { path = "/var/log", warn_gib_per_day = 0.5 },
+  { path = "/var/lib/docker/containers", warn_gib_per_day = 0.5 },
+  { path = "/var/log/journal", warn_gib_per_day = 0.5 },
+  { path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles", warn_gib_per_day = 0.5 },   # trimmed by app_cache_trim
+]
+
+[tasks.spike_sampler]
+keep_days = 14
+
+[tasks.stuck_detector]
+enforce = false               # report-only until 14 days of samples have been reviewed
+min_samples = 6
+min_anon_gib = 4
+growth_gib_per_hour = 0.5
+
+[tasks.stuck_scans]
+orphan_min_age_min = 20       # an abandoned scan older than this that is reading the disk pages
+attached_min_age_min = 180    # a scan someone may be waiting for is only listed (no page) after this
+min_read_kib_s = 256
+sample_s = 4
+
+[tasks.swap_audit]
+sample_s = 3
+cold_refault_pps = 5.0
+active_in_mib_s = 1.0
+thrash_in_mib_s = 16.0
+thrash_total_mib_s = 64.0
+thrash_psi_full = 3.0
+full_pct = 90.0
+min_free_swap_pct = 5.0
+scarce_ram_pct = 20.0
+relief_min_used_gib = 1.0
+relief_headroom_gib = 16.0
+relief_cap_margin = 0.9
+relief_disk_busy_pct = 40.0
+relief_psi_full = 1.0
+
+[tasks.swap_auto_relief]
+disruptive = true            # a freeze (FREEZE file, holiday freeze) holds it to report-only, like the restarts
+mode = "report"               # the owner switches it on (apply); it never kills anything, it only runs swapoff + swapon behind every gate
+trigger_pct = 80.0
+release_pct = 60.0
+persist_hours = 2.0
+min_cold_share = 0.7
+cold_refault_pps = 5.0
+min_interval_hours = 12.0
+refill_hours = 6.0
+breaker_after_refills = 2.0
+breaker_days = 3.0
+max_defer_hours = 24.0
+quiet_out_mib_s = 8.0
+window_start_hour = 2.0        # unattended reliefs only inside this local-time window (swapoff can stall a process that maps memory)
+window_end_hour = 6.0
+max_gap_hours = 0.75           # a longer gap between observations restarts the persistence timer
+retry_hours = 1.0
+max_failed_attempts = 3.0
+sample_s = 3
+
+[tasks.orphan_report]
+idle_hours = 3
+
+[tasks.image_ledger]
+keep_days = 30
+
+[tasks.plex_media_mount_check]
+mount_point = "/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server/Media"
+expected_source_prefix = "/media/SandiskSSD/plex"
+
+[tasks.config_drift]
+expect_journald_system_max_use = "1G"
+expect_tmp_age_days = 30      # systemd-tmpfiles default; the weekly `find /tmp -atime +7` cron is being retired
+expect_reserved_pct = 1.0
+
+# ------------------------------------------------------------------ C0: checks added by the umbrella build (read-only)
+# An empty table only documents that the task exists; options go in it. `enabled = false` switches a task off.
+[tasks.os_jobs]                  # the OS's own timers (apt-daily, logrotate, fstrim, snapd refresh ...) ran and succeeded recently
+# ignore = []   extra_jobs = [{ name = "x", timer = "x.timer", service = "x.service", max_age_hours = 36 }]
+
+[tasks.docker_prune_parity]      # weekly: do docker_cache + docker_images + docker_containers_prune cover docker-prune.sh? (the cutover gate)
+
+[tasks.legacy_audit]             # weekly, info only: a timer, cron line or /etc/cron.* file that no item of legacy-retirement.toml accounts for
+
+[tasks.docker_prune_exposure]    # PAGES while docker-prune.timer would still delete something the native tasks keep (the stopped comfyui container)
+crit_within_h = 72               # crit when that timer fires within this many hours (or its next run is unknown), else warn
+imminent_h = 6                   # one more page when it gets this close
+
+[tasks.surrealdb_health]         # port of notebook-db-alert.sh: WAL size, disk space, leading indicators
+signature_alerts = true          # page again when the SET of failing checks changes at the same level
+first_sight_page = true          # page at the first run that sees a problem (the script did), not after alert_confirm_runs
+# optional, the defaults reproduce the script: container, data_dir, wal_max_mb = 1024, db_max_gb = 25, disk_min_gb = 40, restart_gt = 3
+
+[tasks.probes]                   # the monitoring plane (etc/probes.toml); the one-minute engine is the tick job `probes-run`
+alert_mode = "task"              # "task": the check tier pages on the task level. "events": per-probe pages (needs the cli.py self_notifies edit)
+# budget_s, workers, force: see homelab_maint/tasks/monitors.py
+
+[tasks.self_health]              # the monitoring pipeline itself: runner -> publish -> website, tick, live, ring, registry, ack inbox, website, Kuma
+# every key optional (homelab_maint/tasks/self_health.py): check_interval_s = 900, web_port = 8098, web_container = "maintenance-web",
+# web_check = true, kuma_keys = ["tier-check", "umbrella-probes"], kuma_required = false, registry_check_generated = true,
+# refresh_s = 60, stale_factor = 3, stale_down_factor = 10, outbox_warn_s, breaker_fail_n, kuma_fail_n
+# public/self.json is rewritten every minute by homelab-maint-selfhealth.timer (NOT the tick: it is the dead-man of the tick)
+
+[tasks.pressure_state]           # the spike ladder's level 0-5 per resource (thresholds, hysteresis: classes.toml [ladder])
+[tasks.bulkhead_check]           # weekly, info only: concurrency settings that drifted from the agreed values (Ollama, ComfyUI, Plex ...)
+
+[tasks.report_daily]             # reports (C0: they only write STATE_DIR/public/reports/)
+timezone = ""                    # IANA name for the report days; empty = the host's /etc/localtime
+keep = 60                        # entries kept in the shared index; give report_weekly the same value
+ignore_tasks = []                # checks left out of the health score
+
+[tasks.report_weekly]
+keep = 60
+ignore_tasks = []
+
+# The routine's built-in steps (homelab_maint/routine.py). All C0 except routine_rotate, which is report-only until switched on.
+# Their options live in etc/routine.toml [steps.*]; a key set here wins.
+[tasks.routine_spike_review]
+[tasks.routine_verify_daily]
+[tasks.routine_capacity]
+[tasks.routine_smart_selftest]
+[tasks.routine_updates]
+[tasks.routine_image_updates]
+[tasks.routine_backup_verify]
+[tasks.routine_verify_weekly]
+[tasks.routine_restore_check]
+[tasks.routine_expiry]
+[tasks.routine_trends]
+[tasks.routine_verify_monthly]
+
+[tasks.routine_rotate]           # monthly: archive old audit / changes / spike records
+mode = "report"
+
+# ------------------------------------------------------------------ the spike manager (tasks/pressure.py; classes, budgets, ladder: classes.toml)
+# The one rung that ships ON: unloading idle Ollama models / freeing idle ComfyUI VRAM. Non-destructive, only at memory or GPU pressure
+# level 2+, budgeted per day, audited. Slowing, restarting and stopping containers are report-only until you flip them. The check
+# service passes --apply so this can act; PAUSE (or `homelab-maint pause pressure_response`) stops every rung and puts back any
+# cpu-shares throttle or emergency-stopped container the ladder applied.
+[tasks.pressure_response]
+mode = "apply"                   # MASTER switch (shows "apply" on the dashboard); "report" forces every rung to report-only
+reclaim = "apply"                # L2: unload idle models, free idle VRAM
+throttle = "report"              # L3: lower cpu-shares of P2/P3 batch containers (L3-L5 stay report-only until you set them to "apply")
+restart = "report"               # L4: restart ONE proven-stuck P2/P3 container (2 per 6 h, backoff)
+emergency = "report"             # L5: stop containers from classes.toml emergency_stop (empty by default), one per run
+
+# ------------------------------------------------------------------ C1: safe clean (daily 07:30-09:30) -- REPORT ONLY
+[tasks.docker_cache]
+mode = "report"
+high_gib = 15
+low_gib = 8
+max_gib_per_run = 30
+
+[tasks.docker_images]
+mode = "report"
+unused_days = 14
+max_items_per_run = 12
+max_gib_per_run = 15
+
+[tasks.apt_clean]
+mode = "report"
+
+[tasks.apt_cache]                # `apt-get clean` again, with a size floor and a measured freed figure: the ALTERNATIVE to apt_clean
+mode = "report"                  # ships OFF so the pair never both run: to use it set enabled = true here and enabled = false on apt_clean
+enabled = false
+min_mib = 10
+
+[tasks.stale_driver_packages]    # purge apt packages of NVIDIA driver branches other than the loaded one (one apt run; many proofs)
+mode = "report"
+max_gib_per_run = 10
+# keep_branches = ["535"]        # driver branches that are never purged (the LOADED branch is always kept)
+
+[tasks.apt_autoremove_unused]    # purge `apt autoremove` candidates that are shared libraries/plugins no process uses (allow-list policy)
+mode = "report"
+keep = ["tree", "inxi"]          # owner keep-list: package names or fnmatch globs that are never purged
+max_candidates = 80              # candidates examined per run (each costs one apt-get -s)
+max_gib_per_run = 5
+# never = ["libfoo*"]            # extra never-purge globs (kernels, nvidia, dkms, grub, shim, initramfs, systemd, libc6, docker, qemu ... are built in)
+# allow_purge = ["libgl1-amber-dri"]   # waives only the "ships only shared libraries" file-class check for these; the in-use proof still applies
+
+[tasks.snap_revisions]
+mode = "report"
+retain = 2
+
+[tasks.retention]
+mode = "report"
+rules = [
+  { name = "kavita-logs",    path = "/volume1/docker/kavita/config/logs",    glob = "kavita*.log", max_age_days = 3 },
+  { name = "kavita-backups", path = "/volume1/docker/kavita/config/backups", glob = "*.zip", keep_newest = 3 },
+]                                # the Tunarr subtitle cache is app_cache_trim's now, the crash dumps crash_dumps': one cleaner per file set
+allowed_roots = ["/volume1/docker/kavita/config", "/var/log"]
+
+[tasks.trash]
+mode = "report"
+max_age_days = 30
+users = ["ohmz"]
+
+[tasks.gradle_reaper]
+mode = "report"
+idle_minutes = 120
+min_samples = 2               # consecutive daily samples, >= idle_minutes apart, with no CPU progress
+
+# ---- cleaners-v2, daily (tasks/cleaners_apps.py, cleaners_dev.py): the places that were cleaned by hand once and must not fill up again.
+# All report-only; each task is enabled on its own once its report has been read. Suggested order: dangling_images, crash_dumps,
+# log_compress, tool_caches, then app_cache_trim last (read its first run's container health line). The root-needing ones refuse
+# to apply without root (the daily service is root; a manual run as ohmz only reports).
+[tasks.app_cache_trim]           # generalised cache trimmer: rules {name, path, max_age_days, container, health_url ...}, health-checked
+mode = "report"
+# a rule path must be a STRICT descendant of an allowed root; the code's never-touch list then limits both roots to their cache dirs
+allowed_roots = ["/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache", "/volume1/docker/kavita/config"]
+# anchored on the canonical path (the code refuses any . or ..): a disposable cache inside the protected tunarr app dir, for THIS task only
+unprotect = ["^/home/ohmz/StudioProjects/tunarr/\\.docker-data/tunarr/cache/subtitles(/|$)"]
+max_gib_per_run = 15
+max_items_per_run = 100          # one item = ONE batch of up to batch_files files (a 131k-file cache is ~60 items)
+batch_files = 2000
+canary_files = 200               # the first batch of a rule with a container is a canary: settle, probe, then the bulk
+check_every = 5                  # re-check the container every N applied batches (and every check_s seconds), and once after the rule
+check_s = 10
+settle_s = 5
+warn_after_runs = 2              # a rule refused/skipped this many runs in a row (or stalled 3x) makes the task warn
+manifest_keep_days = 30          # every unlinked file is listed in STATE_DIR/manifests/app_cache_trim.<ts>.jsonl
+# Tunarr has no Docker HEALTHCHECK, so health = container running + the app answering health_url (liveness only; mitigated by the canary).
+rules = [
+  { name = "tunarr-subtitles", path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles", max_age_days = 30, root_owned_ok = true, container = "tunarr-host-net", health_url = "http://127.0.0.1:8000/" },
+  # second example (verified read-only; never files_only = false on an app dir without need):
+  # { name = "kavita-cache", path = "/volume1/docker/kavita/config/cache", max_age_days = 14, container = "kavita", health_url = "http://127.0.0.1:5000/api/health" },
+]
+
+[tasks.log_compress]             # gzip rotated logs over min_mib (gzip -t, length check, never a file a process has open or logrotate is rotating)
+mode = "report"
+roots = ["/var/log"]             # canonical paths only (no `..`, no trailing slash)
+min_mib = 50
+min_age_days = 1
+max_depth = 2
+exclude_dirs = ["journal"]
+max_gib_per_run = 5
+
+[tasks.dangling_images]          # untagged images, unreferenced by any container (running or exited), older than min_age_hours; one `docker image rm ID` each
+mode = "report"                  # (dangling only: tagged unused images stay docker_images' job, 14 days). Needs a fresh image ledger: no ledger, nothing selected
+min_age_hours = 24
+ledger_max_age_hours = 48
+local_build_days = 7             # an image with no registry digest (a local build) waits this long: it cannot be pulled back
+max_items_per_run = 20
+max_gib_per_run = 15
+
+[tasks.crash_dumps]              # apport *.crash older than 2 days, systemd-coredump files older than 7 days (inside the two directories only)
+mode = "report"
+crash_dir = "/var/crash"
+crash_max_age_days = 2
+coredump_dir = "/var/lib/systemd/coredump"
+coredump_max_age_days = 7
+
+[tasks.tool_caches]              # regenerable developer caches (npm, pip, uv, pnpm store, thumbnails, Gradle daemon logs, browser caches)
+mode = "report"
+user = "ohmz"                    # npm/pip/uv/pnpm run as this user (runuser when root)
+min_mib = 64                     # a cache smaller than this is left alone (npm, pip, uv; pnpm: files nothing links to)
+thumbs_days = 30                 # ~/.cache/thumbnails/*/*.png older than this, by mtime (atime is reset by readers)
+gradle_log_days = 14             # ~/.gradle/daemon/*/daemon-<pid>.out.log whose daemon is gone (never ~/.gradle/caches)
+browser_days = 7                 # browser cache files, only while that browser is not running (never profiles)
+long_lived_min = 30              # npx/pnpx/uvx/`uv run` older than this no longer pin a cache (an install always does)
+projects_root = "/home/ohmz/StudioProjects"   # package.json packageManager fields name the pnpm version (never an unpinned download)
+max_gib_per_run = 10
+# off switches: npm pip uv pnpm thumbnails gradle_logs browsers (e.g. pnpm = false)
+
+[tasks.caps]
+mode = "report"
+ceilings = { "tunarr-host-net" = 40, "kavita" = 20, "sabnzbd" = 32, "omnivoice-studio-gpu" = 16, "comfyui" = 48 }
+swap_extra_ratio = 0.25
+unprotect = ["^tunarr-host-net$", "^kavita$", "^sabnzbd$", "^omnivoice-studio-gpu$", "^comfyui$"]  # a memory ceiling is not a kill
+
+[tasks.qos_classes]              # baseline cpu-shares per service class (classes.toml), idempotent `docker update`
+mode = "report"
+
+[tasks.openwebui_media_prune]    # port of prune-openwebui-media.sh (allow-listed generated media, 7 days)
+mode = "report"
+retention_days = 7
+unprotect = ["^/volume1/docker/comfyui/output/owui_"]
+
+# ---- ports of legacy scripts that run in the CHECK tier (every 15 min). Report-only here; the legacy timers keep doing the real work
+# until `homelab-maint migrate cutover ITEM` retires them (docs/MIGRATION.md: the cutover refuses unless the mode is "apply").
+[tasks.comfyui_idle_reclaim]     # port of comfyui-idle-vram.sh: restart ComfyUI when idle and holding VRAM (two strikes, 15-30 min here)
+mode = "report"
+unprotect = ["^comfyui$"]        # protected.toml names comfyui; this exempts the restart for THIS task only
+# threshold_mb = 3000, strikes = 2, strike_ttl_min = 45, min_gap_min = 30, match_cgroup = true, queue_url (default: protected.toml [busy])
+
+[tasks.immich_recycle]           # port of immich-server-recycle.service: `docker restart immich_server`, gated like the drop-in
+mode = "report"
+unprotect = ["^immich_server$"]
+# every_hours = 2 (0 when the scheduler runs it on "0 */2 * * *"), min_gap_min = 30, gate = "immich-recycle"
+
+# ------------------------------------------------------------------ weekly
+[tasks.docker_containers_prune]  # stopped containers older than 7 days (the part of docker-prune.sh the cache/image cleaners do not cover)
+mode = "report"
+stopped_days = 7
+# keep = []   (failed_units.expected_stopped_containers is honoured too, so the stopped comfyui container is never removed)
+
+[tasks.c2_candidates]
+unprotect = ["StudioProjects/kometa/backups/config-backup-"]   # one stale tarball inside the protected kometa dir
+candidates = [
+  { name = "cursor-state-backup", path = "/home/ohmz/.config/Cursor/User/globalStorage/state.vscdb.backup", why = "stale Cursor chat-state backup (app unused since June)" },
+  { name = "cursor-worktrees", path = "/home/ohmz/.cursor/worktrees", why = "17 old worktrees; check for unpushed commits first", needs_manual_check = true },
+  { name = "orphan-docker-plex-config", path = "/volume1/docker/plex", why = "unmounted by any container since 2025-05; archive first", archive_to = "/media/WD24to10TB/archive" },
+  { name = "home-venv", path = "/home/ohmz/.venv", why = "11 GiB torch/vllm env no process uses" },
+  { name = "android-fold-avd", path = "/home/ohmz/.android/avd/Pixel_10_Pro_Fold.avd", why = "untouched since June; 9.3 GiB" },
+  { name = "kometa-backup-tarball", path = "/home/ohmz/StudioProjects/kometa/backups/config-backup-20260922-190738.tar.gz", why = "10.8 GiB; archive to cold disk", archive_to = "/media/WD24to10TB/archive" },
+  { name = "hermes-genesis-gguf", path = "/home/ohmz/models/hermes-genesis", why = "duplicates Ollama blobs but docs say keep (unbacked-up); archive, do not delete", archive_to = "/media/WD24to10TB/archive", needs_manual_check = true },
+]
+
+# ---- cleaners-v2, weekly (cleaners_dev.py, cleaners_pkgs.py). Report-only; the C2 plans are applied one hash at a time with `homelab-maint approve`.
+[tasks.stale_build_output]       # C1: git-ignored build output (target, .next, .turbo, __pycache__ ...) of projects idle for idle_days; walks StudioProjects
+mode = "report"
+projects_root = "/home/ohmz/StudioProjects"
+home = "/home/ohmz"
+idle_days = 90                   # no commit, no HEAD movement, no working-tree change for this long
+output_days = 30                 # and the build output itself untouched this long
+apply_generic = false            # dist/ and build/ stay report-only until you flip this (they are not provably regenerable)
+clock_tolerance_h = 6            # the four dev cleaners refuse unless the clock is NTP-synchronised (else within this of the newest write)
+ref_timeout_s = 120              # units, cron, launchers, nginx roots, compose files naming the output or its project (~175k files)
+max_depth = 7
+scan_budget_s = 900
+max_items_per_run = 200
+max_gib_per_run = 30
+# protected.toml name patterns (homarr, open-notebook, immich, tunarr, claude ...) also match project PATHS: 75 of the 103 build-named dirs
+# are skipped for that reason today. Lift one project on purpose, e.g.:
+# unprotect = ["/StudioProjects/homarr(/|$)"]
+
+[tasks.unused_venvs]             # C2 plan: venvs nothing uses; approving archives pip freeze + pyvenv.cfg + bin listing first, reads them back, then removes
+mode = "report"
+roots = ["/home/ohmz"]
+home = "/home/ohmz"              # `~/x` and `$HOME/x` spellings of a path are searched for too
+max_depth = 3
+idle_days = 60                   # untouched (mtime, ctime and file atime) this long
+active_days = 90                 # a project-local venv of a git project active within this long is kept
+archive_dir = "/media/WD24to10TB/archive/dev-leftovers"
+ref_timeout_s = 120              # reference search (~175k files, ~40 s here); the library's own 25 s default is too short
+approval_ttl_hours = 48
+allow_manual_check_items = false # hand-made content / unreadable RECORDs make an item `needs_manual_check`; true only after reading the plan
+
+[tasks.large_cold_files]         # C2 plan: files and directories over min_gib whose newest file is older than cold_days; approving archives, verifies, removes
+mode = "report"
+roots = ["/home/ohmz/StudioProjects", "/home/ohmz/.config", "/home/ohmz/.android"]
+min_gib = 2
+cold_days = 90
+archive_root = "/media/WD24to10TB/archive"   # items land in <archive_root>/<studioprojects|config|android>/<relative parent>/
+scan_budget_s = 900
+approval_ttl_hours = 48
+allow_manual_check_items = false # items inside/containing a git repo (or one file of a directory still in use) are refused without it
+
+[tasks.flatpak_unused]           # C1: `flatpak uninstall --unused` per installation, runtimes only (never an app), none used by a running sandbox
+mode = "report"
+max_gib_per_run = 10
+# installations = ["system", "user:ohmz"]   # default: the system installation only; one entry per flatpak installation, each listed, checked and
+#                                          # removed on its own (apps of every other installation are cross-checked either way)
+
+# ------------------------------------------------------------------ live monitor (homelab-maint-live.service, 5 s heartbeat -> public/live.json)
+# Optional: with no [live] section the built-in defaults are identical (tests/test_live.py pins that). Listing it here makes the service
+# list editable.
+# [live] is read ONCE when the daemon starts: after editing it run `systemctl restart homelab-maint-live` (safe, ~5 s gap in the graph).
+[live]
+interval_s = 5                # sample + write cadence in seconds (1..60); the history ring is 720 points at this step
+gpu = true                    # nvidia-smi probe (every gpu_every_s)
+sensors = true                # hwmon temperatures and fans; the sensor-exporter on :9110 is only a rare fallback
+docker = true                 # container list over the docker socket (every docker_every_s)
+disk = true                   # statvfs of the mounts (every disk_every_s)
+gpu_every_s = 10
+sensors_every_s = 15          # temperatures
+fans_every_s = 60             # fan speeds: the Super-I/O chip is the dearest read (~17 ms of kernel time), fans change slowly
+docker_every_s = 10
+services_every_s = 30
+disk_every_s = 30
+http_timeout_s = 5            # per service probe
+slow_ms = 2000                # a service that answers slower than this reads "degraded"
+cpu_fans = [1, 4]             # nct6798 fan headers, same grouping as sensor-exporter
+case_fans = [2, 3, 5]
+# mounts = ["/", "/media/SandiskSSD"]     # default: [tasks.disk_forecast].watch
+
+# One [[live.services]] table per service. name = label on the website. container = docker container name (state + health).
+# unit = systemd unit (asked only when HTTP fails). url = loopback http URL (anything else is refused). expect = HTTP codes that
+# count as healthy (default 200-399). slow_ms = per-service override. At least one of container / unit / url is required.
+[[live.services]]
+name = "Plex"
+unit = "snap.plexmediaserver.plexmediaserver.service"
+url = "http://127.0.0.1:32400/identity"
+
+[[live.services]]
+name = "Immich"
+container = "immich_server"
+url = "http://127.0.0.1:2283/api/server/ping"
+
+[[live.services]]
+name = "Kavita"
+container = "kavita"
+url = "http://127.0.0.1:5000/api/health"
+
+[[live.services]]
+name = "Seerr"
+container = "Seerr"
+url = "http://127.0.0.1:5056/api/v1/status"
+
+[[live.services]]
+name = "Open WebUI"
+container = "open-webui"
+url = "http://127.0.0.1:4567/health"
+
+[[live.services]]
+name = "Homarr"
+container = "homarr"
+url = "http://127.0.0.1:7575/"
+
+[[live.services]]
+name = "Uptime Kuma"
+container = "uptime-kuma"
+url = "http://127.0.0.1:3011/api/entry-page"
+
+[[live.services]]
+name = "Nextcloud"
+container = "nextcloud"
+url = "http://127.0.0.1:8090/status.php"
+
+[[live.services]]
+name = "Tunarr"
+container = "tunarr-host-net"
+url = "http://127.0.0.1:8000/"
+
+[[live.services]]
+name = "Radarr"
+container = "Radarr"
+url = "http://127.0.0.1:7878/ping"
+
+[[live.services]]
+name = "Sonarr"
+container = "Sonarr"
+url = "http://127.0.0.1:8989/ping"

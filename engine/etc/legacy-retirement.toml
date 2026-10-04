@@ -1,0 +1,1187 @@
+# homelab-maint: legacy retirement inventory (SPEC4 S11). Read by homelab_maint/legacy.py (`homelab-maint migrate ...`).
+#
+# One [[item]] per legacy scheduled thing or hook on this host. Built from a READ-ONLY inventory taken 2026-10-02 of:
+# `systemctl list-unit-files|list-timers` for system AND user (ohmz), /etc/systemd/system units and drop-ins, the root and ohmz
+# crontabs, /etc/crontab, /etc/cron.*, anacron, /usr/local/sbin, /usr/local/bin, ~/ai-stack/scripts, ~/tunarr-sync,
+# ~/sensor-exporter, every OnFailure= in /etc/systemd and ~/.config/systemd/user, /etc/smartd.conf, /etc/udev/rules.d (no RUN=
+# hooks except snap interfaces), `docker ps` (Diun, Kometa, nextcloud_cron schedulers), the Uptime Kuma DB COPY (13 monitors plus the
+# Media Stack group, ZERO notification channels), and the Hermes cron store (one fare-watch job).
+#
+# MODES
+#   adapter  the umbrella schedules, gates, logs, alerts and reports the proven script; the old timer / cron line is retired,
+#            the script stays where it is and becomes the job's command.
+#   port     a native task replaces it: timer disabled, script MOVED to <legacy_root>/<item>/ (never deleted).
+#   retire   superseded, nothing replaces it (or the replacement is a platform setting): same mechanics as port.
+#   observe  OS-managed (apt, logrotate, fstrim, ...): never touched, verified by the os_jobs check.
+#   keep     daemon / app plumbing: never touched, probed. Cutover only records the adoption.
+#
+# FIELDS  name kind(unit|timer|cron|script|hook) location mode wave scope("system"|"user:ohmz") schedule replaced_by(string|list)
+#   via(job|task|probe|os_job|route|none) parity_check(table|list; derived from replaced_by+via when omitted)
+#   unmonitored("why": observe/keep items nothing can verify; parity is then trivially green) retire_actions(list)
+#   depends_on soak_days(days a DEPENDENT must wait after this item is retired; when the item hands a job to the tick the soak counts from the
+#   job's FIRST green run recorded by the tick after the cutover) verified_runs(green tick runs a dependent needs: default 1 for an adapter
+#   with a job; monitors are quiet in history, so only 1 is provable for them) require_idle(units that must not be running)
+#   require_idle_jobs(tick jobs that must not be running) backup(true: also refuse while a /run/lock/backup-*.lock is held; both lists and
+#   the item's own job are checked for cutover AND rollback, --force cannot override them)
+#   keeps_job("job": a KEEP item whose job stays in observe mode on purpose, its legacy driver stays the driver)
+#   job("name in jobs.toml": hand the thing over to the scheduler tick; appends a last {do="job_mode"} action = managed for
+#   adapters, retired for ports, and the tick's own interlock then lets it run only once the legacy driver is off; the job must
+#   exist in jobs.toml and its `retire` list must name the same driver, a test enforces both)
+#   pause_on_rollback(mutating native tasks to PAUSE if the legacy thing comes back, so the two never both act)
+#   pre_retired(YYYY-MM-DD: already retired by hand; recorded, and checked for drift) owner_notes.
+#   There is no hand-written rollback_actions: rollback is DERIVED from the state recorded before each action, so it restores the
+#   exact enablement state / file mode / cron line (see legacy.py). `migrate plan ITEM` and docs/MIGRATION.md print both directions.
+# PARITY KINDS  task job probe (green runs over a soak; a probe must also be up NOW with a fresh last_run) | scheduled (the tick lists the job:
+#   only that it KNOWS it) | scheduler_health | scheduler_validate (jobs.toml loads and `scheduler validate` is clean for the job: added
+#   automatically to every adapter that hands a job over) | unit_equiv (the EFFECTIVE jobs.toml job launches exactly what the legacy service
+#   launches, per `systemctl show`: the stand-in for a proof run that cannot exist before the cutover) | job_attr (equals|contains on the
+#   EFFECTIVE jobs.toml job) | task_applies (mode = apply AND --apply really reaches it) | status_json file_age (what the LEGACY driver
+#   last wrote: a baseline only) config command notify os_job manual none
+# OWNER ADDITIONS go in /etc/homelab-maint/legacy-retirement.d/*.toml (extra [[item]] tables, root-owned 0644); this file is part of the release.
+# ACTIONS  {do="disable", unit, scope?, now?}  {do="move", src, dst_name?, reload?}  {do="stub", path, content, mode?}
+#   {do="cron_comment", user, tag | match}  {do="job_mode", job, mode}  {do="manual", note}   (`{legacy_dir}` in a stub = <legacy_root>/<item>)
+#
+# WAVES (safe order; docs/MIGRATION.md explains each): 0 observe, 1 monitors, 2 notification hooks, 3 small jobs, 4 the tick's first
+# managed jobs (Hermes user jobs, the stack backup, the daily/weekly/metrics runner timers; the CHECK timer stays on purpose), 5 system
+# backups, 6 backup wrappers.
+
+[meta]
+version = 1
+verified = "2026-10-02 (read-only inventory, re-verified against the live host and `migrate audit`; see header)"
+legacy_root = "/usr/local/lib/homelab-maint/legacy"
+
+[meta.parity_defaults]
+green = 8          # consecutive green runs ...
+min_hours = 48     # ... spanning at least this long
+fresh_h = 2        # newest run must be this recent (daily/weekly tasks set their own)
+
+[meta.waves]
+"0" = "Observe: OS-managed jobs (no host change)"
+"1" = "Monitors and always-on daemons (no host change)"
+"2" = "Notification hooks"
+"3" = "Small jobs and cron lines"
+"4" = "The tick takes over: Hermes user jobs, the stack backup, the daily/weekly/metrics runner timers (the check timer stays)"
+"5" = "System backups (last: the crown jewels)"
+"6" = "Backup wrappers (only after both backups are cut over and soaked)"
+
+# =====================================================================================================================
+# WAVE 0: OS-managed timers. Observed by the os_jobs task (tasks/native.py DEFAULT_OS_JOBS); security updates must keep working.
+# =====================================================================================================================
+[[item]]
+name = "os-apt-daily"
+title = "apt-daily (package index refresh)"
+kind = "timer"
+location = "apt-daily.timer"
+mode = "observe"
+wave = 0
+schedule = "06:00 and 18:00, up to 12 h random delay"
+replaced_by = "apt-daily"
+via = "os_job"
+
+[[item]]
+name = "os-apt-daily-upgrade"
+title = "apt-daily-upgrade (unattended security upgrades)"
+kind = "timer"
+location = "apt-daily-upgrade.timer"
+mode = "observe"
+wave = 0
+schedule = "06:00, up to 1 h random delay"
+replaced_by = "apt-daily-upgrade"
+via = "os_job"
+owner_notes = "Must keep running: /etc/apt/apt.conf.d/50unattended-upgrades allows only the -security and ESM origins (linux-* is not blacklisted)."
+
+[[item]]
+name = "os-unattended-upgrades"
+title = "unattended-upgrades shutdown helper"
+kind = "unit"
+location = "unattended-upgrades.service"
+mode = "observe"
+wave = 0
+schedule = "always on (the upgrades themselves run from apt-daily-upgrade.timer)"
+replaced_by = "unattended-upgrades"
+via = "os_job"
+owner_notes = "os_jobs also reads /var/log/unattended-upgrades/unattended-upgrades.log for ERROR lines."
+
+[[item]]
+name = "os-logrotate"
+title = "logrotate"
+kind = "timer"
+location = "logrotate.timer"
+mode = "observe"
+wave = 0
+schedule = "daily 00:00"
+replaced_by = "logrotate"
+via = "os_job"
+owner_notes = "Replaced the root cron `logrotate /etc/logrotate.conf` line retired 2026-10-01 (see cron-root-logrotate)."
+
+[[item]]
+name = "os-tmpfiles-clean"
+title = "systemd-tmpfiles-clean"
+kind = "timer"
+location = "systemd-tmpfiles-clean.timer"
+mode = "observe"
+wave = 0
+schedule = "15 min after boot, then daily"
+replaced_by = "systemd-tmpfiles-clean"
+via = "os_job"
+owner_notes = "Replaced the root cron `find /tmp -atime +7 -delete` line retired 2026-10-01; config_drift checks the 30 d age policy."
+
+[[item]]
+name = "os-fstrim"
+title = "fstrim"
+kind = "timer"
+location = "fstrim.timer"
+mode = "observe"
+wave = 0
+schedule = "Mon 00:00, up to 1 h 40 min random delay"
+replaced_by = "fstrim"
+via = "os_job"
+
+[[item]]
+name = "os-e2scrub"
+title = "e2scrub_all (ext4 online scrub)"
+kind = "timer"
+location = "e2scrub_all.timer"
+mode = "observe"
+wave = 0
+schedule = "Sun 03:10"
+replaced_by = "e2scrub_all"
+via = "os_job"
+owner_notes = "e2scrub@.service carries OnFailure=e2scrub_fail@%i.service (a package hook; left alone)."
+
+[[item]]
+name = "os-fwupd-refresh"
+title = "fwupd-refresh (firmware metadata)"
+kind = "timer"
+location = "fwupd-refresh.timer"
+mode = "observe"
+wave = 0
+schedule = "hourly, up to 1 h random delay"
+replaced_by = "fwupd-refresh"
+via = "os_job"
+
+[[item]]
+name = "os-man-db"
+title = "man-db index update"
+kind = "timer"
+location = "man-db.timer"
+mode = "observe"
+wave = 0
+schedule = "daily 00:00, up to 12 h random delay"
+replaced_by = "man-db"
+via = "os_job"
+
+[[item]]
+name = "os-sysstat-collect"
+title = "sysstat-collect (sar samples)"
+kind = "timer"
+location = "sysstat-collect.timer"
+mode = "observe"
+wave = 0
+schedule = "every 10 minutes"
+replaced_by = "sysstat-collect"
+via = "os_job"
+
+[[item]]
+name = "os-sysstat-summary"
+title = "sysstat-summary"
+kind = "timer"
+location = "sysstat-summary.timer"
+mode = "observe"
+wave = 0
+schedule = "daily 00:07"
+replaced_by = "sysstat-summary"
+via = "os_job"
+
+[[item]]
+name = "os-dpkg-db-backup"
+title = "dpkg database backup"
+kind = "timer"
+location = "dpkg-db-backup.timer"
+mode = "observe"
+wave = 0
+schedule = "daily 00:00"
+replaced_by = "dpkg-db-backup"
+via = "os_job"
+
+[[item]]
+name = "os-snapd-refresh"
+title = "snapd automatic refresh (refresh.retain=2)"
+kind = "hook"
+location = "snapd.service (internal refresh timer)"
+mode = "observe"
+wave = 0
+schedule = "snapd decides (about 4 times a day)"
+replaced_by = "snapd-refresh"
+via = "os_job"
+owner_notes = "Old revisions are trimmed by the snap_revisions cleaner (retain=2), not by snapd. snapd.failure.service is snapd's own OnFailure hook."
+
+[[item]]
+name = "os-certbot"
+title = "certbot renewal timer"
+kind = "timer"
+location = "certbot.timer"
+mode = "observe"
+wave = 0
+schedule = "00:00 and 12:00, up to 12 h random delay"
+unmonitored = "no certificates are issued (/etc/letsencrypt/live does not exist), so the timer is a no-op; add it to [tasks.os_jobs].extra_jobs if that changes"
+
+[[item]]
+name = "os-cron-shims"
+title = "anacron and /etc/cron.{daily,weekly,monthly} package shims"
+kind = "script"
+location = "/etc/cron.daily/{0anacron,apport,apt-compat,dpkg,google-chrome,logrotate,man-db,sysstat}, /etc/cron.weekly/{0anacron,man-db}, /etc/cron.monthly/0anacron, anacron.timer"
+mode = "observe"
+wave = 0
+schedule = "anacron.timer 07:30-23:30 hourly runs run-parts; anacrontab: daily +5 min, weekly +10 min, monthly +15 min"
+unmonitored = "package shims: apt-compat, dpkg, logrotate, man-db and sysstat exit at once under systemd; the live ones are apport (below) and google-chrome (re-adds its apt source)"
+owner_notes = """
+/etc/cron.daily/apport deletes crash reports older than 7 days from /var/crash. The `retention` rule `crash-dumps` in maint.toml does the
+same for files, so either may act first; both are safe. Leave apport's script alone (package-owned) and keep the umbrella rule in report
+mode unless you want the umbrella to be the only janitor.
+"""
+
+[[item]]
+name = "os-cron-d"
+title = "/etc/cron.d package entries"
+kind = "cron"
+location = "/etc/cron.d/{anacron,certbot,e2scrub_all,sysstat}"
+mode = "observe"
+wave = 0
+schedule = "inert under systemd (each line is guarded by `test -e /run/systemd/system ||` or an equivalent)"
+unmonitored = "inert while systemd is the init system; nothing to verify"
+
+[[item]]
+name = "os-ubuntu-misc-timers"
+title = "Ubuntu convenience timers (motd-news, ua-timer, apport-autoreport, snapd.snap-repair, update-notifier-*, systemd-sysupdate*, apt-news, esm-cache)"
+kind = "timer"
+location = "motd-news.timer, ua-timer.timer, apport-autoreport.timer, snapd.snap-repair.timer, update-notifier-download.timer, update-notifier-motd.timer, systemd-sysupdate.timer and systemd-sysupdate-reboot.timer (both disabled)"
+mode = "observe"
+wave = 0
+schedule = "various; apport-autoreport and the update-notifier ones never fire here (their conditions are false)"
+unmonitored = "cosmetic or condition-gated Ubuntu timers; an alert about them would be noise. Listed so nothing on the host is unaccounted for"
+
+[[item]]
+name = "user-launchpadlib-cache-clean"
+title = "launchpadlib-cache-clean (user timer)"
+kind = "timer"
+location = "launchpadlib-cache-clean.timer (ohmz user manager, /usr/lib/systemd/user)"
+mode = "observe"
+wave = 0
+scope = "user:ohmz"
+schedule = "5 min after login, then daily"
+unmonitored = "package timer: `find ~/.launchpadlib/api.launchpad.net/cache -type f -mtime +30 -delete`. os_jobs reads the SYSTEM manager only, so this one cannot be verified there"
+
+[[item]]
+name = "user-firmware-notifier"
+title = "snap firmware-updater notifier (user timer)"
+kind = "timer"
+location = "snap.firmware-updater.firmware-notifier.timer (ohmz user manager)"
+mode = "observe"
+wave = 0
+scope = "user:ohmz"
+schedule = "daily 03:00"
+unmonitored = "snap-generated desktop notifier; no maintenance effect"
+
+# =====================================================================================================================
+# WAVE 1: monitors and always-on daemons. Nothing here is retired; the umbrella PROBES them (etc/probes.toml).
+# =====================================================================================================================
+[[item]]
+name = "kuma-monitors"
+title = "Uptime Kuma monitors (13 plus the Media Stack group, feeding the Homarr uptime widget)"
+kind = "hook"
+location = "container uptime-kuma :3011 (v1); monitors: Internet, Plex (paused), Radarr, Sonarr, Prowlarr, SABnzbd, Deluge, Transmission, Bazarr, Tautulli, Seerr, Kometa, Immich"
+mode = "keep"
+wave = 1
+schedule = "every 60 s (Internet every 900 s)"
+replaced_by = ["internet", "radarr", "sonarr", "prowlarr", "sabnzbd", "deluge", "transmission", "bazarr", "tautulli", "seerr", "ct-kometa", "immich"]
+via = "probe"
+owner_notes = """
+Kuma stays: Homarr's uptimeStatus widget reads it. The umbrella becomes the source of truth: the probes above cover the same targets
+(verify with `python3 -m homelab_maint.probes kuma-diff <COPY of the Kuma sqlite>`; never point it at the live DB). Kuma has no
+notification channels today, so it pages nobody; the umbrella pages through notify. The Plex monitor is paused in Kuma, so the plex probe
+is left out of the parity set. kuma.toml push tokens (optional) let the umbrella heartbeat Kuma push monitors.
+"""
+
+[[item]]
+name = "platform-daemons"
+title = "Platform daemons: docker, cloudflared, tailscaled, fail2ban, smartd, ollama, Plex snap"
+kind = "unit"
+location = "docker.service, cloudflared.service, tailscaled.service, fail2ban.service, smartmontools.service (alias smartd.service), ollama.service, snap.plexmediaserver.plexmediaserver.service"
+mode = "keep"
+wave = 1
+schedule = "always on"
+replaced_by = ["docker-daemon", "svc-cloudflared", "tailscale", "fail2ban", "svc-smartd", "ollama", "svc-plex"]
+via = "probe"
+owner_notes = "plexmediaserver.service (the apt unit) is masked (-> /dev/null); the snap unit is the live one. cloudflared-update.timer is disabled on purpose (the service runs with --no-autoupdate)."
+
+[[item]]
+name = "umbrella-services"
+title = "The umbrella's own services: homelab-maint-www (:9111), homelab-maint-live, the tick timer, the self-health timer, the maintenance site container"
+kind = "unit"
+location = "homelab-maint-www.service (127.0.0.1:9111, installed), homelab-maint-live.service, homelab-maint-tick.timer and homelab-maint-selfhealth.timer (shipped by install.sh), container maintenance-web (127.0.0.1:8098)"
+mode = "keep"
+wave = 1
+schedule = "always on; the tick every minute"
+replaced_by = ["umbrella-www", "svc-hm-www", "umbrella-status"]
+via = "probe"
+owner_notes = """
+The platform itself: this tool refuses to disable any of these (a validation rule, not a convention). They are probed so a dead umbrella is
+seen by something other than itself: svc-hm-tick / umbrella-probes (Kuma push dead-man's switch) when the tick is installed.
+"""
+
+[[item]]
+name = "dashboards-and-sensors"
+title = "Always-on helpers: glances, sensor-exporter, smart-bridge, thermal-log"
+kind = "unit"
+location = "glances.service (127.0.0.1:61208), sensor-exporter.service (127.0.0.1:9110, fan supervisor), smart-bridge.service (127.0.0.1:7634), thermal-log.service (CSV every 30 s)"
+mode = "keep"
+wave = 1
+schedule = "always on"
+replaced_by = ["glances", "sensor-exporter", "svc-smart-bridge", "svc-thermal-log"]
+via = "probe"
+parity_check = [
+  { kind = "probe", names = ["glances", "sensor-exporter", "svc-smart-bridge", "svc-thermal-log"] },
+  { kind = "file_age", path = "/home/ohmz/StudioProjects/sensor-exporter/tuning/logs/thermal.csv", max_age_s = 300 },
+]
+owner_notes = """
+sensor-exporter drives fans (hardware control): it is NEVER retired by this tool. thermal-log.service keeps a 30 s CSV with package
+and GPU watts that the 1-minute metrics ring does not carry; retire it only after the ring does.
+"""
+
+[[item]]
+name = "hermes-stack"
+title = "Hermes pieces: gateway, delivery timer, flightclaw, cancel-service, internal cron ticker"
+kind = "unit"
+location = "ohmz user manager: hermes-gateway.service, hermes-delivery.timer (1 min), flightclaw.service (127.0.0.1:8765), cancel-service.service (loopback, behind cloudflared); ~/.hermes/cron (one fare-watch job)"
+mode = "keep"
+wave = 1
+scope = "user:ohmz"
+schedule = "always on; hermes-delivery every minute"
+replaced_by = ["hermes-api", "hermes-gateway", "hermes-ticker", "hermes-ticker-ok", "hermes-flightclaw", "cancel-service", "hermes-wd-delivery"]
+via = "probe"
+owner_notes = "Application plumbing, not maintenance: probed through its state files (~/.hermes/cron/ticker_heartbeat, ticker_last_success), never imported."
+
+[[item]]
+name = "app-schedulers"
+title = "Application-internal schedulers: Kometa (23:00), nextcloud_cron, Plex butler and library scans, Immich/arr jobs"
+kind = "hook"
+location = "containers kometa and nextcloud_cron (cron.sh); Plex (ScheduledLibraryUpdateInterval=3600, butler default window); Immich and *arr internal job queues"
+mode = "keep"
+wave = 1
+schedule = "owned by each application"
+replaced_by = ["ct-kometa", "nextcloud"]
+via = "probe"
+owner_notes = "Out of scope on purpose: they are application logic, not host maintenance. The routine calendar shows the Plex butler window so heavy jobs avoid it."
+
+[[item]]
+name = "other-services"
+title = "Other services found on the host: fancontrol, coolercontrold, teamviewerd, kerneloops, libvirt, nginx; user: x11vnc, gnome-remote-desktop, lucebox, qwen36-vllm"
+kind = "unit"
+location = "fancontrol.service (enabled, inactive), coolercontrold.service (disabled), teamviewerd.service (active), kerneloops.service, lm-sensors.service, rsyslog.service, libvirtd.service (+ sockets), nginx.service (disabled); user manager: x11vnc.service (active), gnome-remote-desktop.service, lucebox-dflash(.proxy).service (disabled), qwen36-vllm.service (broken symlink)"
+mode = "keep"
+wave = 1
+schedule = "none of them is a scheduled job"
+unmonitored = "daemons and desktop helpers that run no maintenance. Listed so the inventory is complete; teamviewerd has a probe (svc-teamviewerd). fancontrol never starts (ConditionFileNotEmpty=/etc/fancontrol fails: there is no such file) because sensor-exporter is the fan supervisor; do not create /etc/fancontrol or both would drive the same PWM outputs"
+
+[[item]]
+name = "boot-nvidia-tdp"
+title = "nvidia-tdp (GPU power limit at boot)"
+kind = "timer"
+location = "nvidia-tdp.timer -> nvidia-tdp.service (nvidia-smi -pm 1; nvidia-smi -pl 385)"
+mode = "keep"
+wave = 1
+schedule = "5 s after boot"
+parity_check = [{ kind = "command", argv = ["nvidia-smi", "--query-gpu=power.limit", "--format=csv,noheader,nounits"], regex = "^385\\." }]
+owner_notes = "Hardware setting, not maintenance. The parity check reads the live power limit (385 W)."
+
+[[item]]
+name = "boot-nvidia-cdi-refresh"
+title = "nvidia-cdi-refresh (CDI spec regenerated each boot)"
+kind = "unit"
+location = "nvidia-cdi-refresh.service -> /usr/local/sbin/nvidia-cdi-refresh (writes /etc/cdi/nvidia.yaml)"
+mode = "keep"
+wave = 1
+schedule = "boot, before docker.service"
+parity_check = [{ kind = "command", argv = ["systemctl", "is-active", "nvidia-cdi-refresh.service"], regex = "^active" }]
+owner_notes = "Boot dependency of every GPU container. Do not move the script."
+
+[[item]]
+name = "boot-tunarr-autostart"
+title = "tunarr-autostart (docker start tunarr-host-net on boot)"
+kind = "unit"
+location = "tunarr-autostart.service (oneshot, RemainAfterExit)"
+mode = "keep"
+wave = 1
+schedule = "boot"
+unmonitored = "tunarr-host-net already has RestartPolicy=always, so this unit is redundant; harmless and left for the owner to drop (its ExecStop does a tidy docker stop at shutdown)"
+
+[[item]]
+name = "lmstudio"
+title = "lmstudio.service (headless LM Studio, port 1234)"
+kind = "unit"
+location = "lmstudio.service -> /usr/local/bin/lmstudio-start.sh"
+mode = "keep"
+wave = 1
+schedule = "none: disabled, started by hand"
+unmonitored = "disabled unit; not part of the routine. Listed because it was easy to miss"
+
+[[item]]
+name = "cloudflared-update"
+title = "cloudflared-update.timer (disabled)"
+kind = "timer"
+location = "cloudflared-update.timer"
+mode = "keep"
+wave = 1
+schedule = "daily, DISABLED"
+unmonitored = "disabled on purpose; cloudflared runs with --no-autoupdate and is updated by hand"
+
+# =====================================================================================================================
+# WAVE 2: notification hooks. One path out: notify.py -> the owner's Hermes transports.
+# =====================================================================================================================
+[[item]]
+name = "notify-route"
+title = "The one notification path (notify.py over the Hermes SMS + Gmail transports)"
+kind = "hook"
+location = "~ohmz/.hermes/alert_transports.env via /usr/local/sbin/backup-notify-hermes.py and backup_report_html.py (kept as the umbrella's transport and email palette)"
+mode = "keep"
+wave = 2
+schedule = "event driven"
+replaced_by = "notify"
+via = "route"
+parity_check = [
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+  { kind = "task", name = "alert_path_health", green = 8, min_hours = 48 },
+]
+owner_notes = """
+Prove it before anything depends on it: `homelab-maint notify-test` (sends one clearly labelled TEST of each kind to your phone and
+inbox), then `homelab-maint migrate check notify-route`. backup-notify-hermes.py and backup_report_html.py are libraries of the
+umbrella now: NEVER move them (core.Notifier's bridge and notify.py's palette import them).
+"""
+
+[[item]]
+name = "smartd-alert-hook"
+title = "smartd -M exec hook (smart-alert.sh)"
+kind = "hook"
+location = "/etc/smartd.conf: DEVICESCAN -a -n standby,q -W 4,45,55 -m root -M exec /usr/local/sbin/smart-alert.sh"
+mode = "port"
+wave = 2
+schedule = "event driven (smartd)"
+replaced_by = "smart_event"
+via = "task"
+depends_on = ["notify-route"]
+soak_days = 14
+parity_check = [
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+  { kind = "task", name = "alert_path_health", green = 8, min_hours = 48 },
+  # The new entry (homelab_maint/smart_hook.py: stdlib only, so it survives a bad deploy of any other module), run for real from the installed
+  # code but with the sender replaced and the log pointed at /dev/null: it parses a smartd TEST event, builds the notify event and returns 0. Nothing is sent or written. Without it the stub would "succeed" while every event
+  # silently fell back to the slow legacy script (the stub falls back whenever `homelab-maint smart-event` fails or does not exist).
+  { kind = "command", argv = ["/usr/bin/python3", "-c", "import sys; sys.path.insert(0, '/usr/local/lib/homelab-maint'); from homelab_maint import smart_hook as n; sent = []; n._notify = lambda ev: (sent.append(ev), {'ok': True})[1]; rc = n.smart_event(env={'SMARTD_DEVICE': '/dev/TEST', 'SMARTD_FAILTYPE': 'EmailTest', 'SMARTD_MESSAGE': 'TEST ONLY'}, argv=['x'], log_path='/dev/null'); ok = rc == 0 and len(sent) == 1 and sent[0]['kind'] == 'test'; print('smart_event dry run ok' if ok else 'smart_event dry run FAILED'); sys.exit(0 if ok else 1)"], regex = "^smart_event dry run ok", timeout = 30, note = "`python3 -c ...` runs the new smart_hook entry for real on a smartd TEST event (sender replaced, log at /dev/null: nothing is sent or written) and gets exit 0" },
+  # ... and the installed CLI really has the subcommand the stub calls.
+  { kind = "command", argv = ["/usr/bin/grep", "-q", "smart-event", "/usr/local/lib/homelab-maint/homelab_maint/cli.py"], note = "the installed cli.py knows the `smart-event` subcommand the stub calls" },
+]
+retire_actions = [
+  { do = "move", src = "/usr/local/sbin/smart-alert.sh" },
+  { do = "stub", path = "/usr/local/sbin/smart-alert.sh", mode = "0755", content = """#!/bin/sh
+# homelab-maint forwarding stub (the retired smart-alert.sh). smartd.conf still names this path and is NOT edited.
+# The umbrella handles the event; if it cannot run, fall back to the legacy script so a SMART alert is never lost.
+/usr/local/sbin/homelab-maint smart-event "$@" && exit 0
+exec {legacy_dir}/smart-alert.sh "$@"
+""" },
+]
+owner_notes = """
+smartd.conf and smartd are not touched (no reload needed): the old path becomes a stub that calls `homelab-maint smart-event`, which logs
+to /var/log/smart-alert.log first (alert_path_health reads it) and then goes through notify.send. The swap is atomic: the script is copied
+(verified) into the legacy dir and the stub replaces it in ONE rename, so smartd, which calls the hook once and does not retry, never finds
+the path empty; rollback is one rename the other way. After cutover test it end to end:
+sudo env SMARTD_DEVICE=/dev/TEST SMARTD_FAILTYPE=EmailTest SMARTD_MESSAGE='TEST ONLY' /usr/local/sbin/smart-alert.sh
+and expect a line in /var/log/smart-alert.log plus a labelled test email. /etc/smartmontools/run.d/10mail is the unused package default.
+"""
+
+[[item]]
+name = "diun-mail"
+title = "Diun image-update notifier (own SMTP mail, daily 09:00)"
+kind = "hook"
+location = "container diun (crazymax/diun:4.29), DIUN_WATCH_SCHEDULE=0 9 * * *; its own SMTP settings DIUN_NOTIF_MAIL_* live in /home/ohmz/docker-container-data/diun/diun.env (env_file of /home/ohmz/docker-container-data/homelab-capture/diun.yml); database /home/ohmz/docker-container-data/diun/data"
+mode = "adapter"
+wave = 2
+schedule = "daily 09:00 (Toronto)"
+replaced_by = "routine_image_updates"
+via = "task"
+depends_on = ["notify-route"]
+parity_check = [
+  { kind = "task", name = "routine_image_updates", green = 1, min_hours = 0, fresh_h = 200 },
+  { kind = "notify", kinds = ["test", "report_weekly"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "manual", note = "comment out the DIUN_NOTIF_MAIL_* lines in /home/ohmz/docker-container-data/diun/diun.env (never print that file: it holds an SMTP password; edit it with a text editor) and recreate only that container: docker compose -f /home/ohmz/docker-container-data/homelab-capture/diun.yml up -d diun. Diun keeps checking registries and writing its database; routine_image_updates reads it and the weekly report carries the findings" },
+]
+owner_notes = "The tool never recreates a container. Diun is the one notifier left that does NOT go through notify.py (it mails with its own SMTP credentials), so this is the last place a message can leave the host outside the one path. Until you do the manual step you get Diun's own emails AND the umbrella's weekly list: harmless duplication."
+
+[[item]]
+name = "stack-alert-hook"
+title = "stack-alert@.service OnFailure hook (Hermes failure notifier)"
+kind = "hook"
+location = "~/.config/systemd/user/stack-alert@.service; OnFailure=stack-alert@%n.service on hermes-gateway, hermes-delivery, flightclaw, cancel-service (drop-ins) and stack-backup.service"
+mode = "keep"
+wave = 2
+scope = "user:ohmz"
+schedule = "event driven (any listed user unit fails)"
+unmonitored = "the umbrella's failed_units check cannot see USER units (the runner is root), so this Hermes hook is the only alarm for them. Keep it until a probes.toml `command` probe runs `runuser -u ohmz -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user --failed`"
+owner_notes = "Delivery is the same Hermes transport the umbrella uses (alert_transports.send_report); batches simultaneous failures into one message."
+
+# =====================================================================================================================
+# WAVE 3: small jobs and cron lines.
+# =====================================================================================================================
+[[item]]
+name = "notebook-db-alert"
+title = "notebook-db-alert (SurrealDB WAL / disk leading indicators)"
+kind = "timer"
+location = "notebook-db-alert.timer -> /usr/local/sbin/notebook-db-alert.sh (state /var/lib/notebook-db-alert/state, log /var/log/notebook-db-alert.log)"
+mode = "port"
+wave = 3
+schedule = "10 min after boot, then every 15 min"
+replaced_by = "surrealdb_health"
+via = "task"
+job = "notebook-db-alert"
+depends_on = ["notify-route"]
+require_idle = ["notebook-db-alert.service"]
+parity_check = [
+  { kind = "task", name = "surrealdb_health" },
+  { kind = "config", key = "tasks.surrealdb_health.first_sight_page", equals = true, note = "page at first sight like the script did (an upgraded maint.toml may lack it: merge maint.toml.dist)" },
+  { kind = "command", argv = ["/usr/bin/grep", "-q", "HermesNotifier", "/usr/local/lib/homelab-maint/homelab_maint/cli.py"], note = "the installed runner pages through notify.py (HermesNotifier); with plain core.Notifier every incident would page twice" },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "disable", unit = "notebook-db-alert.timer" },
+  { do = "move", src = "/usr/local/sbin/notebook-db-alert.sh" },
+]
+owner_notes = """
+The port fixes the script's broken RESOLVED path (the signature never contained |BAD, so recovery was never announced); see the PARITY.md
+section in tasks/native.py. The old log and state file stay where they are.
+"""
+
+[[item]]
+name = "comfyui-idle-vram"
+title = "comfyui-idle-vram (restart ComfyUI when idle and holding VRAM)"
+kind = "timer"
+location = "comfyui-idle-vram.timer -> /usr/local/bin/comfyui-idle-vram.sh (strike file /run/comfyui-idle-vram.strike)"
+mode = "port"
+wave = 3
+schedule = "5 min after boot, then every 5 min"
+replaced_by = "comfyui_idle_reclaim"
+via = "task"
+job = "comfyui-idle-vram"
+pause_on_rollback = ["comfyui_idle_reclaim"]
+depends_on = ["notify-route"]
+require_idle = ["comfyui-idle-vram.service"]
+parity_check = [
+  { kind = "task", name = "comfyui_idle_reclaim" },
+  { kind = "task_applies", name = "comfyui_idle_reclaim", tier_job = "tier-check" },
+]
+retire_actions = [
+  { do = "disable", unit = "comfyui-idle-vram.timer" },
+  { do = "move", src = "/usr/local/bin/comfyui-idle-vram.sh" },
+]
+owner_notes = """
+A port that can only REPORT is not a replacement, hence the task_applies parity check: it needs mode = "apply" AND something that passes --apply.
+`homelab-maint-check.service` and the tier-check job now carry --apply (C0 tasks stay read-only whatever the flag), so this check goes green once
+[tasks.comfyui_idle_reclaim] mode = "apply" is set in maint.toml. It stays red until then on purpose: the cutover would otherwise retire the
+5-minute legacy timer and leave nothing that ever restarts ComfyUI. The check tier runs every 15 min, so the two-strike rule takes 30 min
+instead of 10; give the task a `schedule = "*/5 * * * *"` if that matters.
+"""
+
+[[item]]
+name = "prune-openwebui-media"
+title = "prune-openwebui-media (generated media older than 7 days)"
+kind = "timer"
+location = "prune-openwebui-media.timer -> /usr/local/bin/prune-openwebui-media.sh (RETENTION_DAYS=7)"
+mode = "port"
+wave = 3
+schedule = "daily 04:00, up to 30 min random delay"
+replaced_by = "openwebui_media_prune"
+via = "task"
+job = "prune-openwebui-media"
+pause_on_rollback = ["openwebui_media_prune"]
+depends_on = ["notify-route"]
+require_idle = ["prune-openwebui-media.service"]
+parity_check = [
+  { kind = "task", name = "openwebui_media_prune", green = 3, min_hours = 48, fresh_h = 30 },
+  { kind = "task_applies", name = "openwebui_media_prune", tier_job = "tier-daily" },
+]
+retire_actions = [
+  { do = "disable", unit = "prune-openwebui-media.timer" },
+  { do = "move", src = "/usr/local/bin/prune-openwebui-media.sh" },
+]
+owner_notes = "The allow-list name patterns (owui_*.png, owui_vid_*.webm, *_owui_vid.*, *_generated-image.png, *_generated_image*) are identical in the port."
+
+[[item]]
+name = "mem-guard"
+title = "mem-guard (dry-run only, superseded by pressure/stuck logic)"
+kind = "timer"
+location = "mem-guard.timer -> /usr/local/sbin/mem-guard.py --threshold-gib 5 --dry-run (log /var/log/mem-guard.log)"
+mode = "retire"
+wave = 3
+schedule = "3 h after boot, then every 3 h"
+replaced_by = ["pressure_state", "stuck_detector"]
+via = "task"
+job = "mem-guard"
+require_idle = ["mem-guard.service"]
+parity_check = [
+  { kind = "task", name = "pressure_state" },
+  { kind = "task", name = "stuck_detector" },
+]
+retire_actions = [
+  { do = "disable", unit = "mem-guard.timer" },
+  { do = "move", src = "/usr/local/sbin/mem-guard.py" },
+]
+owner_notes = "It only ever logged (--dry-run); sizing alone is a bad signal, which is why pressure_state looks at PSI and stuck_detector at progress. Not ported."
+
+[[item]]
+name = "immich-server-recycle"
+title = "immich-server-recycle (docker restart immich_server every 2 h)"
+kind = "timer"
+location = "immich-server-recycle.timer -> immich-server-recycle.service (ExecStart=/usr/bin/docker restart immich_server)"
+mode = "port"
+wave = 3
+schedule = "15 min after boot, then every 2 h"
+replaced_by = "immich_recycle"
+via = "task"
+depends_on = ["notify-route"]
+soak_days = 1
+job = "immich-server-recycle"
+pause_on_rollback = ["immich_recycle"]
+require_idle = ["immich-server-recycle.service"]
+parity_check = [
+  { kind = "task", name = "immich_recycle" },
+  { kind = "task_applies", name = "immich_recycle", tier_job = "tier-check" },
+]
+retire_actions = [
+  { do = "disable", unit = "immich-server-recycle.timer" },
+]
+owner_notes = "No script to move: the unit runs docker directly. Same gate semantics natively (busy => defer, 12 h max). immich_recycle is a check-tier C1 task: like comfyui-idle-vram it needs --apply on the check tier (see that item) before the task_applies check goes green."
+
+[[item]]
+name = "immich-recycle-gate-dropin"
+title = "immich-server-recycle gate drop-in (ExecCondition=homelab-maint gate immich-recycle)"
+kind = "unit"
+location = "/etc/systemd/system/immich-server-recycle.service.d/10-homelab-gate.conf (installed by install.sh)"
+mode = "retire"
+wave = 3
+schedule = "n/a (applies whenever the service starts)"
+replaced_by = "immich_recycle"
+via = "task"
+depends_on = ["immich-server-recycle"]
+parity_check = [{ kind = "task", name = "immich_recycle" }]
+retire_actions = [
+  { do = "move", src = "/etc/systemd/system/immich-server-recycle.service.d/10-homelab-gate.conf", reload = "system" },
+]
+owner_notes = "install.sh must stop re-installing this drop-in once the timer is retired (see glue), otherwise the next upgrade quietly puts it back."
+
+[[item]]
+name = "docker-prune"
+title = "docker-prune (weekly image / stopped-container / build-cache prune)"
+kind = "timer"
+location = "docker-prune.timer -> /usr/local/sbin/docker-prune.sh (Environment=DOCKER_CONFIG=/home/ohmz/.docker, log /var/log/docker-prune.log)"
+mode = "port"
+wave = 3
+schedule = "Sun 04:00, up to 15 min random delay, Persistent"
+replaced_by = ["docker_cache", "docker_images", "docker_containers_prune"]
+via = "task"
+job = "docker-prune"
+pause_on_rollback = ["docker_cache", "docker_images", "docker_containers_prune"]
+depends_on = ["notify-route"]
+require_idle = ["docker-prune.service"]
+parity_check = [
+  { kind = "task", name = "docker_prune_parity", green = 1, min_hours = 0, fresh_h = 200 },
+  { kind = "task_applies", name = "docker_cache", tier_job = "tier-daily" },
+  { kind = "task_applies", name = "docker_images", tier_job = "tier-daily" },
+  { kind = "task_applies", name = "docker_containers_prune", tier_job = "tier-weekly" },
+]
+retire_actions = [
+  { do = "disable", unit = "docker-prune.timer" },
+  { do = "move", src = "/usr/local/sbin/docker-prune.sh" },
+]
+owner_notes = """
+The classic regression: the build cache once reached 46 GB while the old job reported success, because root's docker sees only its own
+empty `default` builder. The natives need Environment=DOCKER_CONFIG=/home/ohmz/.docker in homelab-maint-daily.service/-weekly.service;
+docker_prune_parity reports 'builder discovery' as a gap until they have it, which is why it gates this cutover. Volumes are never pruned
+by either side.
+"""
+
+[[item]]
+name = "cron-bazarr-subtitle-rules"
+title = "Bazarr nightly subtitle rules (ohmz crontab)"
+kind = "cron"
+location = "ohmz crontab: 30 2 * * * python3 /home/ohmz/StudioProjects/docker-bazarr/bazarr_subtitle_rules.py >> .../bazarr_subtitle_rules.log # bazarr-nightly-subtitle-rule"
+mode = "adapter"
+wave = 3
+schedule = "daily 02:30"
+replaced_by = "bazarr-rules"
+via = "job"
+job = "bazarr-rules"
+depends_on = ["notify-route"]
+parity_check = [
+  { kind = "scheduled", job = "bazarr-rules" },
+  { kind = "file_age", path = "/home/ohmz/StudioProjects/docker-bazarr/data/bazarr/config/log/bazarr_subtitle_rules.log", max_age_s = 93600 },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "cron_comment", user = "ohmz", tag = "bazarr-nightly-subtitle-rule" },
+]
+owner_notes = "The script stays in place and becomes the job command (user ohmz). Its own log file stops growing: the job log lives under /var/log/homelab-maint/jobs/bazarr-rules/. The script holds /tmp/bazarr_subtitle_rules.lock itself, so a manual run never overlaps."
+
+[[item]]
+name = "cron-tunarr-weekly-sync"
+title = "Tunarr weekly channel sync (ohmz crontab)"
+kind = "cron"
+location = "ohmz crontab: 15 4 * * 1 /home/ohmz/StudioProjects/tunarr-sync/run.sh # tunarr-weekly-channel-sync"
+mode = "adapter"
+wave = 3
+schedule = "Mon 04:15"
+replaced_by = "tunarr-sync"
+via = "job"
+job = "tunarr-sync"
+depends_on = ["notify-route"]
+parity_check = [
+  { kind = "scheduled", job = "tunarr-sync" },
+  { kind = "file_age", path = "/home/ohmz/StudioProjects/tunarr-sync/logs", max_age_s = 777600 },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "cron_comment", user = "ohmz", tag = "tunarr-weekly-channel-sync" },
+]
+owner_notes = "run.sh keeps writing logs/sync-DATE.log and prunes to the last 12; the job adds exit-code alerting. The 04:15 slot sits after Kometa's nightly refresh and inside the Plex butler window: the scheduler treats it as heavy."
+
+[[item]]
+name = "purge-public-guests"
+title = "purge_public_guests.py (reap guest accounts on the public Open WebUI) - currently UNSCHEDULED"
+kind = "script"
+location = "/home/ohmz/StudioProjects/ai-stack/scripts/purge_public_guests.py (README calls it load-bearing; no timer, no cron line and no Hermes cron job runs it)"
+mode = "adapter"
+wave = 3
+schedule = "none today: run by hand"
+replaced_by = "purge-public-guests"
+via = "job"
+job = "purge-public-guests"
+depends_on = ["notify-route"]
+parity_check = [
+  { kind = "scheduled", job = "purge-public-guests" },
+  { kind = "command", argv = ["runuser", "-u", "ohmz", "--", "/usr/bin/python3", "/home/ohmz/StudioProjects/ai-stack/scripts/purge_public_guests.py"], timeout = 60 },
+]
+owner_notes = """
+A gap, not a retirement: the public instance mints a user row per visit and nothing else prunes them. There is no legacy driver, so there is
+nothing to disable: jobs.toml ships the job in observe mode (it deletes accounts, so it is adopted deliberately) with no `retire` list, and
+this cutover only flips it to managed. The parity command is the script's own DRY RUN (its default: it signs in through the loopback admin
+door and lists accounts; it deletes nothing). Run that once by hand and read the list before the cutover.
+"""
+
+[[item]]
+name = "cron-root-journal-vacuum"
+title = "root cron: journalctl --vacuum-time=7d (retired 2026-10-01)"
+kind = "cron"
+location = "root crontab (commented): 30 5 * * 0 /usr/bin/journalctl --vacuum-time=7d"
+mode = "retire"
+wave = 3
+schedule = "was Sun 05:30"
+replaced_by = "config_drift"
+via = "task"
+pre_retired = "2026-10-01"
+parity_check = [{ kind = "task", name = "config_drift", green = 1, min_hours = 0, fresh_h = 200 }]
+retire_actions = [
+  { do = "cron_comment", user = "root", match = "journalctl --vacuum-time=7d" },
+]
+owner_notes = "Replaced by /etc/systemd/system/journald.conf.d/10-homelab.conf (SystemMaxUse=1G, MaxRetentionSec=1month); config_drift watches it."
+
+[[item]]
+name = "cron-root-find-tmp"
+title = "root cron: find /tmp -atime +7 -delete (retired 2026-10-01)"
+kind = "cron"
+location = "root crontab (commented): 0 6 * * 0 /usr/bin/find /tmp -type f -atime +7 -delete"
+mode = "retire"
+wave = 3
+schedule = "was Sun 06:00"
+replaced_by = "os_jobs"
+via = "task"
+pre_retired = "2026-10-01"
+retire_actions = [
+  { do = "cron_comment", user = "root", match = "find /tmp -type f -atime +7" },
+]
+owner_notes = "Replaced by systemd-tmpfiles-clean (30 d); see os-tmpfiles-clean."
+
+[[item]]
+name = "cron-root-logrotate"
+title = "root cron: logrotate /etc/logrotate.conf (retired 2026-10-01)"
+kind = "cron"
+location = "root crontab (commented): 30 6 * * 0 /usr/sbin/logrotate /etc/logrotate.conf"
+mode = "retire"
+wave = 3
+schedule = "was Sun 06:30"
+replaced_by = "os_jobs"
+via = "task"
+pre_retired = "2026-10-01"
+retire_actions = [
+  { do = "cron_comment", user = "root", match = "/usr/sbin/logrotate /etc/logrotate.conf" },
+]
+owner_notes = "Replaced by logrotate.timer; see os-logrotate."
+
+[[item]]
+name = "cron-root-old-disabled"
+title = "root cron: three older jobs the owner had already commented out"
+kind = "cron"
+location = "root crontab (commented): run_cursor_agent_nightly.sh (07:00 nightly), run_rotten-tomatoes.sh (Wed 03:00), run_kometa.sh (Wed 03:30)"
+mode = "retire"
+wave = 3
+schedule = "disabled before the migration"
+replaced_by = "ct-kometa"
+via = "probe"
+pre_retired = "2026-10-01"
+retire_actions = [
+  { do = "cron_comment", user = "root", match = "run_cursor_agent_nightly.sh" },
+  { do = "cron_comment", user = "root", match = "run_rotten-tomatoes.sh" },
+  { do = "cron_comment", user = "root", match = "run_kometa.sh" },
+]
+owner_notes = "Commented out by the owner (date not recorded; first seen commented 2026-10-01). Kometa now runs inside its own container."
+
+# =====================================================================================================================
+# WAVE 4: Hermes user-scope jobs and the stack backup (units live in ~ohmz/.config/systemd/user, run by the ohmz user manager).
+# =====================================================================================================================
+[[item]]
+name = "search-canary"
+title = "search-canary (SearXNG canary, two instances)"
+kind = "timer"
+location = "ohmz user timer search-canary.timer -> ~/ai-stack/scripts/search_canary.py (state ~/.hermes/search_canary_state.json)"
+mode = "adapter"
+wave = 4
+scope = "user:ohmz"
+schedule = "10 min after boot, then every 30 min, up to 3 min random delay"
+replaced_by = "search-canary"
+via = "job"
+job = "search-canary"
+depends_on = ["notify-route", "tier-check"]
+soak_days = 3
+require_idle = ["search-canary.service"]
+parity_check = [
+  { kind = "scheduled", job = "search-canary" },
+  { kind = "unit_equiv", job = "search-canary", unit = "search-canary.service", scope = "user:ohmz" },
+  { kind = "file_age", path = "/home/ohmz/.hermes/search_canary_state.json", max_age_s = 7200 },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "disable", unit = "search-canary.timer" },
+]
+owner_notes = """
+The script keeps its own health_alert confirm/recover engine and its own Hermes alert (self_notifies = true until you decide otherwise);
+the umbrella adds scheduling, a timeout (TimeoutStartSec=300 in the old unit), run history and an exit-code alert. Keep the 30 minute
+cadence: SearXNG suspends engines that are queried harder, so a chattier canary causes the outage it exists to detect.
+"""
+
+[[item]]
+name = "stack-watchdog"
+title = "stack-watchdog (gateway, API, delivery timer, backup freshness, ticker, ...)"
+kind = "timer"
+location = "ohmz user timer stack-watchdog.timer -> ~/ai-stack/scripts/stack_watchdog.py + health_alert.py (state ~/.hermes/watchdog_state.json)"
+mode = "adapter"
+wave = 4
+scope = "user:ohmz"
+schedule = "3 min after boot, then every 5 min"
+replaced_by = "stack-watchdog"
+via = "job"
+job = "stack-watchdog"
+depends_on = ["notify-route", "search-canary"]
+soak_days = 7
+require_idle = ["stack-watchdog.service"]
+parity_check = [
+  { kind = "scheduled", job = "stack-watchdog" },
+  { kind = "unit_equiv", job = "stack-watchdog", unit = "stack-watchdog.service", scope = "user:ohmz" },
+  { kind = "file_age", path = "/home/ohmz/.hermes/watchdog_state.json", max_age_s = 900 },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "disable", unit = "stack-watchdog.timer" },
+]
+owner_notes = """
+This is the alarm covering the alarm (the Hermes pipe). It keeps its own 2-run confirm, reminder and KILLED logic; do not rewrite it. If the
+umbrella's tick stops, this stops too. What notices that is NOT the tick: the check tier stays on its own systemd timer
+(homelab-maint-check.timer, item tier-check, never retired), and its `probes` task judges the probe umbrella-tick (tick.json older than
+5 minutes = crit) and pages through core.Notifier. Its Kuma push (umbrella-probes) is only a second, external view: Kuma has no
+notification channel, so it pages nobody.
+"""
+
+[[item]]
+name = "stack-backup"
+title = "stack-backup (nightly ai-stack backup to the SandiskSSD)"
+kind = "timer"
+location = "ohmz user timer stack-backup.timer -> ~/ai-stack/scripts/stack_backup.sh (OnFailure=stack-alert@%n; LAST_OK /media/SandiskSSD/ai-stack-backups/LAST_OK)"
+mode = "adapter"
+wave = 4
+scope = "user:ohmz"
+schedule = "daily 03:30, up to 5 min random delay, Persistent"
+replaced_by = "stack-backup"
+via = "job"
+job = "stack-backup"
+depends_on = ["stack-watchdog"]
+soak_days = 7
+verified_runs = 2
+require_idle = ["stack-backup.service"]
+parity_check = [
+  { kind = "scheduled", job = "stack-backup" },
+  { kind = "unit_equiv", job = "stack-backup", unit = "stack-backup.service", scope = "user:ohmz" },
+  { kind = "job_attr", job = "stack-backup", attr = "pausable", equals = false },
+  { kind = "file_age", path = "/media/SandiskSSD/ai-stack-backups/LAST_OK", max_age_s = 93600 },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "disable", unit = "stack-backup.timer" },
+]
+owner_notes = """
+Cutover only when LAST_OK is fresh (< 26 h) and no backup is running (refused otherwise). The job needs TimeoutStartSec=30min, Nice=10 and
+idle IO like the old unit. The unit's OnFailure=stack-alert@ line stays (harmless; it only fires for manual `systemctl --user start`).
+The stack-watchdog 'backup' check keeps reading LAST_OK, so it keeps alarming if the umbrella job ever stops.
+"""
+
+[[item]]
+name = "tier-check"
+title = "homelab-maint check tier: stays on its own systemd timer, deliberately (the tick's watchdog)"
+kind = "timer"
+location = "homelab-maint-check.timer -> homelab-maint-check.service (homelab-maint run --tier check --apply, every 15 min)"
+mode = "keep"
+wave = 4
+schedule = "every 15 min, up to 60 s random delay"
+keeps_job = "tier-check"
+parity_check = [
+  { kind = "scheduler_health" },
+  { kind = "scheduler_validate" },
+  { kind = "command", argv = ["systemctl", "is-enabled", "homelab-maint-check.timer"], regex = "^enabled" },
+  { kind = "probe", names = ["umbrella-tick"] },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+owner_notes = """
+NEVER retired (validation refuses to disable homelab-maint-check.timer). After wave 4 the stack watchdog, the stack backup, the daily/weekly
+runners and both system backups all start from ONE process, the tick, and its probes-run job lives there too. The check tier is the only
+runner that does not: its `probes` task folds the engine in every 15 minutes and judges the probe umbrella-tick (tick.json older than 5
+minutes = crit, paged through core.Notifier), and backup_freshness, os_jobs and alert_path_health run there. That is what notices a dead
+tick. Kuma's umbrella-probes push is only a second view: Kuma has ZERO notification channels, so it pages nobody.
+The jobs.toml job `tier-check` therefore stays in observe mode for good (its legacy driver, this timer, stays the driver); the cutover of this
+item only RECORDS the adoption once the tick is proven beating and jobs.toml validates, and everything the tick takes over depends on it.
+A jobs.toml typo is the other way the tick silences itself: the tick still beats, but schedules nothing. `scheduler validate` is therefore a
+parity check of every adapter that hands a job over and of this item. (Not done by this tool, a request to the scheduler: report crit and
+make the tick service exit non-zero when it loaded no jobs because of config problems, and keep a last-known-good jobs.toml.)
+"""
+
+[[item]]
+name = "tier-daily"
+title = "homelab-maint daily tier (runner timer, replaced by the tick)"
+kind = "timer"
+location = "homelab-maint-daily.timer -> homelab-maint-daily.service (homelab-maint run --tier daily --apply)"
+mode = "adapter"
+wave = 4
+schedule = "daily 07:30, up to 20 min random delay, Persistent"
+replaced_by = "tier-daily"
+via = "job"
+job = "tier-daily"
+depends_on = ["stack-watchdog"]
+soak_days = 7
+require_idle = ["homelab-maint-daily.service"]
+parity_check = [
+  { kind = "scheduler_health" },
+  { kind = "scheduled", job = "tier-daily" },
+]
+retire_actions = [
+  { do = "disable", unit = "homelab-maint-daily.timer" },
+]
+owner_notes = "The routine engine still decides WHAT the daily tier may do inside its window; only WHO starts it changes. Wait for the next 07:30 and read the daily digest."
+
+[[item]]
+name = "tier-weekly"
+title = "homelab-maint weekly tier (runner timer, replaced by the tick)"
+kind = "timer"
+location = "homelab-maint-weekly.timer -> homelab-maint-weekly.service (homelab-maint run --tier weekly --apply)"
+mode = "adapter"
+wave = 4
+schedule = "Wed 07:45, Persistent"
+replaced_by = "tier-weekly"
+via = "job"
+job = "tier-weekly"
+depends_on = ["tier-daily"]
+require_idle = ["homelab-maint-weekly.service"]
+parity_check = [
+  { kind = "scheduler_health" },
+  { kind = "scheduled", job = "tier-weekly" },
+]
+retire_actions = [
+  { do = "disable", unit = "homelab-maint-weekly.timer" },
+]
+owner_notes = "The job waits for the daily tier (after = tier-daily), like the old After=homelab-maint-daily.service."
+
+[[item]]
+name = "metrics-sample"
+title = "7-day metrics ring sampler (runner timer, replaced by the tick)"
+kind = "timer"
+location = "homelab-maint-metrics.timer -> homelab-maint-metrics.service (python3 -m homelab_maint.metrics_ring sample)"
+mode = "adapter"
+wave = 4
+schedule = "every minute (OnUnitActiveSec=1min)"
+replaced_by = "metrics-sample"
+via = "job"
+job = "metrics-sample"
+depends_on = ["stack-watchdog"]
+require_idle = ["homelab-maint-metrics.service"]
+parity_check = [
+  { kind = "scheduler_health" },
+  { kind = "scheduled", job = "metrics-sample" },
+  { kind = "file_age", path = "/var/lib/homelab-maint/metrics-ring.json", max_age_s = 300 },
+]
+retire_actions = [
+  { do = "disable", unit = "homelab-maint-metrics.timer" },
+]
+owner_notes = "A one-minute job: the tick costs tens of ms when nothing is due, and a missed minute is simply skipped. Watch the ring file stay fresh."
+
+# =====================================================================================================================
+# WAVE 5: system backups. Last, and slowly: each has a 14 day soak (two weekly cycles) before anything depends on it.
+# =====================================================================================================================
+[[item]]
+name = "backup-system"
+title = "backup-system (weekly system-drive backup to BK-SYSTEM)"
+kind = "timer"
+location = "backup-system.timer -> /usr/local/sbin/backup-system.sh (sources backup-common.sh; status /var/log/backup/system-status.json; OnFailure=backup-failure@%n)"
+mode = "adapter"
+wave = 5
+schedule = "Sat 01:00, up to 15 min random delay, Persistent"
+replaced_by = "backup-system"
+via = "job"
+job = "backup-system"
+depends_on = ["stack-backup", "tier-daily", "notify-route"]
+soak_days = 14
+verified_runs = 2
+backup = true
+require_idle = ["backup-system.service"]
+parity_check = [
+  { kind = "scheduled", job = "backup-system" },
+  # No live proof run can exist before the cutover (the legacy-timer interlock forbids it), so prove the job is the unit: same command, user,
+  # nice, ionice, timeout (none), RequiresMountsFor and environment as `systemctl show backup-system.service`.
+  { kind = "unit_equiv", job = "backup-system", unit = "backup-system.service" },
+  # The global kill switch (touch PAUSE) must not silently stop the backup: a pausable job is deferred and finally expired.
+  { kind = "job_attr", job = "backup-system", attr = "pausable", equals = false },
+  { kind = "status_json", path = "/var/log/backup/system-status.json", result_key = "result", ok_values = ["ok"], max_age_hours = 200 },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "disable", unit = "backup-system.timer" },
+]
+owner_notes = """
+The script, backup-common.sh and the status JSON are unchanged; only WHO starts it changes (the umbrella: gated, serialised with the other
+backup, timeout infinity, Nice=10 best-effort IO 7, as in the old unit). Cut over on a Sunday-to-Friday, never while a backup runs (refused:
+the unit, the tick's own run of the job, or a held /run/lock/backup-*.lock; --force cannot override that).
+The job is marked self_notifies = true: you keep getting the script's own report through backup-notify.sh until the wave 6 item
+backup-notify-wrapper turns that off. REQUIRED right after the cutover: start the first run attended, `homelab-maint job run backup-system`,
+and compare its status JSON with the previous one. Nothing that depends on this item counts until the tick has recorded 2 green runs of the
+job, and the 14 day soak starts at the first of them: calendar time with a backup the tick never launched (a pressure deferral, a bad mount, a
+jobs.toml the tick ignores) proves nothing, and is how the weekly backup could stop with nothing but the next backup_freshness warning to say so.
+"""
+
+[[item]]
+name = "backup-immich"
+title = "backup-immich (weekly Immich library backup to BK-IMMICH)"
+kind = "timer"
+location = "backup-immich.timer -> /usr/local/sbin/backup-immich.sh (status /var/log/backup/immich-status.json; OnFailure=backup-failure@%n)"
+mode = "adapter"
+wave = 5
+schedule = "Sun 01:00, up to 15 min random delay, Persistent"
+replaced_by = "backup-immich"
+via = "job"
+job = "backup-immich"
+depends_on = ["backup-system"]
+soak_days = 14
+verified_runs = 2
+backup = true
+require_idle = ["backup-immich.service"]
+parity_check = [
+  { kind = "scheduled", job = "backup-immich" },
+  { kind = "unit_equiv", job = "backup-immich", unit = "backup-immich.service" },
+  { kind = "job_attr", job = "backup-immich", attr = "pausable", equals = false },
+  { kind = "status_json", path = "/var/log/backup/immich-status.json", result_key = "result", ok_values = ["ok"], max_age_hours = 200 },
+  { kind = "notify", kinds = ["test"], max_age_days = 30 },
+]
+retire_actions = [
+  { do = "disable", unit = "backup-immich.timer" },
+]
+owner_notes = "Same mechanics as backup-system (including the attended first run: `homelab-maint job run backup-immich`); starts only after the tick has recorded 2 green backup-system runs and 14 days have passed since the first, so a regression is isolated to one disk."
+
+# =====================================================================================================================
+# WAVE 6: backup wrappers (the legacy notification and failure path around the two backups). Order matters: first make the umbrella
+# the only notifier (self_notifies = false), THEN retire the script's own notifier, THEN the failure hook.
+# =====================================================================================================================
+[[item]]
+name = "backup-notify-wrapper"
+title = "backup-notify.sh (per-backup SMS + email through the Hermes bridge)"
+kind = "script"
+location = "/usr/local/sbin/backup-notify.sh (0750; config /etc/backup/notify.conf 0600; log /var/log/backup/notify.log); called by backup-common.sh and backup-failed.sh"
+mode = "retire"
+wave = 6
+schedule = "event driven (end of each backup run)"
+replaced_by = "notify"
+via = "route"
+depends_on = ["backup-system", "backup-immich"]
+require_idle = ["backup-system.service", "backup-immich.service"]
+require_idle_jobs = ["backup-system", "backup-immich"]
+backup = true
+parity_check = [
+  # you edit /etc/homelab-maint/jobs.toml by hand for self_notifies: a typo there silences every job, so it must still validate cleanly
+  { kind = "scheduler_validate", jobs = ["backup-system", "backup-immich"] },
+  { kind = "job_attr", job = "backup-system", attr = "self_notifies", equals = false },
+  { kind = "job_attr", job = "backup-immich", attr = "self_notifies", equals = false },
+  { kind = "job_attr", job = "backup-system", attr = "notify.on_failure", equals = "alert" },
+  { kind = "job_attr", job = "backup-immich", attr = "notify.on_failure", equals = "alert" },
+  { kind = "notify", kinds = ["maintenance", "alert", "test"], max_age_days = 14 },
+  { kind = "task", name = "backup_freshness", green = 3, min_hours = 48, fresh_h = 2 },
+]
+retire_actions = [
+  { do = "move", src = "/usr/local/sbin/backup-notify.sh" },
+]
+owner_notes = """
+THE interlock of the whole migration: while a job has self_notifies = true the umbrella stays silent about ordinary failures (the script
+alerts for itself). Moving backup-notify.sh without flipping that flag would make a failed backup SILENT. So the parity checks above
+read the EFFECTIVE jobs.toml: set `self_notifies = false` for backup-system and backup-immich in /etc/homelab-maint/jobs.toml first, then
+run `homelab-maint scheduler validate` (a typo in that file makes the tick schedule NOTHING; the scheduler_validate check refuses the cutover).
+After cutover backup-common.sh finds no executable backup-notify.sh and skips it quietly; the umbrella job tells you instead (email
+after each backup, text only for a failure). You stop getting the 'backup OK' text. Never move backup-notify-hermes.py or
+backup_report_html.py: notify.py imports them. /etc/backup/notify.conf is left in place.
+"""
+
+[[item]]
+name = "backup-failure-hook"
+title = "backup-failure@.service OnFailure hook (backup-failed.sh)"
+kind = "hook"
+location = "/etc/systemd/system/backup-failure@.service -> /usr/local/sbin/backup-failed.sh (writes /var/log/backup/FAILED-<unit>.txt, then backup-notify.sh); also run by the jobs' hooks.on_failure"
+mode = "retire"
+wave = 6
+schedule = "event driven (a backup unit fails; or a backup job fails under the tick)"
+replaced_by = ["backup-system", "backup-immich"]
+via = "job"
+depends_on = ["backup-notify-wrapper", "backup-system", "backup-immich"]
+require_idle = ["backup-system.service", "backup-immich.service"]
+require_idle_jobs = ["backup-system", "backup-immich"]
+backup = true
+parity_check = [
+  { kind = "scheduler_validate", jobs = ["backup-system", "backup-immich"] },
+  { kind = "job_attr", job = "backup-system", attr = "self_notifies", equals = false },
+  { kind = "job_attr", job = "backup-immich", attr = "self_notifies", equals = false },
+  { kind = "task", name = "backup_freshness", green = 3, min_hours = 48, fresh_h = 2 },
+]
+retire_actions = [
+  { do = "move", src = "/usr/local/sbin/backup-failed.sh" },
+  { do = "stub", path = "/usr/local/sbin/backup-failed.sh", mode = "0755", content = """#!/bin/sh
+# homelab-maint forwarding stub (the retired backup-failed.sh). Scheduled backups are run and reported by the umbrella job scheduler,
+# which alerts on a failed or lost run itself; this only leaves a journal line when this hook is still called (jobs.toml
+# hooks.on_failure, or somebody started a backup unit by hand and it died).
+echo "BACKUP FAILURE: ${1:-unknown} (scheduled runs are reported by homelab-maint)" | systemd-cat -t backup -p err
+exit 0
+""" },
+]
+owner_notes = """
+The stub keeps `hooks.on_failure = ["/usr/local/sbin/backup-failed.sh", ...]` in jobs.toml valid; remove those two lines at leisure.
+The OnFailure= lines in backup-system.service and backup-immich.service and the backup-failure@.service template stay (inert). The old
+FAILED-*.txt marker files are never read by backup_freshness (they persist forever).
+"""

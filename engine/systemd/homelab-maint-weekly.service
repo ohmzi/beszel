@@ -1,0 +1,16 @@
+[Unit]
+Description=homelab-maint weekly tier (C2 plans and slow audits)
+# Never overlap the daily tier (07:30 plus up to 20 min of random delay): if both are due,
+# the weekly run waits for the daily one to finish.
+After=docker.service homelab-maint-daily.service
+
+[Service]
+Type=oneshot
+# C2 tasks only ever produce a plan here; applying one needs `homelab-maint approve TASK HASH`.
+ExecStart=/usr/local/sbin/homelab-maint run --tier weekly --apply
+Nice=10
+IOSchedulingClass=idle
+OOMScoreAdjust=500
+MemoryMax=2G
+TimeoutStartSec=3h
+SyslogIdentifier=homelab-maint

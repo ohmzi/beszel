@@ -1,0 +1,60 @@
+[Unit]
+Description=homelab-maint live monitor (5 s heartbeat -> public/live.json for the website's Live tab)
+Documentation=file:///usr/local/lib/homelab-maint/homelab_maint/live.py
+# Ordering only (no Wants=): starting the monitor must never start, or restart, anything it merely watches. That includes dockerd:
+# it is socket-activated here (docker.service is TriggeredBy=docker.socket, `dockerd -H fd://`), so a connect to the socket while the
+# service is stopped or stopping would START it. The monitor therefore only opens /var/run/docker.sock after it has seen a live
+# dockerd process AND `systemctl is-active docker.service` == active; otherwise the docker probe just goes stale and the
+# services read HTTP only. `systemctl stop docker` for maintenance is safe with this unit running.
+After=network.target docker.service
+
+[Service]
+Type=simple
+# Config ([live] in maint.toml) is read once at start: after editing it run `systemctl restart homelab-maint-live` (safe: SIGTERM
+# persists the history in ~20 ms; the graph shows a gap of about 5 s). install.sh restarts it when code or units change.
+# Samples /proc, cgroup v2, hwmon, nvidia-smi and the Docker socket every 5 s (read-only) and atomically rewrites
+# /var/lib/homelab-maint/public/live.json plus live-history.json once a minute. Budget (tests/bench_live.py): < 1.5 % of one
+# core, < 40 MiB. Root only because the Docker socket and nvidia-smi want it; the sandbox below lets it write nowhere else.
+User=root
+Environment=PYTHONPATH=/usr/local/lib/homelab-maint
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B -m homelab_maint.live
+# SIGTERM is handled: finish the tick, persist the 60-minute history, exit 0 (well inside the timeout).
+KillSignal=SIGTERM
+TimeoutStopSec=15
+Restart=always
+RestartSec=5
+SyslogIdentifier=homelab-maint-live
+
+# Best effort by design (class P1 "serving" for the dashboard it feeds, but it must never compete with the apps it watches).
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=64M
+CPUQuota=10%
+TasksMax=48
+
+# Read-only everywhere except the state dir. Deliberately NOT PrivateDevices=: nvidia-smi needs /dev/nvidia*. Deliberately NOT
+# ProtectProc=/ProcSubset=: the monitor reads /proc/stat, /proc/diskstats, /proc/net/dev, /proc/pressure/* and /proc/locks.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/homelab-maint
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+# Everything it talks to is local: the Docker socket (AF_UNIX) and loopback HTTP (service health, sensor-exporter on :9110).
+IPAddressDeny=any
+IPAddressAllow=localhost
+# live.json and public/ must be world-readable (the web container reads them as another user); live-history.json is chmod 0600 in code.
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

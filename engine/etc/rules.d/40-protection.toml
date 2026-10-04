@@ -1,0 +1,225 @@
+# homelab-maint rules registry: Protections. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync). The wording fields (title, why, principle, owner_notes) are written from
+# core.Ctx.is_protected and tasks/gates.py; the patterns and the [busy] table compile into protected.toml.
+
+[meta]
+category = "protection"
+title = "Protections"
+blurb = "Workloads and paths the script must never kill, restart or delete."
+
+[[rule]]
+id = "protect.databases-stateful-stores"
+title = "Never touch: databases and stateful stores"
+kind = "protection"
+why = """\
+  A database that is killed, restarted or deleted can lose data or need hours of recovery, and a database \
+  legitimately holds a lot of memory and disk (SurrealDB for Open Notebook, Postgres for Immich, Nextcloud and \
+  Tday, MariaDB, Qdrant, Meilisearch, Redis). Size or a moment of load is never a reason to touch one, so \
+  these names are an absolute veto against deleting, killing, restarting or throttling them."""
+does = """\
+  Each pattern is a case-insensitive regular expression that is SEARCHED (a substring match, not a full match) \
+  in container names, image names, compose project names, process names and command lines, systemd unit names \
+  and every path or label a task hands to the shared action gate (ctx.act). A match stops every task that goes \
+  through ctx.act (all cleaners and the spike ladder's throttle, restart and emergency-stop rungs, recorded as \
+  'refused: protected.toml'); the stuck-container detector still reports a matching container but never offers \
+  it as an action; apt_autoremove_unused keeps a package with such a name. The ladder additionally never \
+  throttles or restarts anything that looks like a database by image or compose service (guard.py), because a \
+  name like afsaane-prod-db is Postgres. Because it is a substring match, any path or image that merely \
+  contains 'redis' or 'postgres' is also protected. A malformed pattern protects everything, and so does a \
+  missing or empty protected.toml (it then falls back to '.*'). The one exemption on the books is the QoS \
+  baseline, which may RAISE (never lower) the CPU weight of the databases that serve P1 apps, through \
+  qos_unprotect in classes.toml."""
+file = "protected.toml"
+target = ""
+merge = "append"
+severity = "none"
+principle = "protect before you clean; never kill by size"
+owner_notes = """\
+  These patterns are mirrored in the baseline (00-baseline-invariants.toml): the registry refuses to shrink \
+  them without an owner override in 99-owner-overrides.toml."""
+since = "2026-10-03"
+order = 1
+
+[rule.params]
+patterns = [
+  "surreal", "postgres", "mariadb", "mysql", "qdrant", "meilisearch", "redis", "grimmory-db",
+  "tday_db", "immich_postgres",
+]
+
+[[rule]]
+id = "protect.ai-media-processing-that"
+title = "Never touch: AI and media processing that legitimately spikes"
+kind = "protection"
+why = """\
+  ComfyUI, Ollama, Plex, Immich, Tunarr, Kometa, the *arr stack, SABnzbd and the speech and embedding services \
+  load models, scan libraries and transcode in bursts, so a large memory or CPU figure at one moment is normal \
+  for them and says nothing about being stuck. They are the people-facing and batch core of the host, which is \
+  why they are protected by name instead of being judged by size."""
+does = """\
+  Matching is as described for the databases rule: a case-insensitive substring search in the names and paths \
+  handed to ctx.act. Nothing the script does may kill, restart, throttle, delete from or stop a match unless \
+  that one task carries an explicit per-task 'unprotect' for it. Six tasks carry one: caps (the five container \
+  names it limits), comfyui_idle_reclaim (^comfyui$), immich_recycle (^immich_server$), app_cache_trim (the \
+  Tunarr subtitles folder), openwebui_media_prune (owui_ files in the ComfyUI output folder) and c2_candidates \
+  (one Kometa path); the ladder's L3 and QoS rungs use their own lists in classes.toml. The match also covers \
+  PATHS: a project folder called tunarr, immich or kometa is skipped by the build-output cleaners, and a \
+  trashed file that came from one is never purged. Image tags that match keep docker_images from removing the \
+  image."""
+file = "protected.toml"
+target = ""
+merge = "append"
+severity = "none"
+principle = "never kill by size; detect by saturation, not size"
+owner_notes = """\
+  Every unprotect is checked against an allow-list in the baseline, so a new exemption is a visible, \
+  deliberate change. The Plex entries name the snap's processes; Plex's Media folder itself is covered by the \
+  data-paths rule."""
+since = "2026-10-03"
+order = 2
+
+[rule.params]
+patterns = [
+  "comfyui", "ollama", "plexmediaserver", "plex media", "plex transcoder", "immich",
+  "open-notebook", "open_notebook", "infinity", "omnivoice", "speaches", "kokoro",
+  "ebook2audiobook", "tunarr", "kometa", "sabnzbd", "radarr", "sonarr", "prowlarr", "bazarr",
+]
+
+[[rule]]
+id = "protect.build-tooling-while-a-build"
+title = "Never touch: Docker build tooling"
+kind = "protection"
+why = """\
+  Killing or pruning a builder in the middle of a build corrupts the build and throws away minutes to hours of \
+  work. These names keep any task from treating a build daemon or build client as something to clean up."""
+does = """\
+  Matching is as described for the databases rule: a case-insensitive substring search in the names and paths \
+  handed to ctx.act. buildkitd, 'docker build' and buildctl in a name or command line are an absolute veto. \
+  The buildx builder container itself (named buildx_buildkit_...) does not contain 'buildkitd', so the \
+  ladder's own never-restart list in guard.py and the docker_build busy gate (which defers docker_cache, \
+  dangling_images and stale_build_output while a build runs) are what actually protect it. Gradle and Kotlin \
+  daemons are deliberately NOT in this list: gradle_reaper decides about them by idleness and by the gradle \
+  gate."""
+file = "protected.toml"
+target = ""
+merge = "append"
+params = { patterns = ["buildkitd", "docker build", "buildctl"] }
+severity = "none"
+principle = "protect before you clean"
+owner_notes = """\
+  The shipped protected.toml comment reads: build tooling while a build may be running (reaper decides \
+  separately via idle checks)."""
+since = "2026-10-03"
+order = 3
+
+[[rule]]
+id = "protect.infrastructure"
+title = "Never touch: infrastructure"
+kind = "protection"
+why = """\
+  The Docker engine, systemd, ssh, the tunnel and VPN, the desktop session, the dashboards and the alert and \
+  monitoring path are what the owner uses to reach, see and repair the host. Losing one of them while a \
+  cleaner runs would hide the damage, so they are protected by name (and sit in class P0 or P1 in \
+  classes.toml)."""
+does = """\
+  Matching is as described for the databases rule: a case-insensitive substring search in the names and paths \
+  handed to ctx.act. dockerd, containerd, systemd, sshd, cloudflared, tailscaled, xorg, xwayland, gnome-shell, \
+  networkmanager, homarr, uptime-kuma, glances, fail2ban, smartd, libvirt, qemu and claude are a veto for \
+  every task and ladder rung. Side effects of the substring match, as shipped: 'systemd' also matches \
+  /var/lib/systemd/coredump, so crash_dumps never removes a core dump (see that rule); 'claude' matches any \
+  path or name containing it (the Claude Code state and project folders); 'homarr' skips the Homarr project \
+  folder in the build-output cleaner; 'libvirt' and 'qemu' keep VM images out of every cleaner, as does the \
+  baseline never-touch list for /var/lib/libvirt."""
+file = "protected.toml"
+target = ""
+merge = "append"
+severity = "none"
+principle = "protect before you clean; classes of service (P0-P3)"
+owner_notes = "Mirrored in the baseline; shrinking the list needs an owner override."
+since = "2026-10-03"
+order = 4
+
+[rule.params]
+patterns = [
+  "dockerd", "containerd", "systemd", "sshd", "cloudflared", "tailscaled", "xorg", "xwayland",
+  "gnome-shell", "networkmanager", "homarr", "uptime-kuma", "glances", "fail2ban", "smartd",
+  "libvirt", "qemu", "claude",
+]
+
+[[rule]]
+id = "protect.data-paths-that-must-never"
+title = "Never touch: data paths that must never be cleaned automatically"
+kind = "protection"
+why = """\
+  Some data is expensive or impossible to recreate: the Plex library and its Media folder, the Ollama and \
+  ComfyUI models, the Docker volumes, the backup disks, the Immich photo library and the database data \
+  folders. A cleaner that is wrong once can destroy it, so these paths are an absolute veto for anything \
+  handed to ctx.act."""
+does = """\
+  Matching is as described for the databases rule: a case-insensitive substring search in the names and paths \
+  handed to ctx.act. Paths covered: /var/snap/plexmediaserver (Plex data), /media/SandiskSSD/plex (the SSD \
+  source of Plex's Media folder), /usr/share/ollama (Ollama models), /volume1/docker/comfyui/models, \
+  /var/lib/docker/volumes (volumes are never pruned), surreal_data and notebook_data (Open Notebook's \
+  SurrealDB), /mnt/backup (the system and Immich backup disks), /media/Immich (the photo library) and pgdata \
+  (Postgres data folders). The cleaners' own never-touch lists (cleaners.py, cleaners_apps.py, cleaners_dev.py \
+  and the registry's baseline) repeat most of these as path rules that cannot be unprotected."""
+file = "protected.toml"
+target = ""
+merge = "append"
+severity = "none"
+principle = "protect before you clean"
+owner_notes = """\
+  Plex's Media folder is bind-mounted from the SanDisk SSD (/media/SandiskSSD/plex onto the snap's Plex Media \
+  Server/Media folder); plex_media_mount_check pages if that mount is missing, because Plex would regenerate \
+  Media on the root disk."""
+since = "2026-10-03"
+order = 5
+
+[rule.params]
+patterns = [
+  "/var/snap/plexmediaserver", "/media/SandiskSSD/plex", "/usr/share/ollama",
+  "/volume1/docker/comfyui/models", "/var/lib/docker/volumes", "surreal_data", "notebook_data",
+  "/mnt/backup", "/media/Immich", "pgdata",
+]
+
+[[rule]]
+id = "protect.busy"
+title = "Busy probes and gates: when disruptive work must wait"
+kind = "protection"
+why = """\
+  Protection by name is not enough for work that is safe at one time and harmful at another: restarting Immich \
+  during an upload, pruning the build cache during a build, or touching Gradle daemons during a test run. The \
+  busy gates ask the running system whether the work is actually active right now, using saturation figures \
+  such as queue length and CPU use instead of size."""
+does = """\
+  These settings feed tasks/gates.py. comfyui_queue_url and ollama_ps_url are the queues the ComfyUI and \
+  Ollama gates and the spike ladder ask. backup_units (backup-system, backup-immich, stack-backup, \
+  docker-prune) make the backup gate busy while one is active; stack-backup.service is a USER unit that the \
+  system manager cannot see, so that entry never fires. immich_containers plus the Postgres container are \
+  sampled over 10 seconds and count as busy above immich_cpu_busy_pct (15 percent of one core). \
+  plex_process_patterns make the Plex gate busy during a scan or transcode. build_process_patterns drive the \
+  docker_build gate (the entries GradleDaemon, Gradle Test Executor and kotlin-compiler are filtered out there \
+  and the gradle gate uses its own patterns, so those three have no effect). max_defer_hours lets \
+  `homelab-maint gate immich-recycle` proceed after 12 hours of deferral. Fail closed: any probe error counts \
+  as busy; the only exception is a container or unit that is definitely not running, which is idle."""
+applies_to = ["immich_recycle", "comfyui_idle_reclaim", "pressure_response", "docker_cache", "dangling_images", "gradle_reaper", "stale_build_output"]
+file = "protected.toml"
+target = "busy"
+severity = "none"
+principle = "protect before you clean; detect by saturation, not size"
+owner_notes = """\
+  The scheduler's own max_defer_hours per job (jobs.toml) is a separate setting from the [busy] table. The \
+  routine adds its own default gates (backup and pressure level 2 or more) for disruptive steps."""
+since = "2026-10-03"
+
+[rule.params]
+comfyui_queue_url = "http://127.0.0.1:8188/queue"
+ollama_ps_url = "http://127.0.0.1:11434/api/ps"
+backup_units = ["backup-system.service", "backup-immich.service", "stack-backup.service", "docker-prune.service"]
+build_process_patterns = [
+  "docker build", "buildctl", "buildkitd.*--", "GradleDaemon", "Gradle Test Executor",
+  "kotlin-compiler",
+]
+plex_process_patterns = ["Plex Media Scanner", "Plex Transcoder", "Plex Script Host"]
+immich_containers = ["immich_server", "immich_machine_learning"]
+immich_cpu_busy_pct = 15
+max_defer_hours = { immich-recycle = 12 }

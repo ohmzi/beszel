@@ -1,0 +1,936 @@
+# homelab-maint rules registry: Spike and load response. This file DEFINES what the script does; the legacy config files are
+# generated from it (homelab-maint rules check | diff | sync). Human text (title, why, does, proof, notes) is written; params are
+# the values the runner reads, and compile(rules.d) must keep equalling etc/*.toml.
+
+[meta]
+category = "spike"
+title = "Spike and load response"
+blurb = "How the script reacts to memory, IO, CPU and GPU pressure."
+
+[[rule]]
+id = "task.spike_sampler"
+title = "Memory spike sampler (flight recorder)"
+kind = "spike"
+why = """\
+  A spike can only be explained afterwards if something wrote down who was using memory, CPU and IO while it \
+  happened. This sampler is that flight recorder. Its records feed the stuck-container detector, the pressure \
+  ladder's list of top contributors and the spike log in the reports, so every later decision rests on \
+  measured progress and stalls and never on how big a container looks (detect by saturation, not size)."""
+does = """\
+  Every check run (every 15 minutes, 60 s timeout) it lists the running containers with docker ps and reads \
+  each one's cgroup v2 files: anonymous and file memory, swap, current and peak memory, CPU time, IO bytes, \
+  OOM-kill count and memory PSI full avg60. It also records host MemAvailable, swap used, memory, IO and CPU \
+  PSI avg60, swap-in and swap-out pages, the OOM-kill counter, GPU utilisation and VRAM (nvidia-smi) and the 8 \
+  biggest processes outside containers by anonymous memory. One compact line is appended to samples.jsonl in \
+  the state directory (/var/lib/homelab-maint); lines older than keep_days (14) are dropped, in a rewrite done \
+  at most about once a day. Status: warn (and a page after two confirming runs) when docker ps fails, when no \
+  container could be read or when more than 20 % of the listed containers have unreadable cgroups, so that a \
+  cgroup layout change cannot leave the guard blind while looking healthy; a container that exits between \
+  docker ps and the read is normal and stays ok. It only reads the workload and writes its own sample file."""
+applies_to = ["spike_sampler"]
+file = "maint.toml"
+target = "tasks.spike_sampler"
+params = { keep_days = 14 }
+severity = "warn"
+principle = "detect by saturation, not size: keep the evidence"
+owner_notes = """\
+  keep_days = 14 matches the review period the owner set before any restart enforcement is considered (see \
+  task.stuck_detector). Read-only toward containers. (migrated from maint.toml [tasks.spike_sampler])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.stuck_detector"
+title = "Stuck container detector (no progress, not just big)"
+kind = "spike"
+why = """\
+  A big container is not a fault; a container that holds gigabytes while doing nothing may be one. This \
+  detector supplies the evidence a restart would need: no CPU progress, no IO progress and memory that is flat \
+  or growing, measured over time (never kill by size). It is the evidence stage only. The ladder's L4 restart \
+  rung recomputes the same candidates with these same options, and every candidate is checked against the \
+  protection and busy gates before anyone could act on it."""
+does = """\
+  Every check run it reads the newest min_samples (6) samples.jsonl records of the last 6 hours. It judges \
+  only if they span at least 30 minutes and the newest is under 45 minutes old; otherwise it reports \
+  'collecting samples' or 'sampler not running' at info level, and after 2 hours of records without any \
+  container data it warns that the samples are unusable. A container is a candidate only when, across the \
+  whole window, its CPU and IO counters were readable and never went backwards (a restart resets them), its \
+  anonymous memory plus swap is at least min_anon_gib (4 GiB), its CPU use stays under 1 % of one core and its \
+  IO under 1 MiB/min, and its memory growth is either above growth_gib_per_hour (0.5 GiB/h: leak or runaway) \
+  or within plus or minus that value (idle but holding). Shrinking memory means it is releasing by itself and \
+  is not a candidate. Each candidate is then marked protected (protected.toml by name, image or compose \
+  service, a built-in list of databases and build daemons such as postgres, mariadb, redis, qdrant, surreal, \
+  meilisearch and buildkit, or docker could not confirm it) or busy (the application's own gate says it is \
+  working: ComfyUI queue, Ollama CPU, Immich CPU or backups, Plex scanner or transcoder, docker build). Only a \
+  candidate that is neither is actionable: that gives warn and a page after two confirming runs. Protected and \
+  busy candidates are info and never page. The summary also shows memory pressure (none, warn, crit) judged \
+  with memory_health's thresholds. Options not set in the shipped config use the code defaults: idle_cpu_pct \
+  1, idle_io_mib_per_min 1, min_window_min 30, max_window_hours 6, max_sample_age_min 45, no_data_hours 2. \
+  Restart: with enforce = true the task would restart the largest actionable candidate once per run under \
+  critical memory pressure, but the runner never gives a read-only (C0) task apply permission, so enforce has \
+  no effect today. Restarts belong to the pressure ladder (task.pressure_response, rung L4)."""
+applies_to = ["stuck_detector", "pressure_response"]
+file = "maint.toml"
+target = "tasks.stuck_detector"
+params = { enforce = false, min_samples = 6, min_anon_gib = 4, growth_gib_per_hour = 0.5 }
+severity = "warn"
+principle = "never kill by size: a stall needs proof of no progress"
+owner_notes = """\
+  enforce stays false: the owner wants 14 days of samples reviewed before any automatic restart is considered, \
+  and even then the restart that works is pressure_response L4 (restart = report until switched on). Setting \
+  enforce to true here changes nothing today, and rules check would also demand destructive = true on this \
+  rule. (migrated from maint.toml [tasks.stuck_detector])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.orphan_report"
+title = "Orphaned and idle developer processes"
+kind = "spike"
+why = """\
+  Development tools on this workstation (Gradle and Kotlin daemons, Android emulators, test servers) leave \
+  processes behind that hold gigabytes of RAM for days. This report finds them so the owner, or the \
+  gradle_reaper cleaner once its apply mode is switched on, can deal with them on purpose. It only reports: a \
+  process that looks idle can still be part of a live build, so the decision to kill is left to a person or to \
+  a cleaner with its own in-use proof (report first, in-use proof before deletion)."""
+does = """\
+  Every check run it scans /proc and lists: (1) Gradle and Kotlin compile daemons whose CPU use stayed at or \
+  below idle_cpu_pct (0.5 % of a core) for at least idle_hours (3), judged from CPU ticks remembered between \
+  runs, and only while no Gradle client or test or worker JVM is running; (2) headless emulators (qemu-system \
+  with -avd) whose parent process is gone (orphans), and emulators that have run 24 hours or more under a live \
+  parent (information only); (3) stray test servers matching stray_patterns (default: python slow.py); (4) \
+  crashpad handlers whose parent is gone while no emulator is alive (Chrome's own handler is not matched); (5) \
+  zombies (all counted, at most 6 listed). Status: ok when nothing is found; info (dashboard only, no page) \
+  when something is; warn and a page only when the reported anonymous memory reaches alert_gib (8 GiB) or \
+  zombies reach alert_zombies (100). It never signals or kills a process: it is a read-only (C0) task with no \
+  apply mode."""
+applies_to = ["orphan_report"]
+file = "maint.toml"
+target = "tasks.orphan_report"
+params = { idle_hours = 3 }
+severity = "warn"
+principle = "in-use proof before action; report first, change second"
+owner_notes = """\
+  This host is also the owner's workstation. gradle_reaper (daily, report-only) is the cleaner that would act \
+  on idle Gradle daemons and uses its own thresholds (120 idle minutes over two daily samples). (migrated from \
+  maint.toml [tasks.orphan_report])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.image_ledger"
+title = "Docker image usage ledger"
+kind = "spike"
+why = """\
+  Docker images get deleted when 'nothing uses them', and on this host that guess was nearly wrong: the \
+  ComfyUI container is normally stopped, so a prune that only looks at running containers would remove that \
+  container and then its 14.9 GiB image. The ledger is the in-use proof that makes image cleanup safe. It \
+  remembers when any container, running or stopped, last used each image, so 'unused' means unused for weeks \
+  and not just not running right now."""
+does = """\
+  Every check run it lists all containers including stopped ones (docker ps -a), reads each one's image ID \
+  (docker inspect) and updates ledger/images.json in the state directory: first_seen, last_seen and up to 3 \
+  container names per image. An image that no container references keeps its entry until it was last seen more \
+  than keep_days (30) ago, then the entry is dropped. If docker ps fails, or docker inspect returns nothing \
+  for existing containers, the ledger is left as it was and the task warns, so nothing is guessed; a container \
+  that vanishes mid-run is tolerated. It also counts the images on the host that no container references, for \
+  the dashboard, and changes nothing in Docker. The consumer is the docker_images cleaner: it selects an image \
+  only if the ledger is fresh (updated within 48 hours), has existed for at least unused_days (14) and has not \
+  seen the image in that time, on top of its own 14-day 'seen unreferenced' clock. A missing or stale ledger \
+  means it selects nothing."""
+applies_to = ["image_ledger", "docker_images"]
+file = "maint.toml"
+target = "tasks.image_ledger"
+params = { keep_days = 30 }
+severity = "warn"
+principle = "in-use proof before deletion"
+owner_notes = """\
+  docker-prune.timer was disabled by the owner on 2026-10-02 because it would have removed the stopped comfyui \
+  container and then its 14.9 GiB image; nothing in this project re-enables it. The ledger counts stopped \
+  containers (docker ps -a) as users of their image for exactly that reason. keep_days (30) is longer than the \
+  docker_images unused_days (14), so an image's last_seen is still on record when the cleaner asks. (migrated \
+  from maint.toml [tasks.image_ledger])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.pressure_state"
+title = "Pressure level 0-5 from stalls, not size"
+kind = "spike"
+why = """\
+  A host is in trouble when work is stalled waiting for a resource, not when something is big. This task turns \
+  the kernel's pressure-stall numbers (PSI) and a few other signals into one level from 0 to 5 per resource, \
+  with hysteresis so a number hovering at a threshold cannot flap the level. It is the single input everything \
+  else reads: the response ladder, the scheduler's rule that P2 and P3 jobs do not start under pressure, the \
+  routine's pressure gate, the Live tab and the reports (detect by saturation, not size)."""
+does = """\
+  Every check run (15 minutes) it reads memory, IO and CPU PSI avg60, MemAvailable, the swap-in rate since the \
+  previous run (pages per second, only if that run was 1 minute to 3 hours ago), GPU memory used (nvidia-smi) \
+  and the 1-minute load (shown, not scored). Each of the 8 signals (the classes.ladder.signals rules) maps to \
+  a level 1-5 with its own enter and leave thresholds. Per resource (mem, io, cpu, gpu) the highest signal \
+  wins, capped at 5, 3, 3 and 2. A level is entered after it holds for enter_runs (2) consecutive runs and \
+  left after leave_runs (3) runs below the leave thresholds. Two levels are published: level (the maximum over \
+  all four resources, for the dashboard) and gate_level = max(memory, cpu), which the scheduler, routine and \
+  reports read, because this host holds IO pressure at level 3 for hours every night (a find on a spinning \
+  disk) while nobody is waiting on it. Status: crit when gate_level is 4 or more, warn at 2 or 3, info when \
+  only level is 1 or more (including IO-only or GPU-only pressure), ok at 0; it pages only when memory is at \
+  level 2 or higher. It also writes one line to spikes.jsonl when a spike ends (start, peak, resources \
+  involved, top contributors from the last 50 minutes of samples, what the ladder did), in slices of at most \
+  spike_max_hours (6), and keeps the class membership and the list of unclassified containers for the website. \
+  It changes nothing on the host."""
+applies_to = ["pressure_state"]
+file = "maint.toml"
+target = "tasks.pressure_state"
+params = {}
+severity = "crit"
+principle = "detect by saturation, not size; hysteresis against flapping"
+owner_notes = """\
+  gate_level exists because io PSI sat at level 3 for 32 of 39 runs in 9.5 hours of real samples; counted as \
+  warn it burnt a 99 % SLO to 15 % and deferred every P2 and P3 job and every backup (measured 2026-10-01, \
+  INTEGRATION decision 15). An unreadable /proc/pressure is an error, never level 0. (migrated from maint.toml \
+  [tasks.pressure_state])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.bulkhead_check"
+title = "Concurrency limits (bulkheads) drift check"
+kind = "spike"
+why = """\
+  The most effective way to keep a burst from becoming a host-wide stall is to cap how much work each app \
+  takes at once: a bounded Ollama queue, a single ComfyUI worker, a transcode limit in Plex (admission \
+  control, or bulkheads). Those limits live in each app's own settings and silently disappear when an app is \
+  reinstalled or its unit is edited. This weekly check compares them with the agreed values in \
+  classes.bulkheads, so drift is noticed before the next burst and not during it."""
+does = """\
+  Once a week (weekly routine step, Wednesday window) it reads, read-only: the OLLAMA_* variables of \
+  ollama.service (systemctl show; other variables are never read), the command flags of the running comfyui \
+  container (skipped while it is stopped, which is its normal state here), OPEN_NOTEBOOK_WORKER_MAX_TASKS of \
+  the open-notebook container and TranscodeCountLimit in Plex's Preferences.xml (root only: reported as \
+  unreadable otherwise). It reports drift when OLLAMA_NUM_PARALLEL is unset or more than twice the agreed \
+  value, OLLAMA_MAX_QUEUE is unset, OLLAMA_MAX_LOADED_MODELS or OLLAMA_KEEP_ALIVE (when set) exceed the agreed \
+  values, ComfyUI lacks a required flag, the Open Notebook limit is unset or higher than agreed, or Plex's \
+  limit is 0 (unlimited) or more than twice the agreed value. It also lists running containers that no class \
+  pattern names, because the ladder never acts on those. Immich's job concurrency lives in its database and is \
+  not checked. The result is info (dashboard only, never a page) and nothing is changed."""
+applies_to = ["bulkhead_check"]
+file = "maint.toml"
+target = "tasks.bulkhead_check"
+params = {}
+principle = "admission control: cap concurrent work per app (bulkheads)"
+owner_notes = """\
+  Informational on purpose (alert = false): the limits express how the owner wants to share the GPU and RAM, \
+  so a drift is a note and the fix is made by hand in the app's own settings (see the playbook), never by this \
+  task. (migrated from maint.toml [tasks.bulkhead_check])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.pressure_response"
+title = "Spike response ladder (reclaim, slow, restart, stop)"
+kind = "spike"
+why = """\
+  When the host is really short of a resource, the answer is a fixed order of sacrifice and not killing the \
+  biggest process. This task walks a graduated ladder: reclaim idle memory, then slow best-effort work, then \
+  restart one proven-stuck container, then, only from an explicit list, stop best-effort containers. Each rung \
+  has its own mode, daily budget and audit trail (throttle before kill, classes of service, dry-run first). \
+  Only reclaim ships on; everything that slows, restarts or stops ships report-only until the owner has read \
+  the 'would' rows."""
+does = """\
+  Every check run (after pressure_state) it reads that task's state; a record older than stale_state_min (45 \
+  min) is unknown, so nothing escalates and whatever the ladder changed is released. Rung modes come from this \
+  rule's params: reclaim = apply, throttle, restart and emergency = report ('off' disables a rung). The rule's \
+  mode = apply is the master switch: a run without --apply, or mode = report, forces every rung to report, and \
+  while a PAUSE file exists no rung runs. L1 annotate: one note per spike, never an action. L2 reclaim (memory \
+  or GPU at level 2+): unload an Ollama model only if its expires_at is still in the future and has not moved \
+  for idle_s (300 s), a second probe 2 s later agrees and Ollama's CPU is not busy, at most 4 per run; call \
+  ComfyUI /free only when its queue is empty on two probes and the last call is over 30 min old. L3 slow \
+  (memory or cpu at level 3+; IO alone has no lever on this host): lower cpu-shares to 128 (P3) or 256 (P2) on \
+  active containers (at least 10 % of a core, or growing over 0.5 GiB/h) that classes.toml names explicitly, \
+  P3 first and P2 only when no active unslowed P3 is left, at most 8 per run, never below the floor and never \
+  a database or build daemon; the container's own weight is recorded and put back when memory and cpu are \
+  below level 3. L4 restart (memory level 2+ tracks candidates, level 4+ acts): at most one container per run, \
+  only if stuck_detector's evidence held in 2 consecutive runs, it is not protected, not P0 or P1, not a \
+  database, explicitly classified and not busy, L2 has been tried, and the budget allows it (2 restarts per 6 \
+  h in total, a 30 min x 2^(n-1) backoff per container, 4 per day). L5 emergency (memory level 5 after memory \
+  has been at level 4+ for 20 min): stop one container per run from classes.ladder.emergency_stop (empty, so \
+  it does nothing), P3 before P2, never P0, P1, a database, protected.toml or an unclassified name; each stop \
+  is started back after at most 60 min and not repeated for 6 h. Every attempt is an audit row, and rows also \
+  go to pressure-log.jsonl; in report mode they read 'would'. A failure or an 'alert only' row (a stuck \
+  container the ladder may not touch) warns and pages so the owner decides; a refusal worth a look (protected \
+  target, used-up budget, floor) warns without paging. While the evening freeze is on, the routine holds the \
+  restart and emergency rungs to report-only unless the pressure level is 4 or more; reclaim and slow are \
+  never held."""
+applies_to = ["pressure_response"]
+file = "maint.toml"
+target = "tasks.pressure_response"
+params = { reclaim = "apply", throttle = "report", restart = "report", emergency = "report" }
+mode = "apply"
+severity = "warn"
+destructive = true
+proof = """\
+  Safety comes from layers that can only say no. (1) Class gate: P0 and P1 are never throttled, restarted or \
+  stopped; a container that classes.toml does not name is never acted on; a missing or broken class map \
+  disables L3-L5 (fail closed). (2) protected.toml (name, image and compose service) applies in full to L4 and \
+  L5 and to L3 except the 16 named P2 batch containers, because slowing is not killing; databases and build \
+  daemons are excluded from every rung whatever their class. L2 acts through Ollama's and ComfyUI's own APIs, \
+  so its targets are exempt from protected.toml but nothing is killed. (3) In-use proof: unload only after an \
+  idle timer, a second probe and a CPU check; /free only on an empty queue seen twice; restart only for no CPU \
+  or IO progress and flat or growing memory over at least 30 minutes, an application gate that says not busy, \
+  and two consecutive runs. (4) Budgets: max_per_day 12 / 24 / 4 / 3, 2 restarts per 6 h, 8 slowed per run, \
+  one stop per run, every stop capped at 60 min; the release baseline caps restarts at 6 per 6 h and 12 per \
+  day and stops at 6 per day, and rules check refuses a registry above that. (5) Report first: throttle, \
+  restart and emergency ship as report, so the audit log shows 'would' rows before anything real happens. (6) \
+  Kill switch: homelab-maint pause pressure_response (or the PAUSE file) stops every rung, puts throttles back \
+  at once and starts stopped containers again once memory is below level 4 or the time cap ends."""
+principle = "throttle before kill; classes of service P0-P3; dry-run first"
+owner_notes = """\
+  Only reclaim (L2) ships on. The check tier runs with --apply for exactly this (jobs.toml tier-check and \
+  systemd/homelab-maint-check.service); until install.sh runs, the installed units are the old ones. ComfyUI's \
+  container is normally stopped (failed_units expects it), so L2 today has Ollama models to unload and little \
+  else. L3 to L5 stay report until the owner has reviewed the would-have rows; flip them one at a time. \
+  (migrated from maint.toml [tasks.pressure_response])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "task.qos_classes"
+title = "Service class CPU and IO weights (QoS baselines)"
+kind = "spike"
+why = """\
+  When every container runs at the same CPU weight, a Plex stream or the Immich API competes evenly with a \
+  library scan or a build. This daily task sets standing priorities by class of service, so P1 (interactive) \
+  containers win contention and P3 (best-effort) ones lose it before any spike happens. It only changes \
+  weights, which can be undone, never memory limits or processes, and it ships report-only (dry-run first)."""
+does = """\
+  Daily (routine step qos_classes, after the cleaners) it reads every running container's class from \
+  classes.toml, reads its current cpu-shares, blkio-weight, memory reservation and memory limit with docker \
+  inspect and, for a class that has a [defaults] baseline, runs docker update with the missing flags: \
+  cpu-shares 4096 for P1 and 256 for P3; P2 has no baseline and keeps Docker's default; P0 is skipped. \
+  blkio-weight is set only when a disk really runs bfq or io.cost is on (not the case here, so the summary \
+  says 'io weights skipped'), and memory-reservation only when above 0 and the parent slice has a memory.low \
+  (not the case either). It skips a container that no pattern names, one the L3 throttle holds, a weight that \
+  would fall below the floors, a database that would be lowered, a P1 container already above its baseline and \
+  a P3 container already stricter. A name in protected.toml is refused unless it is in \
+  classes.ladder.qos_unprotect (the P1 front ends and their stores). It is idempotent: a container already at \
+  target is not touched. A container recreated by compose loses the setting and gets it back at the next daily \
+  run. As shipped (mode = report) every change is only an audit row that says 'would'. It never pages."""
+applies_to = ["qos_classes"]
+file = "maint.toml"
+target = "tasks.qos_classes"
+params = {}
+mode = "report"
+severity = "warn"
+destructive = true
+proof = """\
+  It changes cpu-shares (and blkio-weight or memory-reservation where they work) with docker update: no \
+  process is killed or restarted and nothing is deleted, and each change is reversed by the same command. \
+  Checks: the floors (cpu-shares 64, blkio-weight 10) are never crossed; P0, unclassified and L3-throttled \
+  containers are skipped; databases and build daemons are never lowered; a stricter existing setting is not \
+  fought; protected.toml still applies except for the explicit qos_unprotect names; the per-run item cap \
+  applies. The shipped weights make P1 beat an untouched container under both runc mappings (4096 gives weight \
+  157 or 303 against 100) and keep P3 below it (256 gives 10 or 35), and tests/test_pressure.py asserts that. \
+  The mode ships report; the owner flips it to apply, and the run also needs --apply, which the daily tier \
+  passes."""
+principle = "classes of service P0-P3: priorities set before the spike"
+owner_notes = """\
+  Report-only until the owner sets mode = apply. runc 1.2.5 is installed here and maps cpu-shares linearly to \
+  cpu.weight (1024 gives 39, below an untouched container's 100), which is why P1 is 4096 and not 1024. The \
+  disks run none or mq-deadline with io.cost off, so blkio weights do nothing on this host. (migrated from \
+  maint.toml [tasks.qos_classes])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.classes"
+title = "Container service classes P0-P3"
+kind = "spike"
+why = """\
+  The ladder has to know who is who before it touches anything. These patterns put every running container \
+  into one of four classes: P0 platform (docker-socket-proxy), P1 interactive and serving (Seerr, \
+  Audiobookshelf, the Immich API and its stores, Nextcloud, Open WebUI and its public gate, Homarr, Uptime \
+  Kuma, SearXNG, Tday, the personal sites and this maintenance site), P2 batch and background (the arr apps \
+  and downloaders, library scans, ML and GPU jobs, ComfyUI, Tunarr, small side apps) and P3 best effort (test \
+  twins, demos, buildx, Diun, throw-away test containers). The order of sacrifice is P3, then P2; P1 and P0 \
+  are never slowed, restarted or stopped (classes of service)."""
+does = """\
+  Each pattern is a case-insensitive regex searched (not fully matched) against the container name; when two \
+  classes match, the lower number (more protective) wins. A container that matches nothing is shown as P2 on \
+  the website but counted as unclassified: no rung that acts (L3 slow, L4 restart, L5 stop, the qos_classes \
+  baselines) touches it, and pressure_state, pressure.json and the weekly bulkhead_check list it so it can be \
+  added here. A pattern that does not compile, or an empty table, makes the whole class map unusable: L3-L5 \
+  refuse and qos_classes skips (fail closed), leaving only the non-destructive L1 and L2. Databases keep the \
+  class of the app they serve, but the ladder never slows, restarts or stops anything that runs as a database \
+  or build daemon, whatever its class. The Live tab reads the same lists for its class badges. 1 P0, 26 P1, 42 \
+  P2 and 6 P3 patterns ship."""
+applies_to = ["pressure_state", "pressure_response", "qos_classes", "bulkhead_check", "homelab-maint-live"]
+file = "classes.toml"
+target = "classes"
+destructive = true
+proof = """\
+  These lists decide who the ladder may touch at all, and every rung narrows that further: P0 and P1 are never \
+  throttled, restarted or stopped; databases and build daemons are excluded whatever their class; \
+  protected.toml still applies to restarts and stops; an unlisted container is never acted on; a broken \
+  pattern disables L3-L5. The lists were written from docker ps on 2026-10-01 and 02 (75 running containers \
+  plus the stopped comfyui) and tests/test_pressure.py checks the container and unit names captured then \
+  against them. Moving a pattern from P1 down to P2 or P3 widens what the ladder may slow or restart, which is \
+  why a change to this rule is flagged destructive and shown to the owner."""
+principle = "classes of service P0-P3: a fixed order of sacrifice"
+owner_notes = """\
+  A new app must be added here or the ladder ignores it: it shows as P2 on the page, nothing slows, restarts \
+  or stops it, and the weekly bulkhead_check lists it as unclassified. friendarr and friendarr-caddy are in \
+  P2, for example. (migrated from classes.toml [classes])"""
+since = "2026-10-03"
+
+[rule.params]
+P0 = ["^docker-socket-proxy$"]
+P1 = [
+  "^Seerr$", "^Audiobookshelf$", "^immich_server$", "^immich-public-proxy$",
+  "^immich_postgres$", "^immich_redis$", "^nextcloud$", "^nextcloud_postgres$",
+  "^nextcloud_redis$", "^homarr$", "^uptime-kuma$", "^open-webui$", "^open-webui-public$",
+  "^owui-public-gate$", "^owui-public-ollama$", "^owui-public-quota$", "^searxng$",
+  "^tday_backend$", "^tday_db$", "^tday_ollama$", "^ohmz-cloud$", "^omar-iqbal$",
+  "^afsaane-prod$", "^afsaane-prod-db$", "^pa-driving-flashcards$",
+]
+P2 = [
+  "^Radarr$", "^Sonarr$", "^prowlarr$", "^bazarr$", "^Jackett$", "^sonarr-status$", "^kometa$",
+  "^Sabnzbd$", "^qbittorrent$", "^Deluge$", "^Transmission$", "^kavita$", "^booklore$",
+  "^grimmory$", "^grimmory-db$", "^shelfmark$", "^hometube$", "^tautulli$", "^comfyui$",
+  "^immich_machine_learning$", "^omnivoice-studio-gpu$",
+  "^ebook2audiobook-ebook2audiobook-gpu-1$", "^kokoro$", "^infinity-rerank$", "^tika$",
+  "^open-notebook-open_notebook-1$", "^open-notebook-speaches-1$",
+  "^open-notebook-surrealdb-1$", "^tunarr-host-net$", "^qdrant$", "^mariadb$",
+  "^searxng-hermes$", "^nextcloud_cron$", "^anchor$", "^trek$", "^saved-vault$", "^portainer$",
+  "^goodreads$", "^Immaculaterr$", "^ImmaculaterrHttps$", "^friendarr$", "^friendarr-caddy$",
+]
+P3 = [
+  "^afsaane-test$", "^afsaane-test-db$", "^ImmaculaterrDemo$", "^buildx_buildkit_", "^diun$",
+]
+
+[[rule]]
+id = "classes.units"
+title = "Host service classes P0-P3 (display only)"
+kind = "spike"
+why = """\
+  Containers are not the whole host: dockerd, ssh, tailscale, Plex, Ollama and the backups are systemd units, \
+  and the page and the contributor lists should show them in the same four classes. These patterns label them. \
+  The ladder never acts on a unit, so this is documentation that the website can show, not a lever."""
+does = """\
+  Case-insensitive regexes searched against the names of running systemd services. The 6 P0 patterns cover the \
+  platform: docker, containerd, ssh, NetworkManager, tailscaled, cloudflared, dbus, cron, snapd, polkit, \
+  fail2ban, gdm, systemd-* units, smartmontools and smart-bridge (the SMS and e-mail alert path), libvirt's \
+  lock and log daemons and similar desktop services. The 7 P1 patterns cover Plex, Ollama, Glances, \
+  sensor-exporter, the two homelab-maint web units, TeamViewer and the notebook alert; the 3 P2 patterns the \
+  backups, the Immich recycle, tunarr-autostart and thermal-log; the 4 P3 patterns docker-prune, mem-guard, \
+  fstrim, logrotate, the apt timers, the homelab-maint check, daily, weekly and metrics runners and similar \
+  periodic jobs. pressure_state lists the running units per class for the class table. The ladder itself only \
+  unloads models over HTTP and runs docker update, restart and stop on containers; it never touches a unit. \
+  Which scheduled jobs may start under pressure is set per job in jobs.toml (class) and in \
+  [scheduler.pressure_max], not here."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "units"
+principle = "classes of service P0-P3 (host units are labelled, never touched)"
+owner_notes = """\
+  Display only. Plex runs as a snap unit, so it appears here as P1 and is never a ladder target. (migrated \
+  from classes.toml [units])"""
+since = "2026-10-03"
+
+[rule.params]
+P0 = [
+  '^(docker|containerd|ssh|sshd|NetworkManager|wpa_supplicant|tailscaled|cloudflared|dbus|cron|rsyslog|snapd)\.service$',
+  '^(polkit|rtkit-daemon|nvidia-persistenced|fail2ban|udisks2|upower|accounts-daemon|avahi-daemon)\.service$',
+  '^(gdm|user@\d+|systemd-[a-z0-9-]+)\.service$', '^(smartmontools|smart-bridge)\.service$',
+  '^(bluetooth|colord|cups|cups-browsed|fwupd|ModemManager|kerneloops|power-profiles-daemon|switcheroo-control)\.service$',
+  '^(virtlockd|virtlogd)\.service$',
+]
+P1 = [
+  '^snap\.plexmediaserver\.plexmediaserver\.service$', '^ollama\.service$',
+  '^glances\.service$', '^sensor-exporter\.service$', '^homelab-maint-(www|live)\.service$',
+  '^teamviewerd\.service$', '^notebook-db-alert\.(service|timer)$',
+]
+P2 = [
+  '^(backup-system|backup-immich|stack-backup|immich-server-recycle)\.(service|timer)$',
+  '^tunarr-autostart\.service$', '^thermal-log\.service$',
+]
+P3 = [
+  '^(docker-prune|comfyui-idle-vram|mem-guard|prune-openwebui-media|dpkg-db-backup|fstrim|logrotate|man-db|e2scrub_all|certbot)\.(service|timer)$',
+  '^(apt-daily|apt-daily-upgrade|unattended-upgrades|sysstat-[a-z]+|lm-sensors)\.(service|timer)$',
+  '^(anacron|fwupd-refresh|motd-news|nvidia-tdp)\.(service|timer)$',
+  '^homelab-maint-(check|daily|weekly|metrics)\.(service|timer)$',
+]
+
+[[rule]]
+id = "classes.policy"
+title = "What each service class means"
+kind = "policy"
+why = """\
+  The owner and anyone reading the Maintenance tab should see in one sentence what each class means in \
+  practice. These four sentences are shown next to the member lists of the class table (pressure.json). They \
+  document the policy that pressure_response and qos_classes enforce in code; they do not enforce anything \
+  themselves."""
+does = """\
+  Display text only: pressure.export() merges these strings over built-in defaults and publishes them with the \
+  class members. Editing them does not change what the ladder does; behaviour comes from the code and from the \
+  other classes.* rules (class lists, defaults, throttle targets, floors). One sentence is looser than the \
+  code: P3 says an emergency list may stop only P3, but L5 also accepts P2 names on \
+  classes.ladder.emergency_stop (stopping P3 first, then P2). It refuses P0, P1, databases and build daemons, \
+  protected.toml names and unclassified containers."""
+applies_to = ["pressure_response"]
+file = "classes.toml"
+target = "policy"
+principle = "classes of service P0-P3"
+owner_notes = """\
+  The P3 sentence ('the only class an emergency list may stop') does not match what L5 allows: P2 containers \
+  on emergency_stop would also be stopped, after the P3 ones. emergency_stop ships empty, so today nothing is. \
+  (migrated from classes.toml [policy])"""
+since = "2026-10-03"
+
+[rule.params]
+P0 = "Platform. Never throttled, restarted or stopped by the ladder."
+P1 = "Interactive and serving. Protected, gets the highest CPU weight, never slowed, restarted or stopped."
+P2 = "Batch and background. Slowed second, restarted only when proven stuck and unprotected."
+P3 = "Best effort. Slowed first, the only class an emergency list may stop."
+
+[[rule]]
+id = "classes.defaults.p1"
+title = "P1 baseline weights (raised)"
+kind = "spike"
+why = """\
+  Interactive containers should win CPU contention before any spike happens. 4096 is chosen so that P1 beats \
+  an untouched container (cgroup weight 100) under both ways runc converts cpu-shares to weight: runc 1.2.5, \
+  installed here, maps linearly (4096 gives 157) and runc 1.3 and later maps quadratically (4096 gives 303). A \
+  smaller value such as 1024 would silently demote P1 to weight 39 under the linear map, below every untouched \
+  container."""
+does = """\
+  qos_classes sets --cpu-shares 4096 on every running P1 container that is not already there; a higher \
+  explicit value is left alone. It is applied only when the daily task is in apply mode (it ships report, so \
+  today it only logs 'would'). blkio_weight 800 is applied only where a disk runs bfq or io.cost is on; the \
+  disks here run none or mq-deadline with io.cost off, so it has no effect on this host. \
+  memory_reservation_mib = 0 means no reservation: the code only sets one above 0 and only if system.slice has \
+  a memory.low, which it does not."""
+applies_to = ["qos_classes"]
+file = "classes.toml"
+target = "defaults.P1"
+params = { cpu_shares = 4096, blkio_weight = 800, memory_reservation_mib = 0 }
+principle = "classes of service P0-P3: interactive work wins contention"
+owner_notes = """\
+  blkio_weight and memory_reservation_mib are inert on this host today (measured 2026-10-01); cpu_shares is \
+  the only live lever. (migrated from classes.toml [defaults.P1])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.defaults.p2"
+title = "P2 baseline weights (left at Docker default)"
+kind = "spike"
+why = """\
+  Batch and background containers are the reference point: P1 is raised above them and P3 lowered below them, \
+  so P2 needs no number of its own. Leaving it unset keeps every P2 container at Docker's default weight (100 \
+  in cgroup terms) and keeps the P1 and P3 values meaningful."""
+does = """\
+  Empty on purpose: qos_classes has no baseline to apply to P2 and skips those containers. During a spike the \
+  L3 throttle may still lower P2 containers to 256 (classes.ladder.throttle) and puts their weight back when \
+  memory and CPU pressure are over."""
+applies_to = ["qos_classes"]
+file = "classes.toml"
+target = "defaults.P2"
+params = {}
+principle = "classes of service P0-P3: the middle class is the reference"
+owner_notes = """\
+  Do not add a value here without checking the runc mapping: under the linear map a P2 baseline of 1024 would \
+  put P2 at weight 39, below every untouched container. (migrated from classes.toml [defaults.P2])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.defaults.p3"
+title = "P3 baseline weights (lowered)"
+kind = "spike"
+why = """\
+  Best-effort work (test twins, demos, Diun, throw-away test containers) should lose every CPU contention \
+  without being stopped. 256 gives weight 10 under runc 1.2.5 (linear) or 35 under runc 1.3 and later \
+  (quadratic), below the untouched default of 100 under both, so P3 always runs behind P2 and P1 and still \
+  runs."""
+does = """\
+  qos_classes sets --cpu-shares 256 on P3 containers that are unset or above 256; one already stricter than \
+  256 is not raised, and a database or build daemon (the buildx builder, for example) is never lowered. \
+  --blkio-weight 20 is applied only where the disk scheduler honours it, which it does not here. Neither goes \
+  below the floors (cpu_shares_min 64, blkio_weight_min 10). It is applied only in apply mode; as shipped it \
+  logs 'would'."""
+applies_to = ["qos_classes"]
+file = "classes.toml"
+target = "defaults.P3"
+params = { cpu_shares = 256, blkio_weight = 20 }
+principle = "classes of service P0-P3: best effort loses contention"
+owner_notes = """\
+  Lowering is reversible with docker update --cpu-shares 1024 on the container; compose recreation also resets \
+  it. (migrated from classes.toml [defaults.P3])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.floors"
+title = "Weight floors the ladder never goes below"
+kind = "spike"
+why = """\
+  A weight so low that a container barely runs is a slow kill. These floors guarantee that the baselines and \
+  the L3 throttle can only lower a container to a level at which it still makes progress, whatever \
+  classes.toml says."""
+does = """\
+  qos_classes and the L3 throttle refuse any cpu-shares below 64 or blkio-weight below 10 and log 'refused: \
+  ... below floor'. The lowest target shipped is the P3 throttle of 128 (weight 5 under runc 1.2.5), well \
+  above the floor; L3's blkio target is a quarter of the container's current weight, never below 10."""
+applies_to = ["qos_classes", "pressure_response"]
+file = "classes.toml"
+target = "floors"
+params = { cpu_shares_min = 64, blkio_weight_min = 10 }
+principle = "throttle before kill, but never starve"
+owner_notes = """\
+  Raising the floors is always safe; lowering them lets the throttle starve a container. (migrated from \
+  classes.toml [floors])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder"
+title = "Ladder pacing, budgets, idle timers and emergency list"
+kind = "spike"
+why = """\
+  These are the dials of the response ladder: how long a signal must persist before the level changes (so a \
+  blip moves nothing), how long a model must be idle before it is unloaded, how much one run may touch, the \
+  retry budget for restarts, how long an emergency stop may last, and which containers may be exempted from \
+  protected.toml for a weight change. They keep the order reclaim, slow, restart, stop, and keep recovery from \
+  becoming the next overload."""
+does = """\
+  Read by pressure_state and pressure_response; one check run is 15 minutes. Levels: enter_runs 2 (a higher \
+  level must hold for 2 consecutive runs), leave_runs 3 (signals must stay below the leave thresholds for 3 \
+  runs), stale_state_min 45 (an older pressure_state is unknown: no escalation, throttles released), \
+  spike_max_hours 6 (longest single spike record, longer episodes are written in slices). Caps per resource: \
+  io_max_level 3, cpu_max_level 3, gpu_max_level 2 (memory can reach 5), so IO and CPU stalls are only ever \
+  answered by slowing batch work and a full GPU only by reclaim. L2: idle_s 300 and probe_gap_s 2 (a model is \
+  idle when its expires_at has not moved for 300 s and a second probe 2 s later agrees), \
+  comfy_free_cooldown_min 30, max_models_per_run 4. L3: max_throttled_per_run 8, throttle_min_cpu_pct 10 (only \
+  containers using at least 10 % of a core, or growing faster than 0.5 GiB/h, are slowed). L4: \
+  restart_min_streak 2 (stuck candidate in 2 consecutive runs), max_restarts_per_6h 2 across all containers, \
+  plus per container a backoff of 30 min x 2^(n-1) and up to 5 min of fixed jitter. L5: emergency_after_min 20 \
+  (memory continuously at level 4 or worse; L5 itself acts only at level 5), emergency_stop [] (the explicit \
+  list of containers it may stop: empty, so L5 does nothing), max_stop_min 60 (a stopped container is started \
+  back after at most this long) and stop_cooldown_min 360 (not stopped again for 6 h after such a forced \
+  start-back). throttle_unprotect lists 16 P2 batch containers that L3 may slow although protected.toml names \
+  them; qos_unprotect lists 11 P1 containers that qos_classes may re-weight although protected.toml names \
+  them. Both exemptions are for CPU weight changes only and must stay inside the release allow-list."""
+applies_to = ["pressure_state", "pressure_response", "qos_classes"]
+file = "classes.toml"
+target = "ladder"
+destructive = true
+proof = """\
+  Everything here narrows or paces the ladder except three things that need the owner's decision: \
+  emergency_stop (empty: no container can be stopped), the two unprotect lists (the registry refuses any name \
+  outside the release allow-list) and the restart budget (the release baseline caps max_restarts_per_6h at 6). \
+  Even a listed container is stopped only if it is explicitly P2 or P3, not protected by protected.toml and \
+  not a database or build daemon, one per run, for at most max_stop_min, then a cooldown; a stopped container \
+  is started back by the runner even under PAUSE once memory is below level 4 or the time cap ends. Shipped: \
+  empty list, 2 restarts per 6 h, and restart and emergency run in report mode anyway."""
+principle = "throttle before kill; recovery must not become the next overload"
+owner_notes = """\
+  Throttle exemptions exist because almost every spiky P2 workload (comfyui, tunarr, sabnzbd, radarr, sonarr) \
+  is named in protected.toml, which exists so nothing is killed, restarted or deleted; slowing is none of \
+  those. P0, P1 and databases are never in scope whatever these lists say. (migrated from classes.toml \
+  [ladder])"""
+since = "2026-10-03"
+
+[rule.params]
+enter_runs = 2
+leave_runs = 3
+stale_state_min = 45
+spike_max_hours = 6
+io_max_level = 3
+cpu_max_level = 3
+gpu_max_level = 2
+idle_s = 300
+probe_gap_s = 2
+comfy_free_cooldown_min = 30
+max_models_per_run = 4
+max_throttled_per_run = 8
+throttle_min_cpu_pct = 10
+restart_min_streak = 2
+max_restarts_per_6h = 2
+emergency_after_min = 20
+emergency_stop = []
+max_stop_min = 60
+stop_cooldown_min = 360
+throttle_unprotect = [
+  "^(comfyui|tunarr-host-net|Sabnzbd|Radarr|Sonarr|sonarr-status|prowlarr|bazarr|kometa|immich_machine_learning)$",
+  "^(omnivoice-studio-gpu|ebook2audiobook-ebook2audiobook-gpu-1|kokoro|infinity-rerank|open-notebook-open_notebook-1|open-notebook-speaches-1)$",
+]
+qos_unprotect = [
+  "^(immich_server|homarr|uptime-kuma|immich-public-proxy)$",
+  "^(immich_postgres|immich_redis|nextcloud_postgres|nextcloud_redis|tday_db|tday_ollama|owui-public-ollama)$",
+]
+
+[[rule]]
+id = "classes.ladder.throttle"
+title = "L3 throttle targets (cpu-shares per class)"
+kind = "spike"
+why = """\
+  When a spike needs batch work slowed, P3 is slowed harder than P2 and both stay above the floor, so nothing \
+  is starved. CPU is a compressible resource: slowing a container costs time, never data, which is why it \
+  comes before any restart (throttle before kill)."""
+does = """\
+  When the throttle rung is set to apply (it ships report), L3 runs docker update --cpu-shares 128 on active \
+  P3 containers first, or --cpu-shares 256 on P2 containers once no active unslowed P3 is left. Under runc \
+  1.2.5 (installed here, linear map) that is cgroup weight 5 and 10 against 100 for an untouched container; \
+  under runc 1.3 and later about 21 and 35. The container's real weight is recorded first and restored when \
+  memory and CPU pressure are both below level 3, on PAUSE, or when the pressure state goes stale. A target \
+  below floors.cpu_shares_min is refused. Today these numbers only appear in 'would' rows."""
+applies_to = ["pressure_response"]
+file = "classes.toml"
+target = "ladder.throttle"
+params = { P3 = 128, P2 = 256 }
+principle = "throttle before kill: CPU is compressible, slowing costs time not data"
+owner_notes = """\
+  The throttle changes cpu-shares only. docker update cannot unset shares, so restore tries candidate values \
+  until the cgroup weight reads the recorded one again. (migrated from classes.toml [ladder.throttle])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.max_per_day"
+title = "Daily action budget per ladder rung"
+kind = "spike"
+why = """\
+  Each rung gets a daily budget so that a long or oscillating incident can never turn the recovery into the \
+  next load. After the budget is used the rung logs 'refused: max_per_day' and does nothing until the next \
+  local day."""
+does = """\
+  Counts, per rung and per local calendar day, every action that passed the gates: a model unload or ComfyUI \
+  /free (reclaim 12), a slowed container (throttle 24), a restart (4), an emergency stop (3). Report-mode \
+  'would' actions count as well, so a report run shows what apply would be allowed to do and a long \
+  report-mode incident can use up the day's count. The counter lives in pressure_response's state and resets \
+  at local midnight."""
+applies_to = ["pressure_response"]
+file = "classes.toml"
+target = "ladder.max_per_day"
+params = { reclaim = 12, throttle = 24, restart = 4, emergency = 3 }
+destructive = true
+proof = """\
+  The release baseline caps restart at 12 and emergency at 6 per day (plus max_restarts_per_6h at 6) and rules \
+  check blocks a sync above that. The shipped 4 restarts and 3 stops per day are well inside it, and both \
+  rungs run in report mode."""
+principle = "retry budgets: recovery must not become the next overload"
+owner_notes = """\
+  Raising a budget is the way to widen the blast radius of a rung: change it deliberately. (migrated from \
+  classes.toml [ladder.max_per_day])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.mem_full60"
+title = "Signal: memory stall (PSI full)"
+kind = "spike"
+why = """\
+  Memory PSI 'full' means every runnable task was stalled waiting for memory at the same time. That is the \
+  real stall, not a big number in a table, so this is the primary signal and the only one besides MemAvailable \
+  that can drive the ladder to level 5 (detect by saturation, not size)."""
+does = """\
+  Reads /proc/pressure/memory, the 'full' avg60 value in percent of the last 60 s. Levels 1 to 5 are entered \
+  at 1, 3, 8, 15 and 30 %; a level is kept until the value has stayed below 0.5, 2, 5, 10 and 20 % for \
+  leave_runs (3) runs. Max level 5. For comparison, memory_health warns at 5 % and goes crit at 15 %. Level \
+  meaning: 1 annotate only, 2 reclaim, 3 slow batch, 4 restart one stuck container, 5 emergency list."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.mem_full60"
+params = { enter = [1, 3, 8, 15, 30], leave = [0.5, 2, 5, 10, 20], max = 5 }
+principle = "detect by saturation, not size"
+owner_notes = """\
+  One of the four memory signals (mem_full60, mem_some60, mem_avail_gib, swap_in_pps). The memory level is the \
+  highest of them, and only memory level 2 or higher pages. (migrated from classes.toml \
+  [ladder.signals.mem_full60])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.mem_some60"
+title = "Signal: memory wait (PSI some)"
+kind = "spike"
+why = """\
+  Memory PSI 'some' means at least one task waited for memory. It is a weaker and noisier warning than 'full', \
+  so on its own it is capped at level 3 and can never lead to a restart or a stop."""
+does = """\
+  Reads /proc/pressure/memory, the 'some' avg60 value in percent. Levels are entered at 10, 20, 35, 50 and 70 \
+  % and kept until the value stays below 6, 14, 25, 40 and 55 % for leave_runs runs. Max level 3: the entries \
+  for levels 4 and 5 (50 and 70 %) are never reached, a value of 70 % counts as level 3. Level meaning: 1 \
+  annotate only, 2 reclaim, 3 slow batch, 4 restart one stuck container, 5 emergency list."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.mem_some60"
+params = { enter = [10, 20, 35, 50, 70], leave = [6, 14, 25, 40, 55], max = 3 }
+principle = "detect by saturation, not size; a weak signal alone never kills"
+owner_notes = """\
+  The last two enter and leave values are inert by design (max = 3); they keep the five-value shape the code \
+  expects. (migrated from classes.toml [ladder.signals.mem_some60])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.mem_avail_gib"
+title = "Signal: MemAvailable headroom (GiB)"
+kind = "spike"
+why = """\
+  MemAvailable is what the kernel could hand out without swapping, the plain 'how much headroom is left' \
+  number. Page cache and swap in use are not pressure (this host has 94 GiB of RAM and 32 GiB of swap), so \
+  only the headroom counts. Smaller is worse."""
+does = """\
+  Reads MemAvailable from /proc/meminfo in GiB. Levels 1 to 5 are entered at 20, 12, 8, 5 and 3 GiB or less \
+  and kept until the value has been above 24, 15, 10, 7 and 4 GiB for leave_runs (3) runs. Max level 5. On \
+  this 94 GiB host level 2, which unlocks reclaim, starts at 12 GiB available; memory_health warns at 10 GiB \
+  and goes crit at 4 GiB. Level meaning: 1 annotate only, 2 reclaim, 3 slow batch, 4 restart one stuck \
+  container, 5 emergency list."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.mem_avail_gib"
+params = { enter = [20, 12, 8, 5, 3], leave = [24, 15, 10, 7, 4], max = 5 }
+principle = "detect by saturation, not size: headroom, not cache or swap in use"
+owner_notes = """\
+  Like mem_full60 it can reach level 5, so 3 GiB or less available reaches level 5 even when PSI is low. \
+  (migrated from classes.toml [ladder.signals.mem_avail_gib])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.swap_in_pps"
+title = "Signal: swap-in rate (pages per second)"
+kind = "spike"
+why = """\
+  Pages read back in from swap mean the kernel evicted memory that is still needed (thrashing). Swap that is \
+  merely full of cold pages is not a problem, so only the swap-in rate counts, and on its own it is capped at \
+  level 3."""
+does = """\
+  Average rate of pswpin from /proc/vmstat since the previous run, in pages per second; unknown and ignored \
+  when there is no previous run between 1 minute and 3 hours old. Levels are entered at 300, 1000, 2500, 6000 \
+  and 15000 and kept until the rate stays below 150, 600, 1500, 4000 and 10000 for leave_runs runs. Max level \
+  3: the entries for levels 4 and 5 are never reached. memory_health warns at 2000 pages per second. Level \
+  meaning: 1 annotate only, 2 reclaim, 3 slow batch, 4 restart one stuck container, 5 emergency list."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.swap_in_pps"
+params = { enter = [300, 1000, 2500, 6000, 15000], leave = [150, 600, 1500, 4000, 10000], max = 3 }
+principle = "detect by saturation, not size: swap in use is fine, swap thrashing is not"
+owner_notes = """\
+  The last two values are inert by design (max = 3). (migrated from classes.toml [ladder.signals.swap_in_pps])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.io_full60"
+title = "Signal: IO stall (PSI full)"
+kind = "spike"
+why = """\
+  IO PSI 'full' is the share of time every task was stalled on disk, so the disks are saturated. No unload or \
+  restart helps an IO stall, and this host's spinning disks and NTFS mounts hit it for hours every night \
+  during scans and find runs, so it can only ever lead to slowing batch work."""
+does = """\
+  Reads /proc/pressure/io, the 'full' avg60 value in percent. Levels are entered at 10, 25, 45, 65 and 85 % \
+  and kept until the value stays below 6, 15, 30, 45 and 65 % for leave_runs runs. Max level 3, and \
+  io_max_level also caps the resource at 3, so the entries for levels 4 and 5 are never reached. IO pressure \
+  raises level (the dashboard) but not gate_level, so it never defers a backup, the routine or the SLO, and it \
+  never pages. With the disk schedulers here (none, mq-deadline) there is no IO lever, so level 3 from IO \
+  alone only logs 'no lever' in the ladder."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.io_full60"
+params = { enter = [10, 25, 45, 65, 85], leave = [6, 15, 30, 45, 65], max = 3 }
+principle = "throttle before kill: an IO stall is only ever answered by slowing batch work"
+owner_notes = """\
+  Measured on 2026-10-01: io PSI full around 75 % with memory PSI near 0 while a find ran on a spinning disk. \
+  That must never unload a model or restart a container. (migrated from classes.toml \
+  [ladder.signals.io_full60])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.io_some60"
+title = "Signal: IO wait (PSI some)"
+kind = "spike"
+why = """\
+  IO PSI 'some' means at least one task waited for the disk. Waiting on a slow disk is not saturation, so this \
+  signal is capped at level 2 and only annotates."""
+does = """\
+  Reads /proc/pressure/io, the 'some' avg60 value in percent. Levels are entered at 30, 50, 70, 85 and 95 % \
+  and kept until the value stays below 20, 40, 60, 75 and 85 % for leave_runs runs. Max level 2: the entries \
+  for levels 3 to 5 (70, 85 and 95 %) are never reached. It raises level (the dashboard) but not gate_level, \
+  and never pages."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.io_some60"
+params = { enter = [30, 50, 70, 85, 95], leave = [20, 40, 60, 75, 85], max = 2 }
+principle = "throttle before kill: waiting on a slow disk is not saturation"
+owner_notes = """\
+  The last three values are inert by design (max = 2). (migrated from classes.toml [ladder.signals.io_some60])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.cpu_some60"
+title = "Signal: CPU wait (PSI some)"
+kind = "spike"
+why = """\
+  CPU PSI 'some' is the share of time runnable tasks waited for a CPU: real CPU saturation. The load average \
+  is shown but not scored, because it also counts tasks in IO wait (load 33 on 24 cores with 87 % of the CPU \
+  idle was seen during an IO storm here). CPU saturation is answered only by slowing batch work."""
+does = """\
+  Reads /proc/pressure/cpu, the 'some' avg60 value in percent. Levels are entered at 30, 50, 70, 85 and 95 % \
+  and kept until the value stays below 20, 35, 55, 75 and 85 % for leave_runs runs. Max level 3, and \
+  cpu_max_level also caps the resource at 3, so the entries for levels 4 and 5 are never reached. CPU counts \
+  towards gate_level, so level 2 holds P2 and P3 jobs back, and level 3 is where the throttle rung may slow \
+  batch containers."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.cpu_some60"
+params = { enter = [30, 50, 70, 85, 95], leave = [20, 35, 55, 75, 85], max = 3 }
+principle = "detect by saturation, not size: CPU wait, not load average"
+owner_notes = """\
+  The last two values are inert by design (max = 3). (migrated from classes.toml [ladder.signals.cpu_some60])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.ladder.signals.gpu_vram_pct"
+title = "Signal: GPU memory used (%)"
+kind = "spike"
+why = """\
+  ComfyUI, Plex's NVENC and Immich's machine learning share one GPU, so a nearly full card is routine and not \
+  an emergency. The only useful response is to hand back VRAM that is idle, so this signal is capped at level \
+  2."""
+does = """\
+  Reads GPU memory used as a percentage of total from nvidia-smi (summed over GPUs). Levels are entered at 85, \
+  92, 97, 99 and 101 % and kept until the value stays below 80, 88, 94, 97 and 99 % for leave_runs runs. Max \
+  level 2 (and gpu_max_level 2): only 85 % (level 1) and 92 % (level 2) can take effect; 97, 99 and 101 never \
+  do, and 101 % cannot be reached at all. Level 2 enables the reclaim rung (unload idle Ollama models, ComfyUI \
+  /free). GPU pressure raises level but not gate_level, and never pages. If nvidia-smi fails the signal is \
+  unknown and ignored."""
+applies_to = ["pressure_state"]
+file = "classes.toml"
+target = "ladder.signals.gpu_vram_pct"
+params = { enter = [85, 92, 97, 99, 101], leave = [80, 88, 94, 97, 99], max = 2 }
+principle = "throttle before kill: a full GPU is only ever answered by reclaim"
+owner_notes = """\
+  The last three values are inert by design (max = 2). (migrated from classes.toml \
+  [ladder.signals.gpu_vram_pct])"""
+since = "2026-10-03"
+
+[[rule]]
+id = "classes.bulkheads"
+title = "Agreed concurrency limits (bulkheads)"
+kind = "spike"
+why = """\
+  Per-app concurrency limits are the real spike shaper: they decide how big a burst can get before the host \
+  ever sees it. These are the values the owner agreed for the apps that share the GPU and RAM, written down so \
+  the weekly bulkhead_check can tell when reality has drifted (admission control)."""
+does = """\
+  Reference values read by bulkhead_check, which only reports and changes nothing. ollama_num_parallel 2 \
+  (OLLAMA_NUM_PARALLEL: drift if unset or above 4, since each slot multiplies the KV cache); ollama_max_queue \
+  128 (OLLAMA_MAX_QUEUE: drift if unset; a set value is not compared, 128 is only the value recommended); \
+  ollama_max_loaded_models 3 (drift if OLLAMA_MAX_LOADED_MODELS is set above it); ollama_keep_alive_max_s 1800 \
+  (drift if OLLAMA_KEEP_ALIVE is set longer or to forever); open_notebook_worker_max_tasks 1 (drift if unset \
+  or higher); plex_transcode_limit 4 (drift if TranscodeCountLimit is 0, unlimited, or above 8); \
+  comfyui_required_flags (each flag must be on the running container's command, here --disable-smart-memory, \
+  which frees VRAM between jobs for Plex NVENC and Immich ML)."""
+applies_to = ["bulkhead_check"]
+file = "classes.toml"
+target = "bulkheads"
+principle = "admission control: cap concurrent work per app (bulkheads)"
+owner_notes = """\
+  Plex's Preferences.xml is root-only: the weekly tier runs as root and reads it, while a manual run as the \
+  owner reports it unreadable. Immich's job concurrency lives in its database, so it is not covered. (migrated \
+  from classes.toml [bulkheads])"""
+since = "2026-10-03"
+
+[rule.params]
+ollama_num_parallel = 2
+ollama_max_queue = 128
+ollama_max_loaded_models = 3
+ollama_keep_alive_max_s = 1800
+open_notebook_worker_max_tasks = 1
+plex_transcode_limit = 4
+comfyui_required_flags = ["--disable-smart-memory"]

@@ -1,0 +1,40 @@
+# homelab-maint: LOCAL OVERRIDES for incident playbooks, SLOs and correlation hints (read by homelab_maint/incidents.py).
+#
+# The shipped baseline is NOT here: it lives inside the package, homelab_maint/data/playbooks.toml, and is replaced on every
+# install, so text fixes (including the "do not" safety advice) reach this host, the website and the alert e-mails.
+#
+# This file is installed to /etc/homelab-maint/playbooks.toml ONLY IF ABSENT and is merged over the baseline:
+#   [incidents] [slo_defaults]   per key
+#   [playbook.NAME]              per playbook and per key (a key you set replaces the shipped value, the others are kept)
+#   [[slo]]                      by `name`:   same name = per-key override of the shipped objective, new name = added
+#   [[correlation]]              by `cause` + `effect`, the same way
+#   enabled = false              inside an [[slo]] / [[correlation]] drops the shipped one
+#
+# Keep ONLY what you changed on purpose. Do not paste the baseline here: every key you copy shadows its later fixes (and
+# `python3 -m homelab_maint.incidents list` warns when it finds copies). Nothing in this file may look like a secret.
+#
+# Examples (remove the leading "# " to use one):
+#
+# [incidents]
+# confirm_runs = 3              # confirmed over 3 consecutive runs instead of the pager's debounce
+#
+# [playbook.disk_forecast]
+# ask = "Text that replaces only the `ask` line of the shipped disk_forecast playbook."
+#
+# [playbook.my_new_check]       # a playbook for a task of your own: title, class, meaning, impact, checks, fixes, avoid, ask
+# title = "My check"
+# class = "P2"
+# meaning = "What it means."
+# impact = "Who notices."
+# checks = ["$ homelab-maint status | grep my_new_check"]
+# fixes = ["The safe fix."]
+# avoid = ["What not to do."]
+# ask = "The owner."
+#
+# [[slo]]
+# name = "Backups fresh"        # an existing name: only target_pct changes, checks and class stay as shipped
+# target_pct = 98.5
+#
+# [[slo]]
+# name = "Monitoring probes"
+# enabled = false               # drop a shipped objective
