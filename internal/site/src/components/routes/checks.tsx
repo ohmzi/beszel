@@ -29,6 +29,20 @@ export default memo(() => {
 	const d = useMaintenanceFile<{ checks?: Check[] }>("checks.json")
 	const ov = useMaintenanceFile<Overview>("overview.json")
 	const hist = useMaintenanceFile<{ days?: Day[] }>("health-history.json")
+	const acks = useMaintenanceFile<{
+		acks?: {
+			id?: string
+			title?: string
+			summary?: string
+			severity?: string
+			acked_at?: number
+			until?: number
+			days_left?: number
+			by?: string
+			note?: string
+			active?: boolean
+		}[]
+	}>("acks.json")
 	const rows = useMemo(
 		() => [...(d?.checks ?? [])].sort((a, b) => (RANK[a.status ?? ""] ?? 9) - (RANK[b.status ?? ""] ?? 9)),
 		[d]
@@ -179,6 +193,38 @@ export default memo(() => {
 					</Table>
 				</>
 			)}
+			{(acks?.acks?.length ?? 0) > 0 ? (
+				<>
+					<h2 className="text-lg font-semibold mt-8 mb-2">
+						<Trans>Acknowledged issues</Trans>
+					</h2>
+					<p className="text-sm text-muted-foreground mb-3">
+						{acks?.acks?.length} · <Trans>no alerts for these until they expire</Trans>
+					</p>
+					<ul className="space-y-2">
+						{(acks?.acks ?? []).map((a) => (
+							<li key={a.id} className="rounded-lg border border-border bg-card p-3">
+								<div className="flex items-center gap-2">
+									<span className={`block size-2 rounded-full ${dotFor("acknowledged")}`} />
+									<span className="font-medium text-sm">{a.title}</span>
+									<span className="ms-auto text-xs text-muted-foreground whitespace-nowrap">
+										{a.until ? `until ${new Date(a.until * 1000).toLocaleDateString()}` : ""}
+										{typeof a.days_left === "number" ? ` (${a.days_left} days left)` : ""}
+									</span>
+								</div>
+								{a.summary ? <p className="text-sm text-muted-foreground mt-1">{a.summary}</p> : null}
+								<p className="text-xs text-muted-foreground mt-1">
+									<Trans>acknowledged</Trans> {when(a.acked_at)}
+									{a.by ? ` · ${a.by}` : ""}
+									{a.note ? ` · ${a.note}` : ""}
+									{a.active === false ? " · expired" : ""}
+								</p>
+							</li>
+						))}
+					</ul>
+				</>
+			) : null}
+
 			<FooterRepoLink />
 		</>
 	)

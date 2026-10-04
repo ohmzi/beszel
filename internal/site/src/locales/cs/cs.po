@@ -168,20 +168,38 @@ msgstr ""
 msgid "7d ↓ / ↑"
 msgstr ""
 
+#: src/components/routes/report.tsx
+msgid "About this report"
+msgstr ""
+
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
 msgid "Acknowledge"
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "acknowledged"
 msgstr ""
 
 #: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr ""
 
+#: src/components/routes/checks.tsx
+msgid "Acknowledged issues"
+msgstr ""
+
 #: src/components/routes/maintenance.tsx
 msgid "Action"
 msgstr ""
 
+#: src/components/routes/report.tsx
+#: src/components/routes/report.tsx
+msgid "actions"
+msgstr ""
+
 #. Table column
+#: src/components/routes/report.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 #: src/components/routes/system/smart-table.tsx
@@ -208,6 +226,10 @@ msgstr ""
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Active state"
 msgstr "Aktivní stav"
+
+#: src/components/routes/maintenance.tsx
+msgid "acts"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Add"
@@ -276,12 +298,21 @@ msgstr "Historie upozornění"
 msgid "Alerts"
 msgstr "Výstrahy"
 
+#: src/components/routes/report.tsx
+msgid "alerts sent"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/containers-table/containers-table.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 msgid "All Containers"
 msgstr "Všechny kontejnery"
+
+#: src/components/routes/report.tsx
+#: src/components/routes/report.tsx
+msgid "All reports"
+msgstr ""
 
 #: src/components/routes/registry.tsx
 msgid "All rules"
@@ -507,6 +538,10 @@ msgstr "Schopnosti"
 msgid "Capacity"
 msgstr "Kapacita"
 
+#: src/components/routes/report.tsx
+msgid "Capacity outlook"
+msgstr ""
+
 #: src/components/routes/settings/config-yaml.tsx
 msgid "Caution - potential data loss"
 msgstr "Upozornění - možná ztráta dat"
@@ -606,6 +641,7 @@ msgid "Checksum errors"
 msgstr "Chyby kontrolního součtu"
 
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
 msgid "Class"
 msgstr ""
 
@@ -653,6 +689,10 @@ msgstr "Klikněte pro zkopírování"
 
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "collecting…"
+msgstr ""
+
+#: src/components/routes/report.tsx
+msgid "Coming up"
 msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
@@ -901,6 +941,10 @@ msgstr "Denně"
 msgid "Daily and weekly maintenance reports, newest first."
 msgstr ""
 
+#: src/components/routes/report.tsx
+msgid "Daily report"
+msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -956,6 +1000,7 @@ msgstr ""
 msgid "Discharging"
 msgstr "Vybíjení"
 
+#: src/components/routes/report.tsx
 #: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
@@ -1197,6 +1242,10 @@ msgstr "Exportovat aktuální konfiguraci systémů."
 msgid "Fahrenheit (°F)"
 msgstr "Fahrenheita (°F)"
 
+#: src/components/routes/report.tsx
+msgid "failed"
+msgstr ""
+
 #: src/components/routes/system/smart-table.tsx
 msgid "Failed Attributes:"
 msgstr "Neúspěšné atributy:"
@@ -1283,6 +1332,7 @@ msgid "Forgot password?"
 msgstr "Zapomněli jste heslo?"
 
 #: src/components/routes/capacity.tsx
+#: src/components/routes/report.tsx
 msgid "Free"
 msgstr ""
 
@@ -1299,6 +1349,7 @@ msgid "FreeBSD command"
 msgstr "FreeBSD příkaz"
 
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/report.tsx
 msgid "Freed"
 msgstr ""
 
@@ -1313,6 +1364,7 @@ msgid "Full"
 msgstr "Plná"
 
 #: src/components/routes/capacity.tsx
+#: src/components/routes/report.tsx
 msgid "Full in"
 msgstr ""
 
@@ -1355,6 +1407,10 @@ msgstr "Využití GPU"
 #: src/components/systems-table/systems-table.tsx
 msgid "Grid"
 msgstr "Mřížka"
+
+#: src/components/routes/report.tsx
+msgid "Growth"
+msgstr ""
 
 #: src/components/routes/maintenance.tsx
 msgid "Halted:"
@@ -1453,6 +1509,8 @@ msgstr "Neaktivní"
 
 #: src/components/navbar.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/report.tsx
+#: src/components/routes/report.tsx
 msgid "Incidents"
 msgstr ""
 
@@ -1503,10 +1561,18 @@ msgstr ""
 msgid "Last 7 days"
 msgstr ""
 
+#: src/components/pipeline-strip.tsx
+msgid "Last publish"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 #: src/components/routes/maintenance.tsx
 #: src/components/routes/maintenance.tsx
 msgid "Last run"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "lasted"
 msgstr ""
 
 #: src/components/routes/spikes.tsx
@@ -1570,6 +1636,7 @@ msgid "Load Avg"
 msgstr "Prům. zatížení"
 
 #: src/components/navbar.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/spikes.tsx
 msgid "Load spikes"
 msgstr ""
@@ -1633,6 +1700,10 @@ msgstr "Hlavní PID"
 msgid "Maintenance"
 msgstr ""
 
+#: src/components/routes/report.tsx
+msgid "Maintenance done"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "Maintenance is paused (kill switch on): no cleanup actions run."
 msgstr ""
@@ -1660,6 +1731,10 @@ msgstr "Max. 1 min"
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 msgid "Max 1h"
 msgstr "Max. 1h"
+
+#: src/components/routes/maintenance.tsx
+msgid "Members"
+msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/live.tsx
@@ -1720,6 +1795,18 @@ msgstr ""
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Monitor"
+msgstr ""
+
+#: src/components/pipeline-strip.tsx
+#~ msgid "Monitoring pipeline"
+#~ msgstr ""
+
+#: src/components/pipeline-strip.tsx
+msgid "Monitoring pipeline: no answer yet"
+msgstr ""
+
+#: src/components/pipeline-strip.tsx
+msgid "Monitoring pipeline: reported on time"
 msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1811,6 +1898,10 @@ msgstr "Ne"
 
 #: src/components/routes/maintenance.tsx
 msgid "No actions recorded."
+msgstr ""
+
+#: src/components/routes/checks.tsx
+msgid "no alerts for these until they expire"
 msgstr ""
 
 #: src/components/routes/alerts.tsx
@@ -2022,6 +2113,10 @@ msgstr "Stránka {0} z {1}"
 #: src/components/command-palette.tsx
 msgid "Pages / Settings"
 msgstr "Stránky / Nastavení"
+
+#: src/components/pipeline-strip.tsx
+msgid "Parts of the pipeline"
+msgstr ""
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/auth-form.tsx
@@ -2254,6 +2349,14 @@ msgstr ""
 msgid "Refresh"
 msgstr "Aktualizovat"
 
+#: src/components/routes/report.tsx
+msgid "refused"
+msgstr ""
+
+#: src/components/pipeline-strip.tsx
+msgid "registry"
+msgstr ""
+
 #: src/components/navbar.tsx
 #: src/components/routes/registry.tsx
 #: src/components/routes/registry.tsx
@@ -2266,6 +2369,14 @@ msgstr "Vztahy"
 
 #: src/components/routes/migration.tsx
 msgid "Replaced by"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "report only"
+msgstr ""
+
+#: src/components/routes/report.tsx
+msgid "report-only"
 msgstr ""
 
 #: src/components/navbar.tsx
@@ -2301,11 +2412,20 @@ msgstr "Obnovit heslo"
 msgid "Resident"
 msgstr ""
 
+#: src/components/routes/incidents.tsx
+#: src/components/routes/report.tsx
+msgid "resolved"
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Resolved"
 msgstr "Vyřešeno"
+
+#: src/components/routes/incidents.tsx
+msgid "Resolved incidents"
+msgstr ""
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -2313,6 +2433,10 @@ msgstr "Vyřešeno"
 #: src/components/routes/system/charts/monitors-charts.tsx
 msgid "Response"
 msgstr "Odezva"
+
+#: src/components/routes/maintenance.tsx
+msgid "Response ladder"
+msgstr ""
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
 msgid "Response time monitoring from agents."
@@ -2334,6 +2458,10 @@ msgstr "Revize"
 
 #: src/components/routes/checks.tsx
 msgid "Right now"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "right now: level"
 msgstr ""
 
 #: src/components/routes/system/charts/disk-charts.tsx
@@ -2515,11 +2643,16 @@ msgstr "Odeslat"
 msgid "Serial Number"
 msgstr "Sériové číslo"
 
+#: src/components/routes/maintenance.tsx
+msgid "Service classes & the response ladder"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Service Details"
 msgstr "Detaily služby"
 
 #: src/components/navbar.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/slo.tsx
 msgid "Service levels"
 msgstr ""
@@ -2597,6 +2730,10 @@ msgstr "Nastavení SMTP"
 msgid "Sort By"
 msgstr "Seřadit podle"
 
+#: src/components/routes/report.tsx
+msgid "Space freed"
+msgstr ""
+
 #: src/components/routes/capacity.tsx
 msgid "Space freed per day"
 msgstr ""
@@ -2620,12 +2757,17 @@ msgstr "Stav"
 #: src/components/routes/capacity.tsx
 #: src/components/routes/checks.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Status"
 msgstr "Stav"
+
+#: src/components/pipeline-strip.tsx
+msgid "Status data"
+msgstr ""
 
 #: src/components/routes/capacity.tsx
 msgid "Storage headroom and how soon each mount fills at the current rate."
@@ -2730,6 +2872,7 @@ msgstr ""
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/report.tsx
 msgid "Task"
 msgstr ""
 
@@ -2751,6 +2894,10 @@ msgstr "Teplota"
 #: src/components/routes/settings/general.tsx
 msgid "Temperature unit"
 msgstr "Jednotky teploty"
+
+#: src/components/routes/report.tsx
+msgid "Temperatures"
+msgstr ""
 
 #: src/components/routes/live.tsx
 msgid "Temperatures & fans"
@@ -2800,6 +2947,10 @@ msgstr "Poté se přihlaste do backendu a obnovte heslo k uživatelskému účtu
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "Tuto akci nelze vzít zpět. Tím se z databáze trvale odstraní všechny aktuální záznamy pro {name}."
 
+#: src/components/routes/report.tsx
+msgid "This report could not be loaded."
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2816,6 +2967,14 @@ msgstr "Propustnost fondu {displayName}"
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
 msgstr "Formát času"
+
+#: src/components/routes/report.tsx
+msgid "Time healthy"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "Timeline"
+msgstr ""
 
 #: src/components/routes/maintenance.tsx
 msgid "Timer"
@@ -3068,6 +3227,7 @@ msgid "Usage of storage pool {displayName}"
 msgstr "Využití fondu {displayName}"
 
 #: src/components/routes/capacity.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
 #: src/components/routes/system/storage-pools-table.tsx
@@ -3093,6 +3253,10 @@ msgstr ""
 #: src/components/alerts-history-columns.tsx
 msgid "Value"
 msgstr "Hodnota"
+
+#: src/components/pipeline-strip.tsx
+msgid "Verdict"
+msgstr ""
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -3146,8 +3310,20 @@ msgstr "Prahové hodnoty pro varování"
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Push oznámení"
 
+#: src/components/routes/report.tsx
+msgid "Weekly report"
+msgstr ""
+
 #: src/components/routes/maintenance.tsx
 msgid "What"
+msgstr ""
+
+#: src/components/routes/maintenance.tsx
+msgid "What happens to it"
+msgstr ""
+
+#: src/components/routes/report.tsx
+msgid "What mattered"
 msgstr ""
 
 #: src/components/routes/maintenance.tsx
@@ -3209,6 +3385,10 @@ msgstr "Psát"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Write errors"
 msgstr "Chyby zápisu"
+
+#: src/components/routes/report.tsx
+msgid "written"
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"

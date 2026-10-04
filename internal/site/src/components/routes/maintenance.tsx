@@ -75,6 +75,12 @@ export default memo(() => {
 		waiting?: number
 		recent?: Note[]
 	}>("notifications.json")
+	const pressure = useMaintenanceFile<{
+		level?: number
+		level_name?: string
+		ladder?: { level?: number; name?: string; what?: string; mode?: string }[]
+		classes?: { class?: string; members?: string[] }[]
+	}>("pressure.json")
 
 	const t = actions?.totals ?? {}
 	const n24 = notes?.counts?.["24h"] ?? {}
@@ -366,6 +372,77 @@ export default memo(() => {
 								</li>
 							))}
 						</ul>
+					) : null}
+				</>
+			) : null}
+
+			{(pressure?.ladder?.length ?? 0) > 0 || (pressure?.classes?.length ?? 0) > 0 ? (
+				<>
+					<H2>
+						<Trans>Service classes & the response ladder</Trans>
+					</H2>
+					{(pressure?.ladder?.length ?? 0) > 0 ? (
+						<div className="rounded-lg border border-border bg-card p-4 mb-3">
+							<div className="flex items-baseline justify-between mb-2">
+								<h3 className="text-sm font-semibold">
+									<Trans>Response ladder</Trans>
+								</h3>
+								<span className="text-xs text-muted-foreground">
+									<Trans>right now: level</Trans> {pressure?.level ?? 0}{" "}
+									{pressure?.level_name ? `(${pressure.level_name})` : ""}
+								</span>
+							</div>
+							<ol className="text-sm">
+								{(pressure?.ladder ?? []).map((s) => (
+									<li
+										key={s.level}
+										className={`flex items-start gap-2 py-1 border-t border-border/40 ${s.level === pressure?.level ? "font-medium" : ""}`}
+									>
+										<span className="w-6 text-muted-foreground tabular-nums">{s.level}</span>
+										<span className="w-24 capitalize">{s.name}</span>
+										<span className="flex-1 text-muted-foreground">{s.what}</span>
+										{s.mode === "apply" ? (
+											<span className="text-xs text-green-500 shrink-0">
+												<Trans>acts</Trans>
+											</span>
+										) : s.mode === "report" ? (
+											<span className="text-xs text-muted-foreground shrink-0">
+												<Trans>report only</Trans>
+											</span>
+										) : null}
+									</li>
+								))}
+							</ol>
+						</div>
+					) : null}
+					{(pressure?.classes?.length ?? 0) > 0 ? (
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead className="w-20">
+										<Trans>Class</Trans>
+									</TableHead>
+									<TableHead className="w-20 text-right">
+										<Trans>Members</Trans>
+									</TableHead>
+									<TableHead>
+										<Trans>What happens to it</Trans>
+									</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{(pressure?.classes ?? []).map((c) => (
+									<TableRow key={c.class}>
+										<TableCell className="font-medium">{c.class}</TableCell>
+										<TableCell className="text-right tabular-nums">{c.members?.length ?? 0}</TableCell>
+										<TableCell className="text-muted-foreground text-xs truncate max-w-xl">
+											{(c.members ?? []).slice(0, 8).join(", ")}
+											{(c.members?.length ?? 0) > 8 ? ` +${(c.members?.length ?? 0) - 8} more` : ""}
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
 					) : null}
 				</>
 			) : null}

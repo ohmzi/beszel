@@ -7,6 +7,7 @@ import { DirectionProvider } from "@radix-ui/react-direction"
 import { lazy, memo, Suspense, useEffect } from "react"
 import ReactDOM from "react-dom/client"
 import Navbar from "@/components/navbar.tsx"
+import { PipelineStrip } from "@/components/pipeline-strip.tsx"
 import { $router } from "@/components/router.tsx"
 import Settings from "@/components/routes/settings/layout.tsx"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
@@ -31,6 +32,7 @@ const Home = lazy(() => import("@/components/routes/home.tsx"))
 const Alerts = lazy(() => import("@/components/routes/alerts.tsx"))
 const Incidents = lazy(() => import("@/components/routes/incidents.tsx"))
 const Reports = lazy(() => import("@/components/routes/reports.tsx"))
+const Report = lazy(() => import("@/components/routes/report.tsx"))
 const Services = lazy(() => import("@/components/routes/services.tsx"))
 const Containers = lazy(() => import("@/components/routes/containers.tsx"))
 const Smart = lazy(() => import("@/components/routes/smart.tsx"))
@@ -94,6 +96,8 @@ const App = memo(() => {
 		return <Incidents />
 	} else if (page.route === "reports") {
 		return <Reports />
+	} else if (page.route === "report") {
+		return <Report id={page.params.id} />
 	} else if (page.route === "services") {
 		return <Services />
 	} else if (page.route === "system") {
@@ -149,6 +153,7 @@ const Layout = () => {
 						<Navbar />
 					</div>
 					<div className="container relative">
+						<PipelineStrip />
 						<Suspense>
 							<ActiveAlerts className="mb-4" />
 						</Suspense>

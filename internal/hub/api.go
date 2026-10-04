@@ -213,6 +213,8 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	// Ohmz fork: proxy the maintenance engine's published JSON (allowlisted, read-only) so the
 	// dashboard pages (checks, maintenance, slo, ...) can render it.
 	apiAuth.GET("/maintenance/file", h.maintenanceFile)
+	// Ohmz fork: one maintenance report by id (daily / weekly), read-only.
+	apiAuth.GET("/maintenance/report", h.maintenanceReport)
 	// Ohmz fork: forward an acknowledge / un-acknowledge request to the agent, which writes a
 	// signed request into the maintenance engine's inbox.
 	apiAuth.POST("/maintenance/ack", h.maintenanceAck).BindFunc(excludeReadOnlyRole)
@@ -599,7 +601,7 @@ var maintenanceFiles = map[string]struct{}{
 	"slo.json": {}, "pressure.json": {}, "migration.json": {}, "actions.json": {}, "storage.json": {},
 	"metrics.json": {}, "self.json": {}, "acks.json": {}, "notifications.json": {}, "monitors.json": {},
 	"overview.json": {}, "health-history.json": {}, "manifest.json": {}, "rules.json": {},
-	"live.json": {}, "rules-history.json": {}, "journal.json": {},
+	"live.json": {}, "rules-history.json": {}, "journal.json": {}, "reports/index.json": {},
 }
 
 // maintenanceFile handles GET /api/beszel/maintenance/file?name=<file> (Ohmz fork): it serves one
@@ -620,6 +622,35 @@ func (h *Hub) maintenanceFile(e *core.RequestEvent) error {
 	}
 	if len(data) > 6<<20 {
 		return e.InternalServerError("file too large", nil)
+	}
+	e.Response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	e.Response.Header().Set("Cache-Control", "no-store")
+	e.Response.WriteHeader(http.StatusOK)
+	_, _ = e.Response.Write(data)
+	return nil
+}
+
+// maintenanceReportID matches a published report id: a day (2026-10-03) or an ISO week (2026-W40).
+var maintenanceReportID = regexp.MustCompile(`^[0-9]{4}-(?:[0-9]{2}-[0-9]{2}|W[0-9]{2})$`)
+
+// maintenanceReport handles GET /api/beszel/maintenance/report?id=<id> (Ohmz fork): one published report
+// file, read-only. The id is strictly validated, so it can only name a report and can never escape the
+// reports directory. MAINTENANCE_PUBLIC_DIR overrides the directory.
+func (h *Hub) maintenanceReport(e *core.RequestEvent) error {
+	id := e.Request.URL.Query().Get("id")
+	if !maintenanceReportID.MatchString(id) {
+		return e.BadRequestError("unknown report", nil)
+	}
+	dir := os.Getenv("MAINTENANCE_PUBLIC_DIR")
+	if dir == "" {
+		dir = "/var/lib/homelab-maint/public"
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "reports", id+".json"))
+	if err != nil {
+		return e.NotFoundError("", nil)
+	}
+	if len(data) > 12<<20 {
+		return e.InternalServerError("report too large", nil)
 	}
 	e.Response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	e.Response.Header().Set("Cache-Control", "no-store")

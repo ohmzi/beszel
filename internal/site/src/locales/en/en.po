@@ -163,20 +163,38 @@ msgstr "7d (↓ / ↑)"
 msgid "7d ↓ / ↑"
 msgstr "7d ↓ / ↑"
 
+#: src/components/routes/report.tsx
+msgid "About this report"
+msgstr "About this report"
+
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
 msgid "Acknowledge"
 msgstr "Acknowledge"
 
+#: src/components/routes/checks.tsx
+msgid "acknowledged"
+msgstr "acknowledged"
+
 #: src/components/routes/incidents.tsx
 msgid "Acknowledged"
 msgstr "Acknowledged"
+
+#: src/components/routes/checks.tsx
+msgid "Acknowledged issues"
+msgstr "Acknowledged issues"
 
 #: src/components/routes/maintenance.tsx
 msgid "Action"
 msgstr "Action"
 
+#: src/components/routes/report.tsx
+#: src/components/routes/report.tsx
+msgid "actions"
+msgstr "actions"
+
 #. Table column
+#: src/components/routes/report.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 #: src/components/routes/system/smart-table.tsx
@@ -203,6 +221,10 @@ msgstr "active now"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Active state"
 msgstr "Active state"
+
+#: src/components/routes/maintenance.tsx
+msgid "acts"
+msgstr "acts"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Add"
@@ -271,12 +293,21 @@ msgstr "Alert History"
 msgid "Alerts"
 msgstr "Alerts"
 
+#: src/components/routes/report.tsx
+msgid "alerts sent"
+msgstr "alerts sent"
+
 #: src/components/command-palette.tsx
 #: src/components/containers-table/containers-table.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 msgid "All Containers"
 msgstr "All Containers"
+
+#: src/components/routes/report.tsx
+#: src/components/routes/report.tsx
+msgid "All reports"
+msgstr "All reports"
 
 #: src/components/routes/registry.tsx
 msgid "All rules"
@@ -502,6 +533,10 @@ msgstr "Capabilities"
 msgid "Capacity"
 msgstr "Capacity"
 
+#: src/components/routes/report.tsx
+msgid "Capacity outlook"
+msgstr "Capacity outlook"
+
 #: src/components/routes/settings/config-yaml.tsx
 msgid "Caution - potential data loss"
 msgstr "Caution - potential data loss"
@@ -601,6 +636,7 @@ msgid "Checksum errors"
 msgstr "Checksum errors"
 
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/maintenance.tsx
 msgid "Class"
 msgstr "Class"
 
@@ -649,6 +685,10 @@ msgstr "Click to copy"
 #: src/components/routes/system/charts/network-totals.tsx
 msgid "collecting…"
 msgstr "collecting…"
+
+#: src/components/routes/report.tsx
+msgid "Coming up"
+msgstr "Coming up"
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -896,6 +936,10 @@ msgstr "Daily"
 msgid "Daily and weekly maintenance reports, newest first."
 msgstr "Daily and weekly maintenance reports, newest first."
 
+#: src/components/routes/report.tsx
+msgid "Daily report"
+msgstr "Daily report"
+
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
 msgid "Default"
@@ -951,6 +995,7 @@ msgstr "Disabled"
 msgid "Discharging"
 msgstr "Discharging"
 
+#: src/components/routes/report.tsx
 #: src/components/routes/system.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
@@ -1192,6 +1237,10 @@ msgstr "Export your current systems configuration."
 msgid "Fahrenheit (°F)"
 msgstr "Fahrenheit (°F)"
 
+#: src/components/routes/report.tsx
+msgid "failed"
+msgstr "failed"
+
 #: src/components/routes/system/smart-table.tsx
 msgid "Failed Attributes:"
 msgstr "Failed Attributes:"
@@ -1278,6 +1327,7 @@ msgid "Forgot password?"
 msgstr "Forgot password?"
 
 #: src/components/routes/capacity.tsx
+#: src/components/routes/report.tsx
 msgid "Free"
 msgstr "Free"
 
@@ -1294,6 +1344,7 @@ msgid "FreeBSD command"
 msgstr "FreeBSD command"
 
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/report.tsx
 msgid "Freed"
 msgstr "Freed"
 
@@ -1308,6 +1359,7 @@ msgid "Full"
 msgstr "Full"
 
 #: src/components/routes/capacity.tsx
+#: src/components/routes/report.tsx
 msgid "Full in"
 msgstr "Full in"
 
@@ -1350,6 +1402,10 @@ msgstr "GPU Usage"
 #: src/components/systems-table/systems-table.tsx
 msgid "Grid"
 msgstr "Grid"
+
+#: src/components/routes/report.tsx
+msgid "Growth"
+msgstr "Growth"
 
 #: src/components/routes/maintenance.tsx
 msgid "Halted:"
@@ -1448,6 +1504,8 @@ msgstr "Inactive"
 
 #: src/components/navbar.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/report.tsx
+#: src/components/routes/report.tsx
 msgid "Incidents"
 msgstr "Incidents"
 
@@ -1498,11 +1556,19 @@ msgstr "last 30 days"
 msgid "Last 7 days"
 msgstr "Last 7 days"
 
+#: src/components/pipeline-strip.tsx
+msgid "Last publish"
+msgstr "Last publish"
+
 #: src/components/routes/checks.tsx
 #: src/components/routes/maintenance.tsx
 #: src/components/routes/maintenance.tsx
 msgid "Last run"
 msgstr "Last run"
+
+#: src/components/routes/incidents.tsx
+msgid "lasted"
+msgstr "lasted"
 
 #: src/components/routes/spikes.tsx
 msgid "Lasted"
@@ -1565,6 +1631,7 @@ msgid "Load Avg"
 msgstr "Load Avg"
 
 #: src/components/navbar.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/spikes.tsx
 msgid "Load spikes"
 msgstr "Load spikes"
@@ -1628,6 +1695,10 @@ msgstr "Main PID"
 msgid "Maintenance"
 msgstr "Maintenance"
 
+#: src/components/routes/report.tsx
+msgid "Maintenance done"
+msgstr "Maintenance done"
+
 #: src/components/routes/checks.tsx
 msgid "Maintenance is paused (kill switch on): no cleanup actions run."
 msgstr "Maintenance is paused (kill switch on): no cleanup actions run."
@@ -1655,6 +1726,10 @@ msgstr "Max 1 min"
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 msgid "Max 1h"
 msgstr "Max 1h"
+
+#: src/components/routes/maintenance.tsx
+msgid "Members"
+msgstr "Members"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/live.tsx
@@ -1716,6 +1791,18 @@ msgstr "Model"
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Monitor"
 msgstr "Monitor"
+
+#: src/components/pipeline-strip.tsx
+#~ msgid "Monitoring pipeline"
+#~ msgstr "Monitoring pipeline"
+
+#: src/components/pipeline-strip.tsx
+msgid "Monitoring pipeline: no answer yet"
+msgstr "Monitoring pipeline: no answer yet"
+
+#: src/components/pipeline-strip.tsx
+msgid "Monitoring pipeline: reported on time"
+msgstr "Monitoring pipeline: reported on time"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "Monitors created"
@@ -1807,6 +1894,10 @@ msgstr "No"
 #: src/components/routes/maintenance.tsx
 msgid "No actions recorded."
 msgstr "No actions recorded."
+
+#: src/components/routes/checks.tsx
+msgid "no alerts for these until they expire"
+msgstr "no alerts for these until they expire"
 
 #: src/components/routes/alerts.tsx
 msgid "No alerts reported yet."
@@ -2017,6 +2108,10 @@ msgstr "Page {0} of {1}"
 #: src/components/command-palette.tsx
 msgid "Pages / Settings"
 msgstr "Pages / Settings"
+
+#: src/components/pipeline-strip.tsx
+msgid "Parts of the pipeline"
+msgstr "Parts of the pipeline"
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/auth-form.tsx
@@ -2249,6 +2344,14 @@ msgstr "Recent actions"
 msgid "Refresh"
 msgstr "Refresh"
 
+#: src/components/routes/report.tsx
+msgid "refused"
+msgstr "refused"
+
+#: src/components/pipeline-strip.tsx
+msgid "registry"
+msgstr "registry"
+
 #: src/components/navbar.tsx
 #: src/components/routes/registry.tsx
 #: src/components/routes/registry.tsx
@@ -2262,6 +2365,14 @@ msgstr "Relationships"
 #: src/components/routes/migration.tsx
 msgid "Replaced by"
 msgstr "Replaced by"
+
+#: src/components/routes/maintenance.tsx
+msgid "report only"
+msgstr "report only"
+
+#: src/components/routes/report.tsx
+msgid "report-only"
+msgstr "report-only"
 
 #: src/components/navbar.tsx
 #: src/components/routes/reports.tsx
@@ -2296,11 +2407,20 @@ msgstr "Reset Password"
 msgid "Resident"
 msgstr "Resident"
 
+#: src/components/routes/incidents.tsx
+#: src/components/routes/report.tsx
+msgid "resolved"
+msgstr "resolved"
+
 #: src/components/alerts-history-columns.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Resolved"
 msgstr "Resolved"
+
+#: src/components/routes/incidents.tsx
+msgid "Resolved incidents"
+msgstr "Resolved incidents"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -2308,6 +2428,10 @@ msgstr "Resolved"
 #: src/components/routes/system/charts/monitors-charts.tsx
 msgid "Response"
 msgstr "Response"
+
+#: src/components/routes/maintenance.tsx
+msgid "Response ladder"
+msgstr "Response ladder"
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
 msgid "Response time monitoring from agents."
@@ -2330,6 +2454,10 @@ msgstr "Revision"
 #: src/components/routes/checks.tsx
 msgid "Right now"
 msgstr "Right now"
+
+#: src/components/routes/maintenance.tsx
+msgid "right now: level"
+msgstr "right now: level"
 
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
@@ -2510,11 +2638,16 @@ msgstr "Sent"
 msgid "Serial Number"
 msgstr "Serial Number"
 
+#: src/components/routes/maintenance.tsx
+msgid "Service classes & the response ladder"
+msgstr "Service classes & the response ladder"
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Service Details"
 msgstr "Service Details"
 
 #: src/components/navbar.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/slo.tsx
 msgid "Service levels"
 msgstr "Service levels"
@@ -2592,6 +2725,10 @@ msgstr "SMTP settings"
 msgid "Sort By"
 msgstr "Sort By"
 
+#: src/components/routes/report.tsx
+msgid "Space freed"
+msgstr "Space freed"
+
 #: src/components/routes/capacity.tsx
 msgid "Space freed per day"
 msgstr "Space freed per day"
@@ -2615,12 +2752,17 @@ msgstr "State"
 #: src/components/routes/capacity.tsx
 #: src/components/routes/checks.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Status"
 msgstr "Status"
+
+#: src/components/pipeline-strip.tsx
+msgid "Status data"
+msgstr "Status data"
 
 #: src/components/routes/capacity.tsx
 msgid "Storage headroom and how soon each mount fills at the current rate."
@@ -2725,6 +2867,7 @@ msgstr "target[,protocol[,port[,interval[,server]]]]"
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/report.tsx
 msgid "Task"
 msgstr "Task"
 
@@ -2746,6 +2889,10 @@ msgstr "Temperature"
 #: src/components/routes/settings/general.tsx
 msgid "Temperature unit"
 msgstr "Temperature unit"
+
+#: src/components/routes/report.tsx
+msgid "Temperatures"
+msgstr "Temperatures"
 
 #: src/components/routes/live.tsx
 msgid "Temperatures & fans"
@@ -2795,6 +2942,10 @@ msgstr "Then log into the backend and reset your user account password in the us
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 
+#: src/components/routes/report.tsx
+msgid "This report could not be loaded."
+msgstr "This report could not be loaded."
+
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2811,6 +2962,14 @@ msgstr "Throughput of storage pool {displayName}"
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
 msgstr "Time format"
+
+#: src/components/routes/report.tsx
+msgid "Time healthy"
+msgstr "Time healthy"
+
+#: src/components/routes/incidents.tsx
+msgid "Timeline"
+msgstr "Timeline"
 
 #: src/components/routes/maintenance.tsx
 msgid "Timer"
@@ -3063,6 +3222,7 @@ msgid "Usage of storage pool {displayName}"
 msgstr "Usage of storage pool {displayName}"
 
 #: src/components/routes/capacity.tsx
+#: src/components/routes/report.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
 #: src/components/routes/system/storage-pools-table.tsx
@@ -3088,6 +3248,10 @@ msgstr "Valid"
 #: src/components/alerts-history-columns.tsx
 msgid "Value"
 msgstr "Value"
+
+#: src/components/pipeline-strip.tsx
+msgid "Verdict"
+msgstr "Verdict"
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -3141,9 +3305,21 @@ msgstr "Warning thresholds"
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Push notifications"
 
+#: src/components/routes/report.tsx
+msgid "Weekly report"
+msgstr "Weekly report"
+
 #: src/components/routes/maintenance.tsx
 msgid "What"
 msgstr "What"
+
+#: src/components/routes/maintenance.tsx
+msgid "What happens to it"
+msgstr "What happens to it"
+
+#: src/components/routes/report.tsx
+msgid "What mattered"
+msgstr "What mattered"
 
 #: src/components/routes/maintenance.tsx
 #~ msgid "What the engine did, and what the routine is doing."
@@ -3204,6 +3380,10 @@ msgstr "Write"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Write errors"
 msgstr "Write errors"
+
+#: src/components/routes/report.tsx
+msgid "written"
+msgstr "written"
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"

@@ -22,6 +22,21 @@ export function useMaintenanceFile<T = unknown>(name: string): T | null {
 	return data
 }
 
+// Ohmz fork: fetch one published maintenance report (daily / weekly) by id.
+export function useMaintenanceReport<T = unknown>(id: string): T | null {
+	const [data, setData] = useState<T | null>(null)
+	useEffect(() => {
+		let live = true
+		pb.send<T>(`/api/beszel/maintenance/report?id=${encodeURIComponent(id)}`, { method: "GET" })
+			.then((d) => live && setData(d))
+			.catch(() => {})
+		return () => {
+			live = false
+		}
+	}, [id])
+	return data
+}
+
 export const DOT: Record<string, string> = {
 	ok: "bg-green-500",
 	info: "bg-blue-500",

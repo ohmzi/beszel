@@ -5,6 +5,7 @@ import { Trans, useLingui } from "@lingui/react/macro"
 import { useStore } from "@nanostores/react"
 import { memo, useEffect, useMemo } from "react"
 import { FooterRepoLink } from "@/components/footer-repo-link"
+import { Link } from "@/components/router"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { $systems } from "@/lib/stores"
 import type { MaintenanceReport } from "@/types"
@@ -88,7 +89,11 @@ export default memo(() => {
 									</span>
 								</TableCell>
 								<TableCell className="text-muted-foreground">{r.k ?? ""}</TableCell>
-								<TableCell className="font-medium">{r.i ?? ""}</TableCell>
+								<TableCell className="font-medium">
+									<Link href={`/reports/${r.i ?? ""}`} className="hover:underline">
+										{r.i ?? ""}
+									</Link>
+								</TableCell>
 								<TableCell>{r.n ?? ""}</TableCell>
 								<TableCell className="text-muted-foreground whitespace-nowrap">{when(r.t)}</TableCell>
 							</TableRow>
