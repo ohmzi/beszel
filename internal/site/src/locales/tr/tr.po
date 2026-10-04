@@ -496,7 +496,7 @@ msgstr "Toplu ekle"
 msgid "Bulk Add {foo}"
 msgstr "{foo} toplu ekle"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Busiest by CPU"
 msgstr ""
 
@@ -744,7 +744,7 @@ msgstr "Çakışmalar"
 msgid "Connection is down"
 msgstr "Bağlantı kesildi"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
@@ -759,8 +759,8 @@ msgid "Container network"
 msgstr ""
 
 #: src/components/routes/live.tsx
-msgid "containers"
-msgstr ""
+#~ msgid "containers"
+#~ msgstr ""
 
 #: src/components/routes/system.tsx
 msgid "Containers"
@@ -841,8 +841,8 @@ msgid "Core"
 msgstr "Çekirdek"
 
 #: src/components/routes/live.tsx
-msgid "cores"
-msgstr ""
+#~ msgid "cores"
+#~ msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -1026,13 +1026,13 @@ msgstr "Boşalıyor"
 msgid "Disk"
 msgstr "Depolama alanı"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Disk activity"
 msgstr ""
 
 #: src/components/routes/live.tsx
-msgid "Disk I/O"
-msgstr ""
+#~ msgid "Disk I/O"
+#~ msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Disk unit"
@@ -1190,7 +1190,7 @@ msgstr "Geçici"
 msgid "Error"
 msgstr "Hata"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "errors"
 msgstr ""
 
@@ -1552,7 +1552,6 @@ msgid "It may have expired or already been used. Open the dashboard to acknowled
 msgstr ""
 
 #: src/components/routes/alerts.tsx
-#: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
@@ -1562,7 +1561,7 @@ msgstr ""
 msgid "Language"
 msgstr "Dil"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Largest by memory"
 msgstr ""
 
@@ -1629,10 +1628,10 @@ msgid "limit"
 msgstr "Sınır"
 
 #: src/components/routes/live.tsx
-msgid "Live"
-msgstr ""
+#~ msgid "Live"
+#~ msgstr ""
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Live monitor"
 msgstr ""
 
@@ -1755,7 +1754,6 @@ msgid "Members"
 msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
-#: src/components/routes/live.tsx
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1855,7 +1853,6 @@ msgstr ""
 msgid "Net"
 msgstr "Ağ"
 
-#: src/components/routes/live.tsx
 #: src/components/routes/system.tsx
 msgid "Network"
 msgstr "Ağ"
@@ -2286,7 +2283,7 @@ msgstr "Kayıtlı zamanda kesin kullanım"
 msgid "Preferred Language"
 msgstr "Tercih Edilen Dil"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Pressure"
 msgstr ""
 
@@ -2294,7 +2291,7 @@ msgstr ""
 msgid "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
 msgstr ""
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Process"
 msgstr ""
 
@@ -2340,7 +2337,7 @@ msgstr "Depolama pool'u {displayName} ham kullanımı"
 
 #. Disk read
 #. Disk read
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
@@ -2429,8 +2426,8 @@ msgid "Reset Password"
 msgstr "Şifreyi Sıfırla"
 
 #: src/components/routes/live.tsx
-msgid "Resident"
-msgstr ""
+#~ msgid "Resident"
+#~ msgstr ""
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/report.tsx
@@ -2537,7 +2534,7 @@ msgstr "S.M.A.R.T. Kendiliğinden Test"
 msgid "Safety proof"
 msgstr ""
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "samples"
 msgstr ""
 
@@ -2684,7 +2681,7 @@ msgstr ""
 msgid "Service objectives are still collecting data."
 msgstr ""
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2808,10 +2805,10 @@ msgid "Summary"
 msgstr ""
 
 #: src/components/routes/live.tsx
-msgid "Swap"
-msgstr ""
+#~ msgid "Swap"
+#~ msgstr ""
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Swap held by"
 msgstr ""
 
@@ -2926,8 +2923,8 @@ msgid "Temperatures"
 msgstr ""
 
 #: src/components/routes/live.tsx
-msgid "Temperatures & fans"
-msgstr ""
+#~ msgid "Temperatures & fans"
+#~ msgstr ""
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Temperatures of system sensors"
@@ -2946,8 +2943,8 @@ msgid "Test notification sent"
 msgstr "Test bildirimi gönderildi"
 
 #: src/components/routes/live.tsx
-msgid "The live monitor has not published yet."
-msgstr ""
+#~ msgid "The live monitor has not published yet."
+#~ msgstr ""
 
 #: src/components/routes/health.tsx
 msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
@@ -3170,7 +3167,7 @@ msgstr "Tür"
 msgid "Un-acknowledge"
 msgstr ""
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "Sağlıksız"
@@ -3223,6 +3220,10 @@ msgstr "Güncel"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Update"
 msgstr "Güncelle"
+
+#: src/components/live-panels.tsx
+msgid "updated"
+msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -3399,8 +3400,8 @@ msgid "When using POST, each heartbeat includes a JSON payload with system statu
 msgstr "POST kullanırken, her heartbeat sistem durumu özeti, çöken sistemlerin listesi ve tetiklenen uyarıları içeren bir JSON yükü içerir."
 
 #: src/components/routes/live.tsx
-msgid "Who"
-msgstr ""
+#~ msgid "Who"
+#~ msgstr ""
 
 #: src/components/routes/health.tsx
 msgid "Why"
@@ -3422,7 +3423,7 @@ msgstr ""
 
 #. Disk write
 #. Disk write
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx

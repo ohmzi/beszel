@@ -491,7 +491,7 @@ msgstr "Bulk Add"
 msgid "Bulk Add {foo}"
 msgstr "Bulk Add {foo}"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Busiest by CPU"
 msgstr "Busiest by CPU"
 
@@ -739,7 +739,7 @@ msgstr "Conflicts"
 msgid "Connection is down"
 msgstr "Connection is down"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/system/charts/container-network.tsx
 #: src/lib/alerts.ts
 msgid "Container"
@@ -754,8 +754,8 @@ msgid "Container network"
 msgstr "Container network"
 
 #: src/components/routes/live.tsx
-msgid "containers"
-msgstr "containers"
+#~ msgid "containers"
+#~ msgstr "containers"
 
 #: src/components/routes/system.tsx
 msgid "Containers"
@@ -836,8 +836,8 @@ msgid "Core"
 msgstr "Core"
 
 #: src/components/routes/live.tsx
-msgid "cores"
-msgstr "cores"
+#~ msgid "cores"
+#~ msgstr "cores"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -1021,13 +1021,13 @@ msgstr "Discharging"
 msgid "Disk"
 msgstr "Disk"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Disk activity"
 msgstr "Disk activity"
 
 #: src/components/routes/live.tsx
-msgid "Disk I/O"
-msgstr "Disk I/O"
+#~ msgid "Disk I/O"
+#~ msgstr "Disk I/O"
 
 #: src/components/routes/settings/general.tsx
 msgid "Disk unit"
@@ -1185,7 +1185,7 @@ msgstr "Ephemeral"
 msgid "Error"
 msgstr "Error"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "errors"
 msgstr "errors"
 
@@ -1547,7 +1547,6 @@ msgid "It may have expired or already been used. Open the dashboard to acknowled
 msgstr "It may have expired or already been used. Open the dashboard to acknowledge from there."
 
 #: src/components/routes/alerts.tsx
-#: src/components/routes/live.tsx
 #: src/components/routes/migration.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
@@ -1557,7 +1556,7 @@ msgstr "Kind"
 msgid "Language"
 msgstr "Language"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Largest by memory"
 msgstr "Largest by memory"
 
@@ -1624,10 +1623,10 @@ msgid "limit"
 msgstr "limit"
 
 #: src/components/routes/live.tsx
-msgid "Live"
-msgstr "Live"
+#~ msgid "Live"
+#~ msgstr "Live"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Live monitor"
 msgstr "Live monitor"
 
@@ -1750,7 +1749,6 @@ msgid "Members"
 msgstr "Members"
 
 #: src/components/containers-table/containers-table-columns.tsx
-#: src/components/routes/live.tsx
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1850,7 +1848,6 @@ msgstr "need attention"
 msgid "Net"
 msgstr "Net"
 
-#: src/components/routes/live.tsx
 #: src/components/routes/system.tsx
 msgid "Network"
 msgstr "Network"
@@ -2281,7 +2278,7 @@ msgstr "Precise utilization at the recorded time"
 msgid "Preferred Language"
 msgstr "Preferred Language"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Pressure"
 msgstr "Pressure"
 
@@ -2289,7 +2286,7 @@ msgstr "Pressure"
 msgid "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
 msgstr "Pressure episodes, the worst first. A spike is logged when memory, disk I/O or CPU pressure stays high for two checks in a row."
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Process"
 msgstr "Process"
 
@@ -2335,7 +2332,7 @@ msgstr "Raw usage of storage pool {displayName}"
 
 #. Disk read
 #. Disk read
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
@@ -2424,8 +2421,8 @@ msgid "Reset Password"
 msgstr "Reset Password"
 
 #: src/components/routes/live.tsx
-msgid "Resident"
-msgstr "Resident"
+#~ msgid "Resident"
+#~ msgstr "Resident"
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/report.tsx
@@ -2532,7 +2529,7 @@ msgstr "S.M.A.R.T. Self-Test"
 msgid "Safety proof"
 msgstr "Safety proof"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "samples"
 msgstr "samples"
 
@@ -2679,7 +2676,7 @@ msgstr "Service levels"
 msgid "Service objectives are still collecting data."
 msgstr "Service objectives are still collecting data."
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2803,10 +2800,10 @@ msgid "Summary"
 msgstr "Summary"
 
 #: src/components/routes/live.tsx
-msgid "Swap"
-msgstr "Swap"
+#~ msgid "Swap"
+#~ msgstr "Swap"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 msgid "Swap held by"
 msgstr "Swap held by"
 
@@ -2921,8 +2918,8 @@ msgid "Temperatures"
 msgstr "Temperatures"
 
 #: src/components/routes/live.tsx
-msgid "Temperatures & fans"
-msgstr "Temperatures & fans"
+#~ msgid "Temperatures & fans"
+#~ msgstr "Temperatures & fans"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Temperatures of system sensors"
@@ -2941,8 +2938,8 @@ msgid "Test notification sent"
 msgstr "Test notification sent"
 
 #: src/components/routes/live.tsx
-msgid "The live monitor has not published yet."
-msgstr "The live monitor has not published yet."
+#~ msgid "The live monitor has not published yet."
+#~ msgstr "The live monitor has not published yet."
 
 #: src/components/routes/health.tsx
 msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
@@ -3165,7 +3162,7 @@ msgstr "Type"
 msgid "Un-acknowledge"
 msgstr "Un-acknowledge"
 
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "Unhealthy"
@@ -3218,6 +3215,10 @@ msgstr "Up to date"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Update"
 msgstr "Update"
+
+#: src/components/live-panels.tsx
+msgid "updated"
+msgstr "updated"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -3394,8 +3395,8 @@ msgid "When using POST, each heartbeat includes a JSON payload with system statu
 msgstr "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
 
 #: src/components/routes/live.tsx
-msgid "Who"
-msgstr "Who"
+#~ msgid "Who"
+#~ msgstr "Who"
 
 #: src/components/routes/health.tsx
 msgid "Why"
@@ -3417,7 +3418,7 @@ msgstr "Working…"
 
 #. Disk write
 #. Disk write
-#: src/components/routes/live.tsx
+#: src/components/live-panels.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 #: src/components/routes/system/disk-io-sheet.tsx

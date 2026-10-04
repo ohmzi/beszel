@@ -26,7 +26,6 @@ func TestIsAppRoute(t *testing.T) {
 		{"/smart", "/", true},
 		{"/monitors", "/", true},
 		{"/checks", "/", true},
-		{"/live", "/", true},
 		{"/registry", "/", true},
 		{"/maintenance", "/", true},
 		{"/capacity", "/", true},

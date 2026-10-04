@@ -17,7 +17,6 @@ import {
 	MenuIcon,
 	NetworkIcon,
 	PlusIcon,
-	RadioIcon,
 	SearchIcon,
 	ScrollTextIcon,
 	ServerIcon,
@@ -78,7 +77,6 @@ const SECTIONS = [
 		load: () => import("@/components/routes/monitors"),
 	},
 	{ divider: true },
-	{ route: "live", icon: RadioIcon, label: "Live", load: () => import("@/components/routes/live") },
 	{ route: "checks", icon: ListChecksIcon, label: "Checks", load: () => import("@/components/routes/checks") },
 	{
 		route: "maintenance",

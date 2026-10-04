@@ -3,6 +3,7 @@ import { useStore } from "@nanostores/react"
 import { memo, Suspense, useEffect } from "react"
 import SystemsTable from "@/components/systems-table/systems-table"
 import SystemDetail from "@/components/routes/system"
+import { LivePanels } from "@/components/live-panels"
 import { FooterRepoLink } from "@/components/footer-repo-link"
 import { $systems } from "@/lib/stores"
 
@@ -18,7 +19,12 @@ export default memo(() => {
 	}, [t, solo])
 
 	if (solo) {
-		return <SystemDetail id={solo.id} />
+		return (
+			<>
+				<SystemDetail id={solo.id} />
+				<LivePanels />
+			</>
+		)
 	}
 
 	return (
