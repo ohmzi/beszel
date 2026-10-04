@@ -273,13 +273,13 @@ msgstr ""
 msgid "Automatic copy requires a secure context."
 msgstr "Η αυτόματη αντιγραφή απαιτεί ασφαλές περιβάλλον."
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "Διαθέσιμο"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Διαθέσιμο"
 
@@ -558,6 +558,10 @@ msgstr "Κάντε κλικ σε ένα σύστημα για να δείτε π
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
 msgstr "Κάντε κλικ για αντιγραφή"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "collecting…"
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1296,6 +1300,16 @@ msgstr ""
 msgid "Language"
 msgstr "Γλώσσα"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 24 hours"
+msgstr ""
+
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 7 days"
+msgstr ""
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr "Διάταξη"
@@ -1503,6 +1517,10 @@ msgstr "Απώλεια παρακολούθησης δικτύου"
 #: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "Παρακολουθήσεις δικτύου"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Network totals"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of containers"
@@ -2161,6 +2179,11 @@ msgstr "Σύνδεση"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Ισχύς σήματος των συνδεδεμένων διεπαφών Wi-Fi"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Since data (up to 30 days)"
+msgstr ""
+
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
 msgstr "Ρυθμίσεις SMTP"
@@ -2547,6 +2570,10 @@ msgstr "Ενημερώσεις"
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"
 msgstr "Αποστολή"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Upload and download over the retained history."
+msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx

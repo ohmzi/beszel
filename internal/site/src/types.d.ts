@@ -768,6 +768,8 @@ export interface UpdateInfo {
 export interface NetworkMonitorRecord {
 	id: string
 	system: string
+	/** optional human name (Ohmz fork) */
+	name?: string
 	target: string
 	protocol: "icmp" | "tcp" | "http" | "dns"
 	port: number

@@ -273,15 +273,15 @@ msgstr ""
 msgid "Automatic copy requires a secure context."
 msgstr "النسخ التلقائي يتطلب سياقًا آمنًا."
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
-msgid "Available"
-msgstr "متاح"
-
 #: src/components/routes/system/storage-pools-table.tsx
 msgctxt "Disk space available"
 msgid "Available"
 msgstr "المتاح"
+
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
+msgid "Available"
+msgstr "متاح"
 
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
@@ -558,6 +558,10 @@ msgstr "انقر على نظام لعرض مزيد من المعلومات."
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
 msgstr "انقر للنسخ"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "collecting…"
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1296,6 +1300,16 @@ msgstr ""
 msgid "Language"
 msgstr "اللغة"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 24 hours"
+msgstr ""
+
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 7 days"
+msgstr ""
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr "التخطيط"
@@ -1503,6 +1517,10 @@ msgstr "فقدان مراقب الشبكة"
 #: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "مراقبو الشبكة"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Network totals"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of containers"
@@ -2161,6 +2179,11 @@ msgstr "تسجيل الدخول"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "قوة إشارة واجهات Wi-Fi المتصلة"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Since data (up to 30 days)"
+msgstr ""
+
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
 msgstr "إعدادات SMTP"
@@ -2547,6 +2570,10 @@ msgstr "التحديثات"
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"
 msgstr "رفع"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Upload and download over the retained history."
+msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx

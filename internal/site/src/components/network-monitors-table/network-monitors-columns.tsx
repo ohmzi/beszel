@@ -66,7 +66,7 @@ const isMuted = (record: NetworkMonitorRecord, systemRecord: SystemRecord | unde
 	!record.enabled || systemRecord?.status !== SystemStatus.Up
 
 export function getMonitorColumns(
-	longestTarget = "",
+	_longestTarget = "",
 	$longestSystemName: ReadableAtom<string>,
 	{
 		onEdit,
@@ -142,10 +142,10 @@ export function getMonitorColumns(
 		{
 			id: "target",
 			meta: { label: t`Target` },
-			sortingFn: (a, b) => a.original.target.localeCompare(b.original.target),
-			accessorFn: (record) => getMonitorTarget(record),
+			sortingFn: (a, b) => (a.original.name || getMonitorTarget(a.original)).localeCompare(b.original.name || getMonitorTarget(b.original)),
+			accessorFn: (record) => record.name || getMonitorTarget(record),
 			header: ({ column }) => <HeaderButton column={column} name={t`Target`} Icon={GlobeIcon} />,
-			cell: ({ row, getValue }) => {
+			cell: ({ row }) => {
 				const monitor = row.original
 				const { status } = useStore($allSystemsById)[monitor.system] || {}
 
@@ -157,14 +157,14 @@ export function getMonitorColumns(
 				} else if (monitor.updated && !monitor.res) {
 					color = "bg-red-500"
 				}
+				const label = monitor.name || getMonitorTarget(monitor)
+				const sub = monitor.name ? getMonitorTarget(monitor) : ""
 				return (
 					<div className="ms-1.5 max-w-64 flex gap-2 items-center tabular-nums">
 						<span className={cn("shrink-0 size-2 rounded-full", color)} />
-						<div className="relative w-fit min-w-0 max-w-full">
-							<span className="invisible block overflow-hidden whitespace-nowrap" aria-hidden="true">
-								{longestTarget}
-							</span>
-							<span className="absolute inset-0 truncate">{getValue() as string}</span>
+						<div className="min-w-0">
+							<span className="block truncate">{label}</span>
+							{sub ? <span className="block truncate text-xs text-muted-foreground">{sub}</span> : null}
 						</div>
 					</div>
 				)

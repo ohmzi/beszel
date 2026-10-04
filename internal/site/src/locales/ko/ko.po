@@ -273,13 +273,13 @@ msgstr ""
 msgid "Automatic copy requires a secure context."
 msgstr "자동 복사는 안전한 컨텍스트가 필요합니다."
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "사용 가능"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "사용 가능"
 
@@ -558,6 +558,10 @@ msgstr "더 많은 정보를 보려면 시스템을 클릭하세요."
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
 msgstr "클릭하여 복사"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "collecting…"
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1296,6 +1300,16 @@ msgstr ""
 msgid "Language"
 msgstr "언어"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 24 hours"
+msgstr ""
+
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 7 days"
+msgstr ""
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr "레이아웃"
@@ -1503,6 +1517,10 @@ msgstr "네트워크 모니터 패킷 손실"
 #: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "네트워크 모니터"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Network totals"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of containers"
@@ -2161,6 +2179,11 @@ msgstr "로그인"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "연결된 Wi-Fi 인터페이스의 신호 강도"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Since data (up to 30 days)"
+msgstr ""
+
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
 msgstr "SMTP 설정"
@@ -2547,6 +2570,10 @@ msgstr "업데이트"
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"
 msgstr "업로드"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Upload and download over the retained history."
+msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx

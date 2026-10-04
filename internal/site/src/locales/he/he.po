@@ -273,13 +273,13 @@ msgstr ""
 msgid "Automatic copy requires a secure context."
 msgstr "העתקה אוטומטית דורשת הקשר מאובטח."
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "זמין"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "זמין"
 
@@ -558,6 +558,10 @@ msgstr "לחץ על מערכת כדי לצפות במידע נוסף."
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
 msgstr "לחץ כדי להעתיק"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "collecting…"
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1296,6 +1300,16 @@ msgstr ""
 msgid "Language"
 msgstr "שפה"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 24 hours"
+msgstr ""
+
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 7 days"
+msgstr ""
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr "פריסה"
@@ -1503,6 +1517,10 @@ msgstr "אובדן מנטר רשת"
 #: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "מנטרי רשת"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Network totals"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of containers"
@@ -2161,6 +2179,11 @@ msgstr "התחבר"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "עוצמת האות של ממשקי Wi-Fi מחוברים"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Since data (up to 30 days)"
+msgstr ""
+
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
 msgstr "הגדרות SMTP"
@@ -2547,6 +2570,10 @@ msgstr "עדכונים"
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"
 msgstr "העלאה"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Upload and download over the retained history."
+msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx

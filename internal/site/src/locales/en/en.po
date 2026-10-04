@@ -268,13 +268,13 @@ msgstr "Attention"
 msgid "Automatic copy requires a secure context."
 msgstr "Automatic copy requires a secure context."
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "Available"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Available"
 
@@ -553,6 +553,10 @@ msgstr "Click on a system to view more information."
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
 msgstr "Click to copy"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "collecting…"
+msgstr "collecting…"
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1291,6 +1295,16 @@ msgstr "Kind"
 msgid "Language"
 msgstr "Language"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 24 hours"
+msgstr "Last 24 hours"
+
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Last 7 days"
+msgstr "Last 7 days"
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr "Layout"
@@ -1498,6 +1512,10 @@ msgstr "Network Monitor Loss"
 #: src/components/routes/monitors.tsx
 msgid "Network Monitors"
 msgstr "Network Monitors"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Network totals"
+msgstr "Network totals"
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of containers"
@@ -2156,6 +2174,11 @@ msgstr "Sign in"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Signal strength of connected Wi-Fi interfaces"
 
+#: src/components/routes/system/charts/network-totals.tsx
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Since data (up to 30 days)"
+msgstr "Since data (up to 30 days)"
+
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
 msgstr "SMTP settings"
@@ -2542,6 +2565,10 @@ msgstr "Updates"
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"
 msgstr "Upload"
+
+#: src/components/routes/system/charts/network-totals.tsx
+msgid "Upload and download over the retained history."
+msgstr "Upload and download over the retained history."
 
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx
