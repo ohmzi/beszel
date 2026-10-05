@@ -633,16 +633,16 @@ runner, the publisher or the website stops, the dashboard would show old numbers
 worse than no dashboard. This check turns each stage of the pipeline into a row and gives one verdict (ok, degraded or \
 down), which the website shows as a strip in its top bar."""
 does = """\
-Runs in the check tier every 15 minutes, and public/self.json is rewritten every minute by \
-homelab-maint-selfhealth.timer. It judges 14 parts, each ok, degraded, down, info (not deployed) or unknown: runner \
-(last check run against the 15 minute interval: late after 1.5 times it plus 2 minutes, down after 3 times), publish \
-(manifest age, export errors), scheduler tick (late after 5 minutes), daily (30 hours) and weekly (9 days) runs, live \
-monitor (90 seconds), sensor ring (5 minutes), rules registry (applied and in sync, generated files not hand edited), \
-runner errors over 24 hours, state directory (free space, size, growth), acknowledge inbox backlog, alert delivery \
-(transport breaker, outbox), the dashboard's /api/health and its unit on loopback, and the Kuma heartbeat keys. Verdict \
-down is crit and degraded is warn. It is read-only and imports only the core module, so nothing it watches is needed \
-to report that it is down. It asks docker only when the daemon is demonstrably running, because docker is \
-socket-activated and a connect would start it."""
+Runs in the check tier every 5 minutes (matching homelab-maint-check.timer; check_interval_s defaults to 300), and \
+public/self.json is rewritten every minute by homelab-maint-selfhealth.timer. It judges 14 parts, each ok, degraded, \
+down, info (not deployed) or unknown: runner (last check run against the 5 minute interval: late after 1.5 times it \
+plus 2 minutes, down after 3 times), publish (manifest age, export errors), scheduler tick (late after 5 minutes), \
+daily (30 hours) and weekly (9 days) runs, live monitor (90 seconds), sensor ring (5 minutes), rules registry (applied \
+and in sync, generated files not hand edited), runner errors over 24 hours, state directory (free space, size, growth), \
+acknowledge inbox backlog, alert delivery (transport breaker, outbox), the dashboard's /api/health and its systemd unit \
+on loopback, and the Kuma heartbeat keys. Verdict down is crit and degraded is warn. It is read-only and imports only \
+the core module, so nothing it watches is needed to report that it is down. It asks systemd with a read-only \
+`systemctl is-active` only; it never starts or stops anything."""
 applies_to = ["self_health"]
 file = "maint.toml"
 target = "tasks.self_health"
@@ -653,8 +653,8 @@ principle = "one umbrella: the monitor is monitored"
 owner_notes = """\
 Never acknowledge self_health: it would hide a blind monitor (it has an explicit issue key, the set of failing parts, \
 so the system would allow it). The refresher is a timer on purpose and not a tick job, because this check is the \
-dead-man of the tick. Every option is optional; the shipped table is empty and the defaults apply (web_port 8088, \
-web_path /api/health, web_service beszel-hub.service)."""
+dead-man of the tick. Every option is optional and the shipped table is empty, so the defaults apply: check_interval_s \
+300 (matching the 5-minute check timer), web_port 8088, web_path /api/health, web_service beszel-hub.service."""
 since = "2026-10-03"
 
 [[rule]]

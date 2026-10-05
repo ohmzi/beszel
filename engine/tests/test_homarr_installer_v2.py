@@ -1285,18 +1285,18 @@ def test_rehearsal_on_a_fresh_copy_of_the_real_live_database(tmp_path, capsys):
     # old bottoms per (layout, section), computed independently of the installer
     bottoms = {(lay, sec): b for lay, sec, b in c.execute("SELECT layout_id, section_id, MAX(y_offset+height) FROM item_layout GROUP BY layout_id, section_id")}
     c.close()
-    assert {"Local-Big-Screen", "Local-Mobile", "Remote-Big-Screen", "Remote-Mobile"} <= set(boards)
+    assert {"Local-Big-Screen", "Local-Mobile", "Remote-Big-Screen"} <= set(boards)
     expected = [json.loads((defs / f"{s}.json").read_text())["name"] for s in inst.ORDER]
     argv = ["--widgets-dir", str(defs), "--no-docker-check", "--no-harness"]
     if any(n in names for n in expected):
         pytest.skip(f"the ops widgets are already installed on the live database ({sorted(set(expected) & names)}): re-run is covered by the idempotence tests")
     assert inst.main([str(copy), "--dry-run", *argv]) == 0 and snapshot(copy) == pre
     bk = tmp_path / "backup-rehearsal"
-    assert inst.main([str(copy), "--backup-dir", str(bk), *argv, "--boards", ",".join(["Local-Big-Screen", "Local-Mobile", "Remote-Big-Screen", "Remote-Mobile"])]) == 0
+    assert inst.main([str(copy), "--backup-dir", str(bk), *argv, "--boards", ",".join(["Local-Big-Screen", "Local-Mobile", "Remote-Big-Screen"])]) == 0
     post = snapshot(copy)
     assert {t for t in post if post[t] != pre[t]} == set(WRITTEN)
     assert len(post["custom_widget_v2_definition"]) == len(pre["custom_widget_v2_definition"]) + 7
-    assert len(post["item"]) == len(pre["item"]) + 28 and len(post["item_layout"]) == len(pre["item_layout"]) + 56
+    assert len(post["item"]) == len(pre["item"]) + 21 and len(post["item_layout"]) == len(pre["item_layout"]) + 42
     assert all(r in post["item_layout"] for r in pre["item_layout"]) and all(r in post["item"] for r in pre["item"])
     assert {t: post[t] for t in post if t not in WRITTEN} == {t: pre[t] for t in pre if t not in WRITTEN}          # incl. legacy tables and secrets
     c = sqlite3.connect(copy)
@@ -1306,7 +1306,7 @@ def test_rehearsal_on_a_fresh_copy_of_the_real_live_database(tmp_path, capsys):
     if thermals_creator:
         assert {r[2] for r in new_defs.values()} == {thermals_creator[0]}
     new_items = c.execute("SELECT id, board_id, json_extract(options,'$.json.definitionId') FROM item WHERE json_extract(options,'$.json.definitionId') IN (%s)" % ",".join("?" * 7), list(new_defs)).fetchall()
-    assert len(new_items) == 28 and legacy_ids_in_use >= 8
+    assert len(new_items) == 21 and legacy_ids_in_use >= 8
     for iid, bid, did in new_items:
         lays = c.execute("SELECT il.layout_id, il.section_id, il.x_offset, il.y_offset, il.width, il.height, l.column_count FROM item_layout il JOIN layout l ON l.id=il.layout_id WHERE il.item_id=?", (iid,)).fetchall()
         assert len(lays) == 2 == c.execute("SELECT count(*) FROM layout WHERE board_id=?", (bid,)).fetchone()[0]

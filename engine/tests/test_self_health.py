@@ -235,7 +235,7 @@ def test_task_result_ok_shape(w):
 
 
 # =========================================================================== runner (check tier cadence)
-@pytest.mark.parametrize("age,state", [(300, "ok"), (1470, "ok"), (1471, "degraded"), (2700, "degraded"), (2701, "down")])
+@pytest.mark.parametrize("age,state", [(300, "ok"), (570, "ok"), (571, "degraded"), (900, "degraded"), (901, "down")])
 def test_runner_thresholds_follow_the_check_interval(w, age, state):
     w.status(check_age=age)
     r = row(w.assess(), "runner")
@@ -1020,7 +1020,7 @@ def test_export_document_shape_and_size(w):
     assert doc["schema"] == 2 and doc["generated_at"] == NOW and doc["level"] == "ok"
     assert doc["verdict"] == {"level": "ok", "reasons": [], "since": NOW}
     assert doc["ttl"] == {"refresh_s": 60, "degraded_after_s": 180, "down_after_s": 600} and doc["valid_until"] == NOW + 180     # FILE freshness
-    assert doc["limits"] == {"runner_late_s": 1470, "runner_down_s": 2700}                                                      # the runner's own limits
+    assert doc["limits"] == {"runner_late_s": 570, "runner_down_s": 900}                                                        # the runner's own limits
     assert [c["id"] for c in doc["checks"]] == [c for c, _ in sh_mod.COMPONENTS]
     assert all({"id", "title", "state", "detail"} <= set(c) for c in doc["checks"])
     assert len(json.dumps(doc)) < 8000 and doc["metrics"]["level"] == "ok"
@@ -1084,7 +1084,7 @@ def test_export_of_a_crashing_self_check_says_so_instead_of_staying_ok(w, monkey
     doc = sh_mod.export(NOW)
     assert doc["level"] == "degraded" and doc["verdict"]["reasons"] == ["the self-check could not run: RuntimeError"]
     assert doc["generated_at"] == NOW and doc["checks"] == [] and doc["ttl"]["down_after_s"] == 600 and doc["valid_until"] == NOW + 180
-    assert doc["limits"]["runner_down_s"] == 2700 and effective_ok(doc, NOW + 700) == "down"                                     # same page rule
+    assert doc["limits"]["runner_down_s"] == 900 and effective_ok(doc, NOW + 700) == "down"                                      # same page rule
 
 
 def test_export_with_a_broken_maint_toml_still_works(w):
@@ -1185,8 +1185,8 @@ def selfjson(level="ok", age=0.0, **kw):
 def test_self_json_ttl_is_the_files_freshness_not_the_runners_lateness(w):
     doc = sh_mod.export(NOW)
     assert doc["ttl"]["degraded_after_s"] == 180 and doc["ttl"]["down_after_s"] == 600 and doc["ttl"]["refresh_s"] == 60
-    assert doc["limits"] == {"runner_late_s": 1470, "runner_down_s": 2700}
-    assert doc["ttl"]["degraded_after_s"] < doc["limits"]["runner_late_s"]                      # a stale ok is NOT tolerated for 24.5 min
+    assert doc["limits"] == {"runner_late_s": 570, "runner_down_s": 900}
+    assert doc["ttl"]["degraded_after_s"] < doc["limits"]["runner_late_s"]                      # a stale ok is NOT tolerated for 9.5 min
 
 
 @pytest.mark.parametrize("age,level,stale", [(0, "ok", False), (60, "ok", False), (180, "ok", False), (181, "degraded", True),
@@ -1235,7 +1235,7 @@ def test_runner_dead_only_the_refresher_alive_the_file_flips_to_down_within_one_
     that the verdict flips on the very next tick, and the page must never show a stale ok."""
     f = w.pub / "self.json"
     seen = []
-    for dt, level in [(0, "ok"), (60, "ok"), (1140, "ok"), (1200, "degraded"), (2400, "degraded"), (2460, "down"), (2520, "down")]:
+    for dt, level in [(0, "ok"), (60, "ok"), (240, "ok"), (300, "degraded"), (540, "degraded"), (660, "down"), (720, "down")]:
         w.jwrite(w.run / "tick.json", {"t": NOW + dt - 5})                                          # the tick, live monitor and sampler are separate
         w.jwrite(w.pub / "live.json", {"generated_at": NOW + dt - 2})                                # units: they keep running while the check tier is dead
         w.jwrite(w.state / "metrics-ring.json", {"v": 1, "last": {"t": NOW + dt - 10}})

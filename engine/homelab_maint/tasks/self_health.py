@@ -18,7 +18,7 @@ Kuma heartbeat). One verdict: {"level": ok|degraded|down, "reasons": [plain lang
 
 ONE ROW PER PIPELINE PART (fixed order; each row = {id, title, state ok|degraded|down|info|unknown, detail, reason, hint, age_s, limit_s}):
   runner     tier_runs.check.last_run (else the newest check task, else generated_at) vs the check interval
-             degraded > 1.5 x interval + grace (a run was missed), down > 3 x interval (45 min)
+             degraded > 1.5 x interval + grace (a run was missed), down > 3 x interval (15 min with the shipped 300 s)
   publish    manifest.json generated_at, else the mtime of overview.json (publish rewrites it on every run); overview.export_errors
   tick       newest of RUN_DIR/tick.json, status.json tick.last_run, sched.json mtime; the tick runs every minute: degraded > 5 min
   daily      tier_runs.daily.last_run vs 30 h        weekly   tier_runs.weekly.last_run vs 9 d   (never ran: only after `born` + limit)
@@ -84,7 +84,7 @@ PUBLIC self.json (export(now); glue: publish.OPTIONAL_SOURCES["self.json"] = (("
    "checks":[row ...],"metrics":{scalars}}
 
 OPTIONS ([tasks.self_health] in maint.toml; all optional, a wrong type or range falls back to the default):
-  check_interval_s 900   late_factor 1.5   grace_s 120   down_factor 3.0     runner/publish limits = late: 1.5 x + grace, down: 3 x
+  check_interval_s 300   late_factor 1.5   grace_s 120   down_factor 3.0     runner/publish limits = late: 1.5 x + grace, down: 3 x
   refresh_s 60   stale_factor 3.0   stale_down_factor 10.0                    file ttl = 3 x / 10 x the refresh period (180 / 600 s)
   tick_late_s 300   daily_max_h 30   weekly_max_d 9   live_late_s 90   metrics_late_s 300
   state_free_warn_pct 5   state_free_warn_gib 2   state_free_down_mib 256   state_max_gib 4   state_growth_warn_mib_day 512
@@ -143,7 +143,7 @@ _statvfs = os.statvfs                           # seams for the tests
 _http_timeout = (socket.timeout, TimeoutError)
 
 DEFAULTS: dict[str, Any] = {
-    "check_interval_s": 900, "late_factor": 1.5, "grace_s": 120, "down_factor": 3.0,
+    "check_interval_s": 300, "late_factor": 1.5, "grace_s": 120, "down_factor": 3.0,
     "tick_late_s": 300, "daily_max_h": 30, "weekly_max_d": 9, "live_late_s": 90, "metrics_late_s": 300,
     "state_free_warn_pct": 5.0, "state_free_warn_gib": 2.0, "state_free_down_mib": 256, "state_max_gib": 4.0,
     "state_growth_warn_mib_day": 512,

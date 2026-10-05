@@ -167,7 +167,7 @@ alert_mode = "task"              # "task": the check tier pages on the task leve
 # budget_s, workers, force: see homelab_maint/tasks/monitors.py
 
 [tasks.self_health]              # the monitoring pipeline itself: runner -> publish -> website, tick, live, ring, registry, ack inbox, website, Kuma
-# every key optional (homelab_maint/tasks/self_health.py): check_interval_s = 900, web_port = 8088, web_path = "/api/health", web_service = "beszel-hub.service",
+# every key optional (homelab_maint/tasks/self_health.py): check_interval_s = 300 (default, matching homelab-maint-check.timer *:0/5), web_port = 8088, web_path = "/api/health", web_service = "beszel-hub.service",
 # web_check = true, kuma_keys = ["tier-check", "umbrella-probes"], kuma_required = false, registry_check_generated = true,
 # refresh_s = 60, stale_factor = 3, stale_down_factor = 10, outbox_warn_s, breaker_fail_n, kuma_fail_n
 # public/self.json is rewritten every minute by homelab-maint-selfhealth.timer (NOT the tick: it is the dead-man of the tick)
