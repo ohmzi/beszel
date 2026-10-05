@@ -86,6 +86,17 @@ Intentional differences:
   5. nvidia-smi failing = "skipped" (script: silently 0 MB). A failed restart is reported (script ignored the rc).
   6. mode = "report" by default (audit "dry-run", nothing restarted). `unprotect = ["^comfyui$"]` is needed because the
      global protected list contains "comfyui".
+  7. ram_threshold_mb (0 = off, the default): when set, the task also fires on the container's RESIDENT SYSTEM RAM
+     (proc_mem_mb, summing /proc/<pid>/statm over its pids), not only on VRAM. ComfyUI can hand a model back to the OS's
+     VRAM while the process keeps it in RAM, and the restart frees both; the legacy script never looked at system RAM.
+     0 reproduces the script's signal exactly, which is why it is the default — every parity sequence above runs with it
+     off, and only a task that configures a threshold ever reads /proc.
+  8. stop_idle_min (15 in the shipped task; 0 = off): a blunt idle-killer layered on top of the port (Ohmz choice,
+     2026-10-04). When > 0 the VRAM/RAM logic above is bypassed entirely: a running container whose queue has been empty
+     for that many minutes in a row is STOPPED (`docker stop`, not restarted), whatever it holds, so a rogue ComfyUI cannot
+     sit on the GPU. The idle clock lives in its own per-lane key (is/ris, like the strikes) and any job or unreadable
+     queue resets it; the queue is re-read right before the stop and a job cancels it. The owner restarts ComfyUI by hand.
+     0 reproduces the legacy VRAM/RAM restart path exactly.
 
 =====================================================================================================================
 PARITY.md  immich_recycle  (immich-server-recycle.service + 10-homelab-gate.conf)
@@ -733,14 +744,43 @@ def gpu_mem_mb(pids: set[int]) -> int | None:
     return total
 
 
+def proc_mem_mb(pids: set[int]) -> int | None:
+    """Total resident RAM (MiB) of `pids` from /proc/<pid>/statm; None when not one of them could be read.
+
+    Deliberately optional: it is only called when a task configures a RAM threshold, so every parity run against the
+    legacy scripts — which never looked at system RAM — reads nothing here."""
+    total = 0
+    seen = False
+    try:
+        page = os.sysconf("SC_PAGE_SIZE")
+    except (OSError, ValueError):
+        return None
+    for pid in pids:
+        try:
+            with open(f"/proc/{pid}/statm") as fh:
+                resident = int(fh.read().split()[1])
+        except (OSError, IndexError, ValueError):
+            continue
+        seen = True
+        total += resident * page
+    return total // (1024 * 1024) if seen else None
+
+
 def comfy_step(st: dict, busy: int | None, vram_mb: int, now: float, thresh_mb: float = 3000, strikes: int = 2,
-               ttl_s: float = 2700.0, min_gap_s: float = 0.0) -> tuple[str, dict]:
-    """The legacy decision. st = {"n": strikes so far, "t": time of the last one}. Returns (action, new state) with
+               ttl_s: float = 2700.0, min_gap_s: float = 0.0, ram_mb: int | None = None,
+               ram_thresh_mb: float = 0.0) -> tuple[str, dict]:
+    """The legacy decision, plus an optional system-RAM arm (PARITY: comfyui_idle_reclaim, difference 1).
+    st = {"n": strikes so far, "t": time of the last one}. Returns (action, new state) with
     action reset | strike | wait | restart. Idle means busy == 0 exactly; None (probe error) is busy.
     `wait`: an idle observation less than min_gap_s after the last strike is NOT a new strike (two runners, a manual run or a
     scheduler catch-up landing seconds apart would otherwise turn one moment of idleness into "sustained"); the state is
-    untouched. A busy/light observation always resets, whatever the gap (the safe direction)."""
-    if busy == 0 and vram_mb > thresh_mb:
+    untouched. A busy/light observation always resets, whatever the gap (the safe direction).
+
+    Held is the legacy test, VRAM > thresh_mb, OR — only when ram_thresh_mb > 0 — RAM > ram_thresh_mb: ComfyUI can release a
+    resident model from VRAM while the process still holds it in system RAM, and the restart frees both. ram_mb None
+    (unreadable) is never heavy, and ram_thresh_mb 0 (the default) reproduces the legacy script exactly."""
+    heavy = vram_mb > thresh_mb or (ram_thresh_mb > 0 and ram_mb is not None and ram_mb > ram_thresh_mb)
+    if busy == 0 and heavy:
         fresh = st.get("n", 0) > 0 and now - st.get("t", 0) <= ttl_s
         if fresh and now - st.get("t", 0) < min_gap_s:
             return "wait", {"n": st["n"], "t": st["t"]}
@@ -751,9 +791,23 @@ def comfy_step(st: dict, busy: int | None, vram_mb: int, now: float, thresh_mb: 
     return "reset", {"n": 0}
 
 
+def comfy_stop_step(st: dict, busy: int | None, now: float, stop_s: float, key: str = "is") -> tuple[str, float | None]:
+    """The simple idle-killer (Ohmz choice, 2026-10-04, when stop_idle_min > 0): forget VRAM and RAM entirely -- a container that
+    has been idle for `stop_s` in a row is STOPPED, whatever it holds, so a rogue ComfyUI cannot sit on the GPU when nobody uses
+    it. Idle is busy == 0 exactly; None (a queue probe error) and any pending job both reset the clock (fail closed: a busy or an
+    unreadable queue never stops anything). Returns (action | "reset" | "start" | "wait" | "stop", idle_since)."""
+    if busy != 0:
+        return "reset", None
+    since = _num(st.get(key))
+    if since is None or since > now:
+        return "start", now
+    return ("wait", since) if now - since < stop_s else ("stop", since)
+
+
 @task("comfyui_idle_reclaim", klass="C1", tier="check", title="ComfyUI idle VRAM", timeout=120)
 def comfyui_idle_reclaim(ctx: Ctx) -> Result:
-    """Restart ComfyUI when it is idle yet holds VRAM across two checks (see PARITY: comfyui_idle_reclaim).
+    """Reclaim the GPU from an idle ComfyUI: with stop_idle_min > 0 (the shipped default) stop it after that many idle
+    minutes; with stop_idle_min = 0, restart it when it is idle yet holds VRAM/RAM across two checks (see PARITY: comfyui_idle_reclaim).
 
     Two LANES of state: a run that can really act (ctx.apply) keeps its strikes in n/t, every other run (report mode, a tier
     run without --apply, PAUSE) in rn/rt, so a report-mode run that happens to share the state file can never add the strike
@@ -761,6 +815,7 @@ def comfyui_idle_reclaim(ctx: Ctx) -> Result:
     o = _Opts(ctx)
     name = o.name("container", "comfyui")
     thresh = o.num("threshold_mb", 3000, 0, 10 ** 6)
+    ram_thresh = o.num("ram_threshold_mb", 0, 0, 10 ** 6)      # 0 = the legacy signal only (VRAM); see comfy_step
     strikes = int(o.num("strikes", 2, 1, 10))
     ttl = o.num("strike_ttl_min", 45, 1, 1440) * 60
     strike_gap = o.num("strike_min_gap_min", 4, 0, 1440) * 60
@@ -775,6 +830,8 @@ def comfyui_idle_reclaim(ctx: Ctx) -> Result:
     def reset() -> None:
         st[kn] = 0
         st.pop(kt, None)
+        st.pop("is", None)                                   # the idle-stop clock (see comfy_stop_step)
+        st.pop("ris", None)
 
     insp = _container_pids(name, bool(ctx.opt("match_cgroup", True)))
     if insp is None:
@@ -785,26 +842,65 @@ def comfyui_idle_reclaim(ctx: Ctx) -> Result:
         reset()
         return Result("ok", _ascii(f"ComfyUI container {cstate}: no VRAM to reclaim"), {"mode": "report", "container_state": cstate})
     busy = queue_jobs(url, qto)
+    stop_s = o.num("stop_idle_min", 0, 0, 1440) * 60          # Ohmz choice: 0 = off (the VRAM/RAM restart path below); >0 = a plain idle-killer
+    if stop_s > 0:
+        ki = "is" if ctx.apply else "ris"
+        action, since = comfy_stop_step(st, busy, ctx.now, stop_s, ki)
+        st[kn] = 0                                           # the idle-killer and the VRAM restart are mutually exclusive
+        st.pop(kt, None)
+        if since is None:
+            st.pop(ki, None)
+        else:
+            st[ki] = since
+        idle_min = 0.0 if since is None else (ctx.now - since) / 60
+        mode = "apply" if ctx.apply else "report"
+        m = {"mode": mode, "action": action, "busy": -1 if busy is None else busy, "container_state": cstate,
+             "idle_min": round(idle_min, 1), "stop_idle_min": stop_s / 60}
+        if action == "reset":
+            return Result("ok", _ascii(f"ComfyUI busy ({m['busy']} jobs): idle timer reset"), m)
+        if action == "start":
+            return Result("ok", _ascii(f"ComfyUI idle: will stop it if it stays idle {stop_s / 60:g} min"), m)
+        if action == "wait":
+            return Result("ok", _ascii(f"ComfyUI idle {idle_min:.0f} min of {stop_s / 60:g}: not stopping yet"), m)
+        if ctx.apply and queue_jobs(url, qto) != 0:           # a job may have been queued since the first probe: look again
+            st.pop(ki, None)
+            m["action"] = "cancelled"
+            return Result("ok", _ascii("ComfyUI got a job just before the stop: cancelled"), m)
+        verdict, err = _do(ctx, "docker-stop", name, lambda: _run_ok(["docker", "stop", name], 120))
+        m["action"] = verdict
+        if verdict == "done":
+            st.pop(ki, None)
+            st["last_stop"] = ctx.now
+            return Result("ok", _ascii(f"stopped {name}: idle {idle_min:.0f} min (>= {stop_s / 60:g})"), m)
+        if verdict == "failed":
+            return Result("warn", _ascii(f"stop of {name} failed: {err}"), m)
+        why = {"would": "report", "protected": "protected: set unprotect for this task", "paused": "paused"}[verdict]
+        return Result("info", _ascii(f"{why}: would stop {name} (idle {idle_min:.0f} min)"), m)
     vram = gpu_mem_mb(pids)
     if vram is None:
         reset()
         return _skipped("nvidia-smi unavailable: nothing done")
-    action, new = comfy_step({"n": st.get(kn, 0), "t": st.get(kt, 0)}, busy, vram, ctx.now, thresh, strikes, ttl, strike_gap)
+    ram = proc_mem_mb(pids) if ram_thresh > 0 else None
+    action, new = comfy_step({"n": st.get(kn, 0), "t": st.get(kt, 0)}, busy, vram, ctx.now, thresh, strikes, ttl, strike_gap,
+                             ram, ram_thresh)
     st[kn] = new["n"]
     if "t" in new:
         st[kt] = new["t"]
     else:
         st.pop(kt, None)
     mode = "apply" if ctx.apply else "report"
-    m = {"mode": mode, "action": action, "vram_mb": vram, "busy": -1 if busy is None else busy, "strikes": st[kn],
+    held = f"{vram} MB VRAM" if ram is None else f"{vram} MB VRAM / {ram} MB RAM"      # byte-identical when RAM is off
+    ram_note = "" if ram is None else f" / {ram} MB RAM"
+    m = {"mode": mode, "action": action, "vram_mb": vram, "ram_mb": -1 if ram is None else ram,
+         "ram_threshold_mb": ram_thresh, "busy": -1 if busy is None else busy, "strikes": st[kn],
          "threshold_mb": thresh, "container_state": cstate}
     if action == "reset":
         why = "busy or queue unreadable" if busy != 0 else "VRAM light"
-        return Result("ok", _ascii(f"ComfyUI {why} ({vram} MB held, {m['busy']} jobs): strikes reset"), m)
+        return Result("ok", _ascii(f"ComfyUI {why} ({vram} MB held{ram_note}, {m['busy']} jobs): strikes reset"), m)
     if action == "strike":
-        return Result("ok", _ascii(f"ComfyUI idle and holding {vram} MB VRAM: strike {st[kn]}/{strikes}"), m)
+        return Result("ok", _ascii(f"ComfyUI idle and holding {held}: strike {st[kn]}/{strikes}"), m)
     if action == "wait":
-        return Result("ok", _ascii(f"ComfyUI idle and holding {vram} MB VRAM: strike {st[kn]}/{strikes} is only "
+        return Result("ok", _ascii(f"ComfyUI idle and holding {held}: strike {st[kn]}/{strikes} is only "
                                    f"{(ctx.now - st[kt]) / 60:.0f} min old, waiting (min {strike_gap / 60:g})"), m)
     last = _num(st.get("last_restart"))
     if last is not None and ctx.now - last < gap:
@@ -813,16 +909,17 @@ def comfyui_idle_reclaim(ctx: Ctx) -> Result:
     if ctx.apply and queue_jobs(url, qto) != 0:               # a job may have been queued since the first probe: look again
         reset()
         m["action"] = "cancelled"
-        return Result("ok", _ascii(f"ComfyUI got a job just before the restart: cancelled, strikes reset ({vram} MB held)"), m)
+        return Result("ok", _ascii(f"ComfyUI got a job just before the restart: cancelled, strikes reset "
+                                   f"({vram} MB held{ram_note})"), m)
     verdict, err = _do(ctx, "docker-restart", name, lambda: _run_ok(["docker", "restart", name], 120))
     m["action"] = verdict
     if verdict == "done":
         st["last_restart"] = ctx.now
-        return Result("ok", _ascii(f"restarted {name}: idle for {strikes} checks, held {vram} MB VRAM"), m)
+        return Result("ok", _ascii(f"restarted {name}: idle for {strikes} checks, held {held}"), m)
     if verdict == "failed":
         return Result("warn", _ascii(f"restart of {name} failed: {err}"), m)
     why = {"would": "report", "protected": "protected: set unprotect for this task", "paused": "paused"}[verdict]
-    return Result("info", _ascii(f"{why}: would restart {name} (idle {strikes} checks, {vram} MB VRAM)"), m)
+    return Result("info", _ascii(f"{why}: would restart {name} (idle {strikes} checks, {held})"), m)
 
 
 # =========================================================================== immich_recycle

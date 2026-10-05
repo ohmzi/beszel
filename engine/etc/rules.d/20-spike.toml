@@ -341,7 +341,7 @@ why = """\
   The ladder has to know who is who before it touches anything. These patterns put every running container \
   into one of four classes: P0 platform (docker-socket-proxy), P1 interactive and serving (Seerr, \
   Audiobookshelf, the Immich API and its stores, Nextcloud, Open WebUI and its public gate, Homarr, Uptime \
-  Kuma, SearXNG, Tday, the personal sites and this maintenance site), P2 batch and background (the arr apps \
+  Kuma, SearXNG, Tday and the personal sites), P2 batch and background (the arr apps \
   and downloaders, library scans, ML and GPU jobs, ComfyUI, Tunarr, small side apps) and P3 best effort (test \
   twins, demos, buildx, Diun, throw-away test containers). The order of sacrifice is P3, then P2; P1 and P0 \
   are never slowed, restarted or stopped (classes of service)."""
@@ -353,8 +353,8 @@ does = """\
   added here. A pattern that does not compile, or an empty table, makes the whole class map unusable: L3-L5 \
   refuse and qos_classes skips (fail closed), leaving only the non-destructive L1 and L2. Databases keep the \
   class of the app they serve, but the ladder never slows, restarts or stops anything that runs as a database \
-  or build daemon, whatever its class. The Live tab reads the same lists for its class badges. 1 P0, 26 P1, 42 \
-  P2 and 6 P3 patterns ship."""
+  or build daemon, whatever its class. The Live tab reads the same lists for its class badges. 1 P0, 25 P1, 42 \
+  P2 and 5 P3 patterns ship."""
 applies_to = ["pressure_state", "pressure_response", "qos_classes", "bulkhead_check", "homelab-maint-live"]
 file = "classes.toml"
 target = "classes"
@@ -411,8 +411,8 @@ does = """\
   Case-insensitive regexes searched against the names of running systemd services. The 6 P0 patterns cover the \
   platform: docker, containerd, ssh, NetworkManager, tailscaled, cloudflared, dbus, cron, snapd, polkit, \
   fail2ban, gdm, systemd-* units, smartmontools and smart-bridge (the SMS and e-mail alert path), libvirt's \
-  lock and log daemons and similar desktop services. The 7 P1 patterns cover Plex, Ollama, Glances, \
-  sensor-exporter, the two homelab-maint web units, TeamViewer and the notebook alert; the 3 P2 patterns the \
+  lock and log daemons and similar desktop services. The 8 P1 patterns cover Plex, Ollama, Glances, \
+  sensor-exporter, the two homelab-maint web units, the dashboard hub and its agent, TeamViewer and the notebook alert; the 3 P2 patterns the \
   backups, the Immich recycle, tunarr-autostart and thermal-log; the 4 P3 patterns docker-prune, mem-guard, \
   fstrim, logrotate, the apt timers, the homelab-maint check, daily, weekly and metrics runners and similar \
   periodic jobs. pressure_state lists the running units per class for the class table. The ladder itself only \
@@ -439,6 +439,7 @@ P0 = [
 P1 = [
   '^snap\.plexmediaserver\.plexmediaserver\.service$', '^ollama\.service$',
   '^glances\.service$', '^sensor-exporter\.service$', '^homelab-maint-(www|live)\.service$',
+  '^beszel-(hub|agent)\.service$',
   '^teamviewerd\.service$', '^notebook-db-alert\.(service|timer)$',
 ]
 P2 = [

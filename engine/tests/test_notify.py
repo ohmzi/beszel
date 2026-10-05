@@ -91,7 +91,10 @@ class Fake:
 
 def cfgx(**over) -> dict:
     """Inline notify config on top of the defaults: deterministic host label and quiet-hours zone."""
-    base = {"site": {"host_label": "testhost"}, "quiet_hours": {"tz": "America/Toronto"}, "ack": {"button": True}}      # (the button is "auto": it waits for the site)
+    # ack.mint_url = "": the unit tests mint locally (FakeAcks) rather than call the hub's /mint over HTTP; the shipped
+    # default (http://127.0.0.1:8088/api/beszel/maintenance/ack/mint) is exercised by the _mint_via_hub tests, which set it.
+    base = {"site": {"host_label": "testhost"}, "quiet_hours": {"tz": "America/Toronto"},
+            "ack": {"button": True, "mint_url": ""}}                                          # (the button is "auto": it waits for the site)
     notify._merge(base, over)
     return {"notify": base}
 
@@ -150,7 +153,7 @@ def test_shipped_notify_toml_parses_and_mirrors_the_defaults():
     assert not {"handle", "user", "bridge"} & set(user["transport"])             # those come from maint.toml [global]: one source of truth
     nc = notify.load_config({"global": {"notify_handle": "ohmz", "bridge": "/usr/local/sbin/backup-notify-hermes.py"}})
     assert (nc["transport"]["handle"], nc["transport"]["user"], nc["transport"]["bridge"]) == ("ohmz", "ohmz", "/usr/local/sbin/backup-notify-hermes.py")
-    assert user["site"]["url"] == "https://maintenance.ohmzhomelab.ca"
+    assert user["site"]["url"] == "https://maintainer.ohmzhomelab.ca"
     assert user["mute_file"] == "NOTIFY_MUTE"                 # a top-level key, not swallowed by a table
     for kind in T.KINDS:                                      # every kind has a route and a dedupe window and a budget
         assert kind in user["routes"] or kind in ("alert", "incident_open")
@@ -785,7 +788,7 @@ def test_sms_title_survives_a_long_summary_and_a_long_title_is_clipped_with_elli
 
 
 @pytest.mark.parametrize("text", [
-    "see https://maintenance.ohmzhomelab.ca/#/capacity now", "mail owner@example.com about it", "visit www.example.org today",
+    "see https://maintainer.ohmzhomelab.ca/#/capacity now", "mail owner@example.com about it", "visit www.example.org today",
     "plex.tv is down", "docker.io pull failed", "check example.ca/path?x=1 please", "http://10.0.0.5:8080/x", "HTTPS://UPPER.EXAMPLE.COM",
     "user:pw@host.example.net", "ftp://files.example.com/a", "a.b.c.d.example.co.uk"])
 def test_sms_never_contains_a_url_address_or_bare_hostname(text):
@@ -842,11 +845,11 @@ def test_plain_text_has_every_section_and_a_dashboard_line():
                                        "timeline": [("22:01", "went red")], "sections": [{"title": "Sec", "lines": ["sl"], "kv": [("k", "v")],
                                                                                            "checks": [("c1", True, "n"), ("c2", False, ""), ("c3", None, "")]}]},
             facts={"Free": "4%", "link": "#/capacity", "tiles": [["4%", "free", "crit"]]})
-    m = T.prepare(ev, site={"url": "https://maintenance.ohmzhomelab.ca", "host_label": "h"}, now=NOON)
+    m = T.prepare(ev, site={"url": "https://maintainer.ohmzhomelab.ca", "host_label": "h"}, now=NOON)
     txt = T.build_plain(m)
     for needle in ("[CRITICAL] Disk space", "Host: h", "Check: disk_forecast", "Free: 4%", "What was done", "- cleaned x", "What to do", "1. do y",
                    "22:01  went red", "Details", "para", "Sec", "[ok] c1 n", "[FAIL] c2", "[--] c3", "Log excerpt", "4% free",
-                   "Dashboard: https://maintenance.ohmzhomelab.ca/#/capacity", "Sent by homelab-maint on h."):
+                   "Dashboard: https://maintainer.ohmzhomelab.ca/#/capacity", "Sent by homelab-maint on h."):
         assert needle in txt, needle
 
 
@@ -906,7 +909,7 @@ class Audit(HTMLParser):
         self.text.append(data)
 
 
-def audit_html(doc: str, base="https://maintenance.ohmzhomelab.ca") -> Audit:
+def audit_html(doc: str, base="https://maintainer.ohmzhomelab.ca") -> Audit:
     a = Audit()
     a.feed(doc)
     assert set(a.tags) <= ALLOWED_TAGS, set(a.tags) - ALLOWED_TAGS
@@ -939,7 +942,7 @@ def test_every_template_renders_in_the_ohmz_cloud_family(name):
     assert doc.startswith("<!doctype html>") and 'role="presentation"' in doc and "&#937;" in doc and "Ohmz" in doc and "Maintenance" in doc
     assert 'bgcolor="#211f1d"' in doc and "max-width:600px" in doc and 'meta name="color-scheme"' in doc
     assert len(doc) < 60_000 and "Ohmz Cloud" in doc
-    assert any("maintenance.ohmzhomelab.ca" in h for h in a.hrefs)       # the dashboard link is email-only and present
+    assert any("maintainer.ohmzhomelab.ca" in h for h in a.hrefs)       # the dashboard link is email-only and present
 
 
 def test_status_colours_stay_real():
@@ -996,7 +999,7 @@ def test_email_panel_is_fixed_layout_and_every_dynamic_cell_wraps_long_tokens():
     """The two halves of the fix, asserted on the markup: `table-layout:fixed` on the 600px panel (its width never depends on its
     content) and `word-break:break-word` next to every `overflow-wrap:break-word` (overflow-wrap alone does not shrink an
     auto-layout table's min-content, so a long token still widened the card; fixed layout alone clipped it inside the card)."""
-    m = T.prepare(long_token_event(), site={"url": "https://maintenance.ohmzhomelab.ca", "host_label": "h"}, now=NOON)
+    m = T.prepare(long_token_event(), site={"url": "https://maintainer.ohmzhomelab.ca", "host_label": "h"}, now=NOON)
     doc = T.build_html(m)
     panel = re.search(r'<table[^>]*width="600"[^>]*style="([^"]*)"', doc)
     assert panel and "table-layout:fixed;" in panel[1] and "max-width:600px" in panel[1] and "width:100%" in panel[1]
@@ -1083,7 +1086,7 @@ def test_every_dynamic_field_is_escaped(evil):
          "sections": [{"title": "ST " + evil, "lines": ["SL " + evil], "kv": [("SK " + evil, "SV " + evil)], "checks": [("SC " + evil, False, "SN " + evil)]}]},
         {"FK " + evil: "FV " + evil, "tiles": [["V " + evil, "TL " + evil, "ok"]], "host": "H " + evil, "sev": "SEV " + evil,
          "link": evil, "notified": 3}, "crit", "k", "task " + evil)
-    m = T.prepare(ev, site={"url": "https://maintenance.ohmzhomelab.ca", "host_label": "x"}, now=NOON)
+    m = T.prepare(ev, site={"url": "https://maintainer.ohmzhomelab.ca", "host_label": "x"}, now=NOON)
     doc = T.build_html(m)
     audit_html(doc)                                                  # only allow-listed tags/attributes, one safe href at most
     shown = model_strings(m)
@@ -1110,9 +1113,9 @@ def test_quotes_angle_brackets_and_ampersands_are_entity_encoded_in_every_field(
 
 
 def test_links_are_built_only_from_validated_parts():
-    site = {"url": "https://maintenance.ohmzhomelab.ca", "host_label": "h"}
+    site = {"url": "https://maintainer.ohmzhomelab.ca", "host_label": "h"}
     good = T.prepare(notify.Event("alert", "crit", "t", "s", facts={"link": "#/incidents"}), site=site)
-    assert good.url == "https://maintenance.ohmzhomelab.ca/#/incidents"
+    assert good.url == "https://maintainer.ohmzhomelab.ca/#/incidents"
     assert T.site_url("https://x.ca/", "reports/2026-W40") == "https://x.ca/#/reports/2026-W40"
     assert T.site_url("https://x.ca/maint", "") == "https://x.ca/maint"
     for frag in ("javascript:alert(1)", '#/x" onmouseover="y', "//evil.example", "#/../etc", "#/a/../b", "../x", "#/a b", "#/<x>", "x" * 90, "data:text/html,x"):
@@ -2429,7 +2432,7 @@ def test_the_queued_copy_is_sanitised_and_bounded_and_the_state_file_stays_priva
     notify.flush_pending(cfgx(), NOON + 400, transport=good)
     m = good.calls[0]
     assert "line 4999" in m.plain and "line 10 " not in m.plain and secret not in m.plain + m.html and "password=<redacted>" in m.plain
-    assert "api_key=<redacted>" in m.plain and "https://maintenance.ohmzhomelab.ca/#/incidents" in m.html          # reserved facts keep their meaning
+    assert "api_key=<redacted>" in m.plain and "https://maintainer.ohmzhomelab.ca/#/incidents" in m.html          # reserved facts keep their meaning
 
 
 def test_replay_goes_through_the_same_policy_so_the_owner_is_never_paged_twice():
@@ -2736,7 +2739,7 @@ def disk_dump() -> str:
     return "\n".join(out)
 
 
-BASE = "https://maintenance.ohmzhomelab.ca"
+BASE = "https://maintainer.ohmzhomelab.ca"
 
 
 def luminance(h: str) -> float:
@@ -2756,7 +2759,7 @@ def test_shipped_ack_settings_agree_with_etc_ack_toml():
     rule = tomllib.loads((ROOT / "etc" / "ack.toml").read_text())["ack"]
     assert mine["days"] == rule["days"] == 90 and mine["escalation_breaks"] == rule["escalation_breaks"]
     assert mine["token_ttl_days"] == rule["token_ttl_days"] == 30
-    assert mine["base_url"] == "https://maintenance.ohmzhomelab.ca" and mine["button_text"] == "Acknowledge for {days} days"
+    assert mine["base_url"] == "https://maintainer.ohmzhomelab.ca" and mine["button_text"] == "Acknowledge for {days} days"
     assert mine["days"] in T.ACK_DAYS_ALLOWED and notify.DEFAULTS["ack"]["days"] == mine["days"]
     assert tomllib.loads((ROOT / "etc" / "notify.toml").read_text())["routes"]["ack_expired"] == "email"       # the notice never texts
 
@@ -2916,7 +2919,7 @@ def test_button_text_days_ttl_and_kill_switch_come_from_config(acks):
 # ------------------------------------------------------------------ the SMS, the logs, the state: where a token may NOT be
 def test_the_sms_never_carries_the_link_the_token_or_the_issue_id(acks):
     for sev in ("crit", "warn"):
-        ev = mk("alert", sev, summary="/ is 4% free; see https://maintenance.ohmzhomelab.ca/ack?id=0123456789abcdef&t=" + "Z" * 43 + "&d=90&s=crit")
+        ev = mk("alert", sev, summary="/ is 4% free; see https://maintainer.ohmzhomelab.ca/ack?id=0123456789abcdef&t=" + "Z" * 43 + "&d=90&s=crit")
         d, fk = go(ev, cfg=cfgx(escalation={"warn_sms_after": 1}), now=NOON + (0 if sev == "crit" else D))
         m, fp, tok = fk.calls[0], fp_of(acks, ev), acks.tokens[-1]["token"]
         assert "sms" in m.channels and m.sms.startswith("homelab: ") and len(m.sms) <= 130 and m.sms.isascii()
@@ -3940,7 +3943,7 @@ def test_issue_token_gets_the_mode_of_the_fingerprint(acks, monkeypatch):
 def test_the_button_waits_for_the_site_and_no_token_is_minted_before_that(acks):
     shipped = tomllib.loads((ROOT / "etc" / "notify.toml").read_text())["ack"]
     assert shipped["button"] == "auto" and notify.DEFAULTS["ack"]["button"] == "auto"
-    bare = {"notify": {"site": {"host_label": "testhost"}}}                           # exactly what an old /etc copy without [ack] gets
+    bare = {"notify": {"site": {"host_label": "testhost"}, "ack": {"mint_url": ""}}}   # an old /etc copy without [ack]; local mint (FakeAcks), not the hub
     ev = mk("alert", "crit", task="failed_units", summary="1 failed unit: a.service")
     fp = fp_of(acks, ev)
     d, fk = go(ev, cfg=bare)
@@ -4075,7 +4078,7 @@ def test_a_dry_run_of_a_task_that_may_not_be_acknowledged_shows_no_button_like_t
 # `website_*` is the other side of the link, written from SPEC5 S8 and deliberately NOT built from notify's own regexes
 # (notify_templates._ACK_URL_RE): if the two ever disagree, this chain breaks. Everything runs in the per-test tmp dirs with the REAL
 # acks.py and a fake transport: nothing is sent, nothing live is touched.
-SITE_HOST = "maintenance.ohmzhomelab.ca"
+SITE_HOST = "maintainer.ohmzhomelab.ca"
 WEB_ID, WEB_TOKEN, WEB_NUM = re.compile(r"[0-9a-f]{16}"), re.compile(r"[A-Za-z0-9_-]{43}"), re.compile(r"[0-9]{1,3}")
 WEB_DAYS, WEB_SEV = (7, 30, 90, 365), ("warn", "crit")
 
@@ -4268,16 +4271,16 @@ def test_the_fresh_button_of_an_expiry_notice_passes_the_sites_rules_too(real_ac
 
 
 @pytest.mark.parametrize("bad", [
-    "http://maintenance.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=crit",              # not https
-    "https://maintenance.ohmzhomelab.ca/ack/{t}",                                  # the earlier path shape
-    "https://maintenance.ohmzhomelab.ca/ack?id={i}&t={t}&d=91&s=crit",             # a length the site does not offer
-    "https://maintenance.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=info",             # a severity that is not an acknowledgement ceiling
-    "https://maintenance.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=crit&x=1",         # an extra parameter
-    "https://maintenance.ohmzhomelab.ca/ack?id={i}&id={i}&t={t}&d=90&s=crit",      # a repeated one
-    "https://maintenance.ohmzhomelab.ca/ack?id=ABCDEF0123456789&t={t}&d=90&s=crit",   # upper-case id
-    "https://maintenance.ohmzhomelab.ca/ack?id={i}&t={t}x&d=90&s=crit",            # a 44-character token
+    "http://maintainer.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=crit",              # not https
+    "https://maintainer.ohmzhomelab.ca/ack/{t}",                                  # the earlier path shape
+    "https://maintainer.ohmzhomelab.ca/ack?id={i}&t={t}&d=91&s=crit",             # a length the site does not offer
+    "https://maintainer.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=info",             # a severity that is not an acknowledgement ceiling
+    "https://maintainer.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=crit&x=1",         # an extra parameter
+    "https://maintainer.ohmzhomelab.ca/ack?id={i}&id={i}&t={t}&d=90&s=crit",      # a repeated one
+    "https://maintainer.ohmzhomelab.ca/ack?id=ABCDEF0123456789&t={t}&d=90&s=crit",   # upper-case id
+    "https://maintainer.ohmzhomelab.ca/ack?id={i}&t={t}x&d=90&s=crit",            # a 44-character token
     "https://evil.example/ack?id={i}&t={t}&d=90&s=crit",                           # another host
-    "https://maintenance.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=crit#x",           # a fragment
+    "https://maintainer.ohmzhomelab.ca/ack?id={i}&t={t}&d=90&s=crit#x",           # a fragment
 ])
 def test_the_site_validator_in_this_file_really_refuses_what_it_should(bad):
     """The mirror above is only worth something if it is strict: each of these is a link the site must NOT honour."""

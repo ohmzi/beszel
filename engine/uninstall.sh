@@ -14,8 +14,8 @@
 # registry (config/rules.d, state/rules/ with its history and the originals of every adopted config file): none of it is
 # removed without --purge, and nothing here puts a generated config file back to its pre-registry original (the copies are in
 # state/rules/orig). The immich-server-recycle drop-in is removed with the rest, which means the Immich
-# recycle timer goes back to restarting immich_server without asking the gate first. The maintenance-web container is not
-# touched, except by --purge, which removes it (it bind-mounts the directories the purge deletes).
+# recycle timer goes back to restarting immich_server without asking the gate first. The dashboard (the OhmzMaintainer hub +
+# agent) is a separate install and is never touched here.
 #
 # Refuses (unless --force) while a tier run is in progress, while a job the scheduler tick started is still alive (a backup runs
 # detached from every unit), and while a `homelab-maint migrate cutover` has retired a legacy timer, drop-in or script: removing
@@ -221,15 +221,6 @@ rm_path "$RUNDIR"
 # ------------------------------------------------------------------ purge (explicit only)
 if ((PURGE)); then
   say "Purge"
-  # The website container bind-mounts $STATE/public and $STATE/ack. Deleting them under a running container leaves it serving the
-  # deleted inodes (stale, then /healthz 503) even after a reinstall creates new directories: remove it first (docker compose up
-  # recreates it). Only asked when dockerd is already running: the socket is activated on demand, and a purge must not start it.
-  if [[ -z $ROOT ]] && command -v docker >/dev/null && systemctl is-active --quiet docker.service 2>/dev/null \
-    && [[ $(timeout 10 docker ps -a --filter name='^maintenance-web$' --format '{{.Names}}' 2>/dev/null) == maintenance-web ]]; then
-    run docker rm -f maintenance-web
-    note "$(verb remove)" "container maintenance-web (it bind-mounts the state directories that follow)"
-    CHANGES=$((CHANGES + 1))
-  fi
   rm_path "$CONF"
   rm_path "$STATE"
   rm_path "$LOGD"

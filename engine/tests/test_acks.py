@@ -1642,7 +1642,7 @@ class TestCli:
         fp = fp_of("t", "warn: x")
         assert acks.main(["issue-token", fp, "--ttl-days", "7", "--days", "30"]) == 0
         url = capsys.readouterr().out.strip()
-        m = re.fullmatch(rf"https://maintenance\.ohmzhomelab\.ca/ack\?id={fp}&t=([A-Za-z0-9_-]{{43}})&d=30&s=warn", url)
+        m = re.fullmatch(rf"https://maintainer\.ohmzhomelab\.ca/ack\?id={fp}&t=([A-Za-z0-9_-]{{43}})&d=30&s=warn", url)
         assert m, url
         tok = m.group(1)
         assert acks.token_hash(tok) in store()["tokens"] and tok.encode() not in (core.STATE_DIR / "acks.json").read_bytes()
@@ -1762,7 +1762,7 @@ def wire(world, monkeypatch):
     monkeypatch.setattr(notify, "playbook_loader", lambda task: [])
     tr = FakeTransport()
     cfg = {"notify": {"site": {"host_label": "testhost"}, "quiet_hours": {"tz": "America/Toronto", "enabled": False},
-                      "ack": {"button": True}}}                     # (notify's [ack] button = "auto" waits for the site; the tests want the link)
+                      "ack": {"button": True, "mint_url": ""}}}     # (button "auto" waits for the site; mint_url "" = mint locally, not at the hub)
     return types.SimpleNamespace(tr=tr, cfg=cfg, send=lambda ev, now: notify.send(ev, cfg, now, transport=tr))
 
 

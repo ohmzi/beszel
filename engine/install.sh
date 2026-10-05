@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # install.sh - install or upgrade homelab-maint on this host.
 #
-#   sudo ./install.sh [--dry-run] [--no-start] [--first-check] [--deploy-web] [--no-web-ready] [--adopt-rules]
+#   sudo ./install.sh [--dry-run] [--no-start] [--first-check] [--adopt-rules]
 #
 #   --dry-run       print what would change; write nothing (does not need root)
 #   --no-start      enable the timers and daemons but do not start them now
 #   --first-check   also run the check tier once, in the background (the same run its timer does)
-#   --deploy-web    also build and (re)create the maintenance-web container from ./web (docker compose; opt-in); once docker reports it
-#                   healthy this also creates ack/web_ready, which turns the e-mail Acknowledge button on (see ACKNOWLEDGE below)
-#   --no-web-ready  with --deploy-web: do not create ack/web_ready (do it yourself once the public hostname works)
 #   --adopt-rules   also run `homelab-maint rules sync --adopt` once the registry is installed (see "RULES REGISTRY" below)
+#
+# The dashboard (the OhmzMaintainer beszel hub + agent, the site that replaced the old maintenance-web container) is NOT deployed
+# by this script: it is a separate install (supplemental/systemd/README.md). This script only lays down the engine beside it.
 #
 # ONE UMBRELLA. Enables and starts: the check/daily/weekly tier timers, the 1-minute metrics sampler timer, the 1-minute
 # scheduler tick timer (it drives the routine, the probes, the acknowledge inbox and, after a cutover, the legacy jobs: there
@@ -17,15 +17,15 @@
 # (backups, docker-prune, ...) are never touched: `homelab-maint migrate` retires them one at a time, and this script never puts
 # back what a cutover retired (docker-prune.timer is in no list here and stays exactly as the owner left it).
 #
-# ACKNOWLEDGE (state/ack): the website container (uid and gid 10001) is a postbox, not a writer. ack/ is 0750 root:10001 (the same as
-# `homelab-maint ack init --group`); ack/inbox is 1730 root:10001 (the container may CREATE a request file there, not list or read the
-# others); ack/web.key is 0640 root:10001 (the HMAC key both sides sign with); ack/bootstrap.secret is 0600 root (first-run login; the
-# container cannot read it: `sudo homelab-maint web bootstrap` shows it once). The key and the bootstrap secret are generated ONLY when
+# ACKNOWLEDGE (state/ack): the dashboard is a postbox, not a writer. ack/ is 0750 root:10001 (the same as
+# `homelab-maint ack init --group`); ack/inbox is 1730 root:10001 (it may CREATE a request file there, not list or read the
+# others); ack/web.key is 0640 root:10001 (the HMAC key the hub and the runner both sign with); ack/bootstrap.secret is 0600 root
+# (first-run login; `sudo homelab-maint web bootstrap` shows it once). The key and the bootstrap secret are generated ONLY when
 # absent and never overwritten or printed. The group is the number 10001 (no group of that name is needed); HM_WEB_GID overrides it, and
 # without it the group web.key already has wins, so a host that deployed another gid keeps it.
 # The e-mail "Acknowledge" button stays off until ack/web_ready exists (notify.toml [ack] button = "auto"): a link to a site that is not up is
-# worse than none. --deploy-web creates it only AFTER docker reports the container healthy; --no-web-ready leaves it to you, and a container
-# that never gets healthy leaves it absent too. By hand, once the site answers on its public hostname:  sudo touch STATE/ack/web_ready
+# worse than none. The dashboard's own deploy creates it once the hub answers; by hand, once the site answers on its public hostname:
+#   sudo touch STATE/ack/web_ready
 #
 # RULES REGISTRY (config/rules.d): once the release ships registry content, rules.d is installed beside the config (00-baseline-
 # invariants.toml is release data and always replaced; the other files only when absent). The tick runs `homelab-maint rules sync`;
@@ -52,16 +52,12 @@ usage() { sed -n '2,/^# HM_ROOT/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'; }
 DRY=0
 START=1
 FIRST_CHECK=0
-DEPLOY_WEB=0
-WEB_READY=1
 ADOPT_RULES=0
 while (($#)); do
   case $1 in
     --dry-run) DRY=1 ;;
     --no-start) START=0 ;;
     --first-check) FIRST_CHECK=1 ;;
-    --deploy-web) DEPLOY_WEB=1 ;;
-    --no-web-ready) WEB_READY=0 ;;
     --adopt-rules) ADOPT_RULES=1 ;;
     -h | --help) usage; exit 0 ;;
     *) echo "install.sh: unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -94,7 +90,7 @@ declare -A NEEDS=([$WWW]=server.py [$LIVE]=live.py [homelab-maint-metrics.timer]
                   [homelab-maint-selfhealth.timer]=tasks/self_health.py)
 # Config that is release data rather than owner config: replaced on every install (the owner's own items live in legacy-retirement.d/).
 ALWAYS=(legacy-retirement.toml)
-# The website container's gid (web/Dockerfile: USER 10001:10001). Numeric on purpose: no group of that name exists on the host. Not set by the
+# The dashboard's gid. Numeric on purpose: no group of that name exists on the host. Not set by the
 # owner (HM_WEB_GID): the group an existing web.key already has (what the runner's web_gid() trusts too), else 10001.
 WEB_GID=${HM_WEB_GID:-}
 if [[ -z $WEB_GID && -f $STATE/ack/web.key && ! -L $STATE/ack/web.key ]]; then
@@ -156,9 +152,9 @@ ensure_dir() {
   changed
 }
 
-# pick_web_gid: sets AGID, the group the website container may use. A process that cannot chgrp to it (a user-namespace staging run
-# maps one gid) gets group root instead: closed, never open. On a real host that is a loud warning, because the container could then
-# not post its requests.
+# pick_web_gid: sets AGID, the group the dashboard's ack files (web.key, the inbox) use. A process that cannot chgrp to it (a
+# user-namespace staging run maps one gid) gets group root instead: closed, never open. On a real host that is a loud warning,
+# because the dashboard could then not post its requests.
 pick_web_gid() {
   : >"$STAGE/.gidprobe"
   if ((DRY)) || chgrp "$WEB_GID" "$STAGE/.gidprobe" 2>/dev/null; then
@@ -191,31 +187,6 @@ ensure_secret() {
     ( umask 077; new_secret "$kind" >"$STAGE/new.value" )
     run install -m "$mode" -o root -g "$([[ $gid == 0 ]] && echo root || echo "$gid")" -- "$STAGE/new.value" "$dest"
     note "$(verb create)" "$dest (random $kind value, $mode)"
-    changed
-  fi
-}
-
-# wait_web_healthy [SECONDS]: 0 once docker reports the website container healthy (its HEALTHCHECK is GET /healthz on the container itself),
-# 1 when it turns unhealthy or SECONDS (default 120, HM_WEB_WAIT_S) pass first. Asks docker only (read-only).
-wait_web_healthy() {
-  local end=$((SECONDS + ${1:-${HM_WEB_WAIT_S:-120}})) st
-  while :; do
-    st=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' maintenance-web 2>/dev/null || true)
-    if [[ $st == healthy ]]; then return 0; fi
-    if [[ $st == unhealthy ]] || ((SECONDS >= end)); then return 1; fi
-    sleep 1
-  done
-}
-
-# mark_web_ready: create ack/web_ready (empty, 0644 root) so notify offers the e-mail Acknowledge button. Only ever called after the
-# container reported healthy. An existing one is kept.
-mark_web_ready() {
-  local f=$STATE/ack/web_ready
-  if [[ -e $f ]]; then
-    note same "$f"
-  else
-    run install -m 0644 -o root -g root -- /dev/null "$f"
-    note "$(verb create)" "$f (the e-mail Acknowledge button is on)"
     changed
   fi
 }
@@ -367,12 +338,12 @@ if [[ $PUT == changed ]]; then CODE_CHANGED=1; fi
 say "State and logs"
 ensure_dir "$STATE" 0755     # status.json inside is world-readable on purpose (www runs as a dynamic user)
 ensure_dir "$LOGD" 0755      # audit.jsonl: every mutation attempt, written by root
-# What the maintenance-web container bind-mounts, read-only (files inside are 0644, written by publish.py and live.py). Created here,
-# before the container, and only ever created or chmod-ed: never delete and re-create it, a bind mount follows the directory's inode and
-# the container would see an empty directory until it is restarted.
+# What the dashboard reads, read-only (files inside are 0644, written by publish.py and live.py). Created here, before the dashboard,
+# and only ever created or chmod-ed: never delete and re-create it, a bind mount follows the directory's inode and the dashboard would
+# see an empty directory until it is restarted.
 ensure_dir "$STATE/public" 0755
 ensure_dir "$STATE/public/reports" 0755
-# SPEC5 acknowledgements: the container posts requests here and reads what the runner publishes for it; it can write nothing else.
+# SPEC5 acknowledgements: the dashboard posts requests here and reads what the runner publishes for it; it can write nothing else.
 # Modes are documented in the header. Only created or chmod-ed, never deleted and re-created (same bind-mount rule as public/).
 pick_web_gid
 ensure_dir "$STATE/ack" 0750 "$AGID"                                      # group only: root and the website's gid (a group root = closed, never open)
@@ -542,39 +513,6 @@ else
   fi
 fi
 
-# ------------------------------------------------------------------ 7b. maintenance website (opt-in)
-if ((DEPLOY_WEB)); then
-  say "Maintenance website (docker compose in $SRC/web)"
-  W=$SRC/web
-  if [[ -n $ROOT ]]; then
-    note skipped "docker compose (staging root)"
-  elif [[ ! -f $W/docker-compose.yml || ! -f $W/docker-compose.override.yml ]]; then
-    warn "web/docker-compose.yml or web/docker-compose.override.yml is missing: the website was NOT deployed"
-  elif ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
-    warn "docker compose is not available: the website was NOT deployed"
-  else
-    # BOTH -f files are mandatory on this host: Docker's default address pools are exhausted and the override pins 10.88.0.0/24.
-    # The container mounts $STATE/public read-only (created above, never re-created: a bind mount follows the directory's inode).
-    # A directory this run had to create is a NEW inode: a running container would keep serving the old (deleted) one, and compose
-    # leaves a container whose config did not change alone. So recreate it then.
-    recreate=()
-    if ((${#NEW_DIRS[@]})); then recreate=(--force-recreate); fi
-    run docker compose --project-directory "$W" -f "$W/docker-compose.yml" -f "$W/docker-compose.override.yml" up -d --build "${recreate[@]}"
-    note "$(verb deploy)" "maintenance-web on 127.0.0.1:8098 (Cloudflare tunnel + Access steps: web/README.md)"
-    changed
-    # The e-mail button waits for the site. ack/web_ready is created only once docker says the container is healthy, never before.
-    if ((!WEB_READY)); then
-      note skipped "ack/web_ready (--no-web-ready): when the public hostname works,  sudo touch $STATE_DIR_LIVE/ack/web_ready"
-    elif ((DRY)); then
-      note would-wait "for maintenance-web to report healthy (up to ${HM_WEB_WAIT_S:-120} s), then create ack/web_ready"
-    elif wait_web_healthy; then
-      mark_web_ready
-    else
-      warn "maintenance-web did not report healthy: ack/web_ready was NOT created, so the e-mail Acknowledge button stays off. See: docker ps --filter name=maintenance-web; docker logs --tail 40 maintenance-web. When it is healthy:  sudo touch $STATE_DIR_LIVE/ack/web_ready"
-    fi
-  fi
-fi
-
 # ------------------------------------------------------------------ 8. report
 say "Cleaners that can mutate when their timer fires (mode = \"apply\"):"
 cfg=$CONF/maint.toml
@@ -669,8 +607,8 @@ if [[ -z $ROOT ]]; then
   say "       legacy timers:    untouched; see docs/MIGRATION.md and 'homelab-maint migrate status'"
   say "       sensor ring:      after a minute, GPU columns must be filled (a hardened unit can hide the GPU):"
   say "                         homelab-maint metrics-export | python3 -c \"import json,sys; print(json.load(sys.stdin)['current'])\""
-  say "       website:          ./install.sh --deploy-web, then the Cloudflare steps in web/README.md (first-install runbook: docs/INTEGRATION.md)"
-  say "       acknowledge:      the e-mail button stays off until ack/web_ready exists: --deploy-web creates it once the container is healthy;"
-  say "                         by hand, when the site answers on its hostname:   sudo touch $STATE_DIR_LIVE/ack/web_ready"
+  say "       dashboard:        the OhmzMaintainer hub + agent are a separate deploy: supplemental/systemd/README.md"
+  say "       acknowledge:      the e-mail button stays off until ack/web_ready exists; the dashboard's deploy creates it,"
+  say "                         or by hand once the site answers on its hostname:   sudo touch $STATE_DIR_LIVE/ack/web_ready"
   say "                         first-run web login secret (shown once, on this terminal):   sudo homelab-maint web bootstrap"
 fi

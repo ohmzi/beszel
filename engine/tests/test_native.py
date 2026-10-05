@@ -1149,10 +1149,16 @@ class ComfyWorld:
         self.docker_ok = True
         self.restart_rc = 0
         self.restarts = 0
+        self.stops = 0
         self.urls: list[str] = []
         self.sh = use_sh(monkeypatch,
-                         ("docker container inspect", self._inspect), ("nvidia-smi", self._smi), ("docker restart", self._restart))
+                         ("docker container inspect", self._inspect), ("nvidia-smi", self._smi), ("docker restart", self._restart),
+                         ("docker stop", self._stop))
         monkeypatch.setattr(gates, "http_json", self._http)
+        # The RAM arm reads /proc, which no fake can cover: stub it. It is only consulted when a task configures
+        # ram_threshold_mb, so every legacy-parity sequence is untouched by whatever this holds.
+        self.ram: int | None = None
+        monkeypatch.setattr(nv, "proc_mem_mb", lambda pids: self.ram)
 
     def _inspect(self, cmd):
         if not self.docker_ok:
@@ -1167,6 +1173,11 @@ class ComfyWorld:
     def _restart(self, cmd):
         self.restarts += 1
         return (self.restart_rc, "", "boom: container is wedged" if self.restart_rc else "")
+
+    def _stop(self, cmd):
+        self.stops += 1
+        self.state = "exited"
+        return (0, "", "")
 
     def _http(self, url, timeout=3.0):
         self.urls.append(url)
@@ -1246,6 +1257,44 @@ def test_comfy_step_table(n, thresh, mb, idle, want):
 def test_comfy_step_busy_values():
     for busy in (None, 1, 5):
         assert nv.comfy_step({"n": 1, "t": NOW}, busy, 9000, NOW)[0] == "reset"
+
+
+@pytest.mark.parametrize("vram,ram,ram_thresh,heavy", [
+    (1000, 9000, 4000, True),        # RAM over its threshold, VRAM light: the new arm fires
+    (1000, 1000, 4000, False),       # neither arm over
+    (1000, None, 4000, False),       # RAM unreadable is never heavy
+    (1000, 4001, 4000, True),        # one MiB over, like the VRAM arm
+    (1000, 4000, 4000, False),       # exactly the threshold: not "more than"
+    (9000, 1000, 4000, True),        # the legacy VRAM arm still fires on its own
+    (9000, None, 4000, True),
+    (1000, 9000, 0, False),          # 0 disables the arm: the legacy behaviour, byte for byte
+    (1000, 9000, None, False),
+])
+def test_comfy_step_ram_arm(vram, ram, ram_thresh, heavy):
+    action, _ = nv.comfy_step({}, 0, vram, NOW, 3000, 2, 2700.0, 0.0, ram, ram_thresh or 0)
+    assert (action == "strike") == heavy
+
+
+def test_diff_ram_arm_restarts_while_the_legacy_signal_is_light(monkeypatch):
+    """The intentional difference: idle, VRAM light, RAM heavy — the legacy script does nothing, the port restarts."""
+    w = ComfyWorld(monkeypatch)
+    w.load("D")                                     # idle, 1000 MB VRAM
+    w.ram = 9000
+    for i in range(2):
+        step(nv.comfyui_idle_reclaim, "comfyui_idle_reclaim", NOW + 300 * i, apply=True, unprotect=["^comfyui$"],
+             min_gap_min=1, match_cgroup=False, ram_threshold_mb=4000)
+    assert w.restarts == 1
+
+
+def test_diff_ram_arm_stays_off_without_a_threshold(monkeypatch):
+    """Nothing configured means the legacy signal only: a RAM-heavy but VRAM-light ComfyUI is left alone."""
+    w = ComfyWorld(monkeypatch)
+    w.load("D")
+    w.ram = 9000
+    for i in range(3):
+        step(nv.comfyui_idle_reclaim, "comfyui_idle_reclaim", NOW + 300 * i, apply=True, unprotect=["^comfyui$"],
+             min_gap_min=1, match_cgroup=False)
+    assert w.restarts == 0
 
 
 def test_comfy_strike_expires_after_ttl():
@@ -1587,6 +1636,45 @@ def test_gpu_mem_mb_parsing(monkeypatch):
     assert nv.gpu_mem_mb({100}) == 5011 and nv.gpu_mem_mb({200, 300}) == 7 and nv.gpu_mem_mb(set()) == 0
     use_sh(monkeypatch, ("nvidia-smi", (9, "", "fail")))
     assert nv.gpu_mem_mb({100}) is None
+
+
+def test_comfy_stop_step_waits_for_the_idle_window():
+    assert nv.comfy_stop_step({}, 0, NOW, 900) == ("start", NOW)                   # first idle look: the clock starts
+    assert nv.comfy_stop_step({"is": NOW}, 0, NOW + 600, 900) == ("wait", NOW)     # 10 min of 15
+    assert nv.comfy_stop_step({"is": NOW}, 0, NOW + 900, 900)[0] == "stop"         # 15 min: stop
+    assert nv.comfy_stop_step({"is": NOW}, None, NOW + 9000, 900) == ("reset", None)   # an unreadable queue is busy
+    assert nv.comfy_stop_step({"is": NOW}, 2, NOW + 9000, 900) == ("reset", None)     # a job resets the clock
+
+
+def test_comfy_stops_after_fifteen_idle_minutes_and_never_restarts(monkeypatch):
+    w = ComfyWorld(monkeypatch)
+    res, _ = comfy_at(0, apply=True, stop_idle_min=15)
+    check_result(res)
+    assert res.metrics["action"] == "start" and w.stops == 0 and w.restarts == 0
+    res, _ = comfy_at(600, apply=True, stop_idle_min=15)
+    assert res.metrics["action"] == "wait" and w.stops == 0
+    res, _ = comfy_at(900, apply=True, stop_idle_min=15)
+    check_result(res)
+    assert res.status == "ok" and res.metrics["action"] == "done" and w.stops == 1 and w.restarts == 0
+    assert w.sh.with_prefix("docker stop") == ["docker stop comfyui"]
+    res, ctx = comfy_at(1200, apply=True, stop_idle_min=15)                        # the container is exited now
+    assert w.stops == 1 and "no VRAM to reclaim" in res.summary and "is" not in ctx.state
+
+
+def test_comfy_a_job_between_probes_cancels_the_stop(monkeypatch):
+    w = ComfyWorld(monkeypatch)
+    comfy_at(0, apply=True, stop_idle_min=15)
+    idle, busy = {"queue_running": [], "queue_pending": []}, {"queue_running": [["id", 7]], "queue_pending": []}
+    w.queue_seq = [idle, busy]                                                     # idle at the first probe, a job at the re-probe
+    res, _ = comfy_at(900, apply=True, stop_idle_min=15)
+    assert w.stops == 0 and res.metrics["action"] == "cancelled" and "got a job" in res.summary
+
+
+def test_comfy_stop_mode_off_by_default_still_restarts(monkeypatch):
+    w = ComfyWorld(monkeypatch)
+    comfy_run(0, apply=True, unprotect=["^comfyui$"])
+    comfy_run(1, apply=True, unprotect=["^comfyui$"])
+    assert w.stops == 0 and w.restarts == 1                                        # stop_idle_min 0: the legacy VRAM path runs
 
 
 # =========================================================================== immich_recycle  <-  immich-server-recycle.service + gate drop-in

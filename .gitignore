@@ -1,6 +1,8 @@
 .idea.md
 pb_data
 data
+# engine runtime/generated data (homelab_maint/data/playbooks.toml): kept local, never published
+engine/homelab_maint/data/
 temp
 .vscode
 beszel_data

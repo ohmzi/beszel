@@ -317,9 +317,9 @@ owner_notes = "plexmediaserver.service (the apt unit) is masked (-> /dev/null); 
 
 [[item]]
 name = "umbrella-services"
-title = "The umbrella's own services: homelab-maint-www (:9111), homelab-maint-live, the tick timer, the self-health timer, the maintenance site container"
+title = "The umbrella's own services: homelab-maint-www (:9111), homelab-maint-live, the tick timer, the self-health timer"
 kind = "unit"
-location = "homelab-maint-www.service (127.0.0.1:9111, installed), homelab-maint-live.service, homelab-maint-tick.timer and homelab-maint-selfhealth.timer (shipped by install.sh), container maintenance-web (127.0.0.1:8098)"
+location = "homelab-maint-www.service (127.0.0.1:9111, installed), homelab-maint-live.service, homelab-maint-tick.timer and homelab-maint-selfhealth.timer (shipped by install.sh)"
 mode = "keep"
 wave = 1
 schedule = "always on; the tick every minute"

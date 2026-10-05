@@ -2,6 +2,11 @@
 
 Builds on SPEC.md (rules of engagement), SPEC2-5. SAME HARD RULES: do NOT mutate the live system while developing (nothing under /etc,/usr,/var/lib,/var/log; no systemctl; no real sends); tests use tmp dirs; Python 3.12 stdlib only on the runner side; write only owned files; list `glue`. No secrets in any public file or log.
 
+> **Retired: the `web/` website container this SPEC assumes no longer exists.** It was replaced by the OhmzMaintainer beszel hub
+> (`beszel-hub.service`, `127.0.0.1:8088`, `https://maintainer.ohmzhomelab.ca`), which reads the same published `public/*.json` through
+> the agent. Any "website container" wording below is historical; §6's `website` row now checks the hub's `GET /api/health` and its
+> `beszel-hub.service` unit.
+
 ## 1. What the owner wants (final)
 - A **maintenance script running locally** on the host (the runner/umbrella) and a **front-end container** that only *collects the updates* the script publishes. The website NEVER influences the rules and NEVER inspects scripts directly.
 - The website also has **a health check of its own**: how current the system is doing, and whether the monitoring pipeline itself (runner -> publish -> website) is healthy.
@@ -64,7 +69,7 @@ Rules for compilation: deterministic order (by file name, then id); `target` is 
 The website shows this **read-only** (a "What the script does" reference inside the Maintenance tab: filter/search by category/kind/mode/destructive, each rule's why/does/params and when it last ran/fired, the registry hash + last change time, and a link from every check/cleanup/alert card to its rule(s)). There are NO edit controls, no forms, no write endpoints for rules.
 
 ## 6. Self health (pipeline health of the monitoring system itself)
-Task `self_health` (C0, check tier) and `self.json` public export: ages and states of the whole pipeline: status.json age, publish age (manifest.generated_at), tick/scheduler last run, live.json age, metrics ring age, check/daily/weekly last runs vs expected cadence, registry valid + in sync (generated files match rules.d), runner error rate (tasks in error last 24 h), state-dir free space and sizes, inbox backlog (acks), website container state and its `/healthz` result (GET only, local), the umbrella's own Kuma heartbeat, and a verdict `{"level":"ok|degraded|down","reasons":[...],"since":t}`. The website shows it as a persistent health strip (top bar: "Monitoring pipeline: healthy / degraded: runner stopped 12 min ago") and `/healthz` returns the web container's own readiness. If the runner dies the website must say so loudly (stale data banner + reason) instead of showing old numbers as current.
+Task `self_health` (C0, check tier) and `self.json` public export: ages and states of the whole pipeline: status.json age, publish age (manifest.generated_at), tick/scheduler last run, live.json age, metrics ring age, check/daily/weekly last runs vs expected cadence, registry valid + in sync (generated files match rules.d), runner error rate (tasks in error last 24 h), state-dir free space and sizes, inbox backlog (acks), the dashboard's `GET /api/health` and its `beszel-hub.service` unit (local), the umbrella's own Kuma heartbeat, and a verdict `{"level":"ok|degraded|down","reasons":[...],"since":t}`. The website shows it as a persistent health strip (top bar: "Monitoring pipeline: healthy / degraded: runner stopped 12 min ago") and the hub's `/api/health` returns its own readiness. If the runner dies the website must say so loudly (stale data banner + reason) instead of showing old numbers as current.
 
 ## 7. First-run login (acknowledge feature only)
 Kept from SPEC5 section 5/8 but restricted to what acknowledging needs: setup mode on first visit protected by a host-side **bootstrap secret** (`homelab-maint web bootstrap` prints it once), passphrase (+ optional TOTP), sessions + CSRF; the login unlocks ONLY the acknowledge/un-acknowledge actions. No rule editing, ever.

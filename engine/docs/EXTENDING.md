@@ -270,7 +270,7 @@ Every message the umbrella sends (alerts, recoveries, maintenance updates, the d
 smart events, migration cutovers) goes through `notify.send`, then through your existing Hermes transports (SMS over the carrier gateway, Gmail
 through `alert_transports`). No credentials live in homelab-maint; they stay in `~ohmz/.hermes/alert_transports.env`. Root jobs call Hermes as
 `ohmz`. A text is one ASCII segment of at most 130 characters with no link; the email is HTML in the "Ohmz Cloud" palette with facts, what was
-done, what to do (the playbook) and a link to https://maintenance.ohmzhomelab.ca.
+done, what to do (the playbook) and a link to https://maintainer.ohmzhomelab.ca.
 
 Change who hears what in `/etc/homelab-maint/notify.toml`:
 
@@ -343,9 +343,10 @@ names and paths no automatic action may delete, kill or restart. A malformed pat
   human strings and colour words precomputed) and register it in `ROUTES`; add the `.jsx` template under `widgets/` and its entry in
   `widgets/build_widgets.py`; `python3 widgets/build_widgets.py --check` renders it against ok/warn/crit/stale payloads and enforces the
   Homarr template limits (see `widgets/CONVENTIONS.md`). The server answers on `127.0.0.1:9111`, GET only.
-* **Website.** Add a builder to `BUILDERS` in `homelab_maint/publish.py` (it writes `STATE_DIR/public/NAME.json` atomically, no secrets,
-  no raw output), whitelist the name in `web/app.py` (`API_NAMES`), render it in `web/static/app.js` with `textContent` only (never
-  `innerHTML` with data), and add a fixture under `web/fixtures/`. Rebuild the container with both compose files (see `web/README.md`).
+* **Website (retired).** The old read-only site (`web/app.py`, `web/static/*`, `web/fixtures/`) is retired with the
+  `maintenance-web` container; there is no `web/` directory any more. Its data still comes from `homelab_maint/publish.py`
+  (`STATE_DIR/public/*.json`), which the OhmzMaintainer beszel hub reads; to add a dashboard view, extend the hub instead
+  (`../../docs/EXTENDING-BESZEL.md`).
 
 ## 13. Plugins: owner-written tasks without touching the package
 

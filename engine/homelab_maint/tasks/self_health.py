@@ -18,7 +18,7 @@ Kuma heartbeat). One verdict: {"level": ok|degraded|down, "reasons": [plain lang
 
 ONE ROW PER PIPELINE PART (fixed order; each row = {id, title, state ok|degraded|down|info|unknown, detail, reason, hint, age_s, limit_s}):
   runner     tier_runs.check.last_run (else the newest check task, else generated_at) vs the check interval
-             degraded > 1.5 x interval + grace (a run was missed), down > 3 x interval (45 min = the web /healthz and probes limit)
+             degraded > 1.5 x interval + grace (a run was missed), down > 3 x interval (45 min)
   publish    manifest.json generated_at, else the mtime of overview.json (publish rewrites it on every run); overview.export_errors
   tick       newest of RUN_DIR/tick.json, status.json tick.last_run, sched.json mtime; the tick runs every minute: degraded > 5 min
   daily      tier_runs.daily.last_run vs 30 h        weekly   tier_runs.weekly.last_run vs 9 d   (never ran: only after `born` + limit)
@@ -32,8 +32,9 @@ ONE ROW PER PIPELINE PART (fixed order; each row = {id, title, state ok|degraded
   acks       STATE_DIR/ack/inbox: files waiting and the oldest age
   alerts     can an alert actually be DELIVERED? notify-state.json (read as JSON, no notify import): the transport circuit breaker, critical
              pages stuck in the outbox (degraded after 15 min or an open breaker; down after outbox_ttl_s/2 or when the outbox is full)
-  website    `docker inspect` of maintenance-web (state, health, restarts) + GET http://127.0.0.1:8098/healthz (3 s). Optional: nothing
-             there and never seen = "not deployed yet", info
+  website    GET http://127.0.0.1:8088/api/health (3 s) + `systemctl is-active beszel-hub.service` (the OhmzMaintainer dashboard, the
+             site the old maintenance-web container was retired in favour of). Optional: nothing there and never seen = "not deployed
+             yet", info
   kuma       /etc/homelab-maint/kuma.toml [push] has the umbrella's own heartbeat keys (presence and token SHAPE only, never a value) and,
              when core.kuma_push records its result through note_kuma(), N pushes in a row that failed
 
@@ -57,18 +58,17 @@ SAFETY (a monitor of the monitors must not depend on, or disturb, what it watche
   * imports only core (stdlib + tomllib); no notify, publish, probes or live import: nothing that can be down is needed to say it is down
   * C0, read-only: it writes only its own state STATE_DIR/tasks/self_health.json (since, first_seen, seen flags, size samples, cache),
     the public self.json, and (note_kuma, called by core.kuma_push) STATE_DIR/kuma-state.json
-  * docker here is SOCKET-ACTIVATED (docker.service TriggeredBy=docker.socket): any connect while dockerd is stopped or stopping would
-    START it. So the container is only inspected when a dockerd process is demonstrably alive and `systemctl is-active docker.service`
-    says active (the same gate live.py uses); otherwise the container state is "unknown" and the GET alone decides
-  * the website is only ever asked GET /healthz on a loopback address (a non-loopback `web_host` option is ignored), 3 s at most
+  * the website's unit is read with `systemctl is-active` only (a read-only query: nothing is started, stopped or reloaded), and its
+    /api/health is only ever asked with GET on a loopback address (a non-loopback `web_host` option is ignored), 3 s at most. The
+    service name is only ever passed to systemctl as one argv element, never through a shell
   * every row is computed inside its own try/except: a row that cannot run is `unknown` (counts as degraded), never an exception
   * time is always `now` (ctx.now / the caller's clock): a timestamp in the future is clock trouble, never freshness
   * no secrets: kuma tokens are matched by shape and never copied; texts are ASCII and short; nothing from the website body but a
     sanitised 80-char reason
 
 COST: < 300 ms typical. Reads a handful of small files, one tail window (<= 6 MiB) of history.jsonl, a 60 ms-budgeted walk of the
-state dir, one `systemctl is-active` and one `docker inspect` (~25 ms) and one loopback GET, the last two in parallel threads. The
-only way to exceed 300 ms is a HUNG website or docker (bounded by web_timeout_s = 3 s, 2.5 s for docker).
+state dir, one `systemctl is-active` and one loopback GET, the two in parallel threads. The only way to exceed 300 ms is a HUNG
+website or systemd (bounded by web_timeout_s = 3 s, 2.5 s for the one systemctl call).
 
 PUBLIC self.json (export(now); glue: publish.OPTIONAL_SOURCES["self.json"] = (("tasks.self_health", "export"),); < 8 KB):
   {"schema":2,"generated_at":t,"valid_until":t+degraded_after_s,"level":"ok|degraded|down","headline":str,
@@ -91,7 +91,7 @@ OPTIONS ([tasks.self_health] in maint.toml; all optional, a wrong type or range 
   error_rate_warn_pct 5   error_rate_down_pct 50   error_min_runs 20   error_tasks_warn 3
   inbox_max 25   inbox_late_s 600   registry_grace_s 600   registry_check_generated true
   outbox_warn_s 900   breaker_fail_n 3   kuma_fail_n 3
-  web_check true   web_container "maintenance-web"   web_host "127.0.0.1"   web_port 8098   web_timeout_s 3.0
+  web_check true   web_host "127.0.0.1"   web_port 8088   web_path "/api/health"   web_service "beszel-hub.service"   web_timeout_s 3.0
   kuma_keys ["tier-check", "umbrella-probes"]   kuma_required false
 
 CLI (glue: cli.PASS["self-health"] = ("tasks.self_health", "main", ())):
@@ -106,7 +106,6 @@ CLI (glue: cli.PASS["self-health"] = ("tasks.self_health", "main", ())):
 from __future__ import annotations
 
 import argparse
-import calendar
 import hashlib
 import http.client
 import itertools
@@ -132,9 +131,6 @@ HIST_TAIL = 6 * 1024 * 1024                     # newest history.jsonl bytes rea
 CACHE_S = 1800                                  # export() reuses the expensive parts (history rate, dir size) this long
 WALK_BUDGET_S = 0.06                            # state dir walk: time budget ...
 WALK_MAX = 20000                                #            ... and entry cap; a cut walk is never trusted for growth
-DOCKER_PIDFILE = Path("/var/run/docker.pid")
-DOCKER_PROCS = Path("/sys/fs/cgroup/system.slice/docker.service/cgroup.procs")
-PROC = Path("/proc")
 UNIT_DIR = Path(os.environ.get("HOMELAB_MAINT_UNITS", "/etc/systemd/system"))   # where install.sh puts the units (read-only stats)
 UNIT_FILES = {"check": "homelab-maint-check.timer", "tick": "homelab-maint-tick.timer", "metrics": "homelab-maint-metrics.timer",
               "live": "homelab-maint-live.service"}
@@ -153,7 +149,8 @@ DEFAULTS: dict[str, Any] = {
     "state_growth_warn_mib_day": 512,
     "error_rate_warn_pct": 5.0, "error_rate_down_pct": 50.0, "error_min_runs": 20, "error_tasks_warn": 3,
     "inbox_max": 25, "inbox_late_s": 600, "registry_grace_s": 600, "registry_check_generated": True,
-    "web_check": True, "web_container": "maintenance-web", "web_host": "127.0.0.1", "web_port": 8098, "web_timeout_s": 3.0,
+    "web_check": True, "web_host": "127.0.0.1", "web_port": 8088, "web_path": "/api/health", "web_service": "beszel-hub.service",
+    "web_timeout_s": 3.0,
     "kuma_keys": ["tier-check", "umbrella-probes"], "kuma_required": False,
     "refresh_s": 60.0, "stale_factor": 3.0, "stale_down_factor": 10.0,
     "outbox_warn_s": 900, "breaker_fail_n": 3, "kuma_fail_n": 3,
@@ -913,47 +910,15 @@ def c_alerts(cx: Cx) -> dict:
 
 
 # --------------------------------------------------------------------------- row: website
-def dockerd_up() -> bool:
-    """A dockerd process is alive AND docker.service is active. Docker is socket-activated here: touching the socket while it is
-    stopped or stopping would start it, so nothing may connect unless this says yes (the gate live.py uses)."""
-    def is_dockerd(pid: str) -> bool:
-        try:
-            return pid.isdigit() and len(pid) <= 10 and (PROC / pid / "comm").read_text().strip() == "dockerd"
-        except OSError:
-            return False
-    try:
-        alive = is_dockerd(DOCKER_PIDFILE.read_text().strip())
-    except OSError:
-        alive = False
-    if not alive:
-        try:
-            alive = any(is_dockerd(p) for p in DOCKER_PROCS.read_text().split()[:64])
-        except OSError:
-            alive = False
-    if not alive:
-        return False
-    r = sh(["systemctl", "is-active", "docker.service"], timeout=3)
-    return r.returncode == 0 and r.stdout.strip() == "active"
-
-
-_FMT = "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}|{{.State.StartedAt}}|{{.RestartCount}}|{{.State.ExitCode}}"
-
-
-def docker_state(name: str, timeout: float = 2.5) -> dict | str:
-    """{status, health, started, restarts, exit} | "none" (no such container) | "unknown" (dockerd not safe to ask, or it failed).
-    The --format output holds no environment or config: nothing secret can come back."""
-    if not dockerd_up():
-        return "unknown"
-    r = sh(["docker", "inspect", "--format", _FMT, name], timeout=timeout)
-    if r.returncode != 0:
-        return "none" if "no such" in (r.stderr or "").lower() else "unknown"
-    f = (r.stdout.strip().split("|") + [""] * 5)[:5]
-    started = None
-    m = re.match(r"(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)", f[2])
-    if m:
-        started = float(calendar.timegm(tuple(int(x) for x in m.groups()) + (0, 0, 0)))
-    return {"status": _name(f[0], 20) or "unknown", "health": _name(f[1], 20) or "none", "started": started,
-            "restarts": int(f[3]) if f[3].isdigit() else 0, "exit": int(f[4]) if f[4].lstrip("-").isdigit() else 0}
+def service_state(name: str, timeout: float = 2.5) -> tuple[str, bool]:
+    """(ActiveState, present) of a systemd unit, from one read-only `systemctl is-active`. `is-active` prints "inactive" for a unit
+    that does not exist as well, so presence is decided by its exit code (4 = no such unit), never by the word alone. A systemctl
+    that cannot run (no systemd, a timeout) is "unknown" and not present: the HTTP probe alone then decides."""
+    r = sh(["systemctl", "is-active", name], timeout=timeout)
+    if r.returncode == 4:                                      # no such unit: is-active prints "inactive" for it too, so only the code tells
+        return "unknown", False
+    word = _name(r.stdout, 20) or "unknown"
+    return word, word != "unknown"
 
 
 def http_get(host: str, port: int, path: str, timeout: float) -> tuple[int | None, bytes, str, int]:
@@ -975,10 +940,12 @@ def http_get(host: str, port: int, path: str, timeout: float) -> tuple[int | Non
         c.close()
 
 
-def _probe_web(name: str, host: str, port: int, timeout: float) -> tuple[Any, tuple]:
-    """Container state and /healthz in parallel threads, so the cost is the slower of the two, never the sum."""
+def _probe_site(host: str, port: int, path: str, timeout: float, service: str) -> tuple[tuple[str, bool], tuple]:
+    """The unit's state and the loopback GET in parallel threads, so the cost is the slower of the two, never the sum."""
     out: dict[str, Any] = {}
-    jobs = {"c": lambda: docker_state(name, min(timeout, 2.5)), "h": lambda: http_get(host, port, "/healthz", timeout)}
+    jobs: dict[str, Any] = {"h": lambda: http_get(host, port, path, timeout)}
+    if service:
+        jobs["s"] = lambda: service_state(service, min(timeout, 2.5))
 
     def run(k: str) -> None:
         try:
@@ -991,58 +958,57 @@ def _probe_web(name: str, host: str, port: int, timeout: float) -> tuple[Any, tu
     end = time.monotonic() + timeout + 0.7
     for t in ts:
         t.join(max(0.0, end - time.monotonic()))
-    return out.get("c", "unknown"), out.get("h", (None, b"", "timeout", int(timeout * 1000)))
+    return out.get("s", (None, False)), out.get("h", (None, b"", "timeout", int(timeout * 1000)))
 
 
 def c_website(cx: Cx) -> dict:
+    """The OhmzMaintainer dashboard (the beszel-hub site the old maintenance-web container was retired in favour of): its
+    /api/health over loopback and its systemd unit, judged together. A 200 while the unit is inactive is a stray server; a live unit
+    with no answer is a wedged site; either one alone is the fault."""
     o = cx.o
-    hint = "docker ps -a --filter name=maintenance-web; docker logs --tail 40 maintenance-web"
+    hint = "systemctl status beszel-hub; curl -s http://127.0.0.1:8088/api/health"
     if not o.flag("web_check"):
         return _row("info", "the website check is switched off in the config")
     host = o.text("web_host", r"[A-Za-z0-9.]{1,40}")
     host = host if host in LOOPBACK else str(DEFAULTS["web_host"])           # GET only, and only ever to this machine
     port, to = int(o.num("web_port", 1, 65535)), o.num("web_timeout_s", 0.1, 3.0)
-    name = o.text("web_container", r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}")
-    ctr, (code, body, err, ms) = _probe_web(name, host, port, to)
+    path = o.text("web_path", r"/[A-Za-z0-9._/-]{0,80}")
+    service = o.text("web_service", r"[A-Za-z0-9@_.:-]{0,64}")
+    (svc, present), (code, body, err, ms) = _probe_site(host, port, path, to, service)
     was = cx.first_seen("website")
     listening = code is not None or err in ("timeout", "error")       # a refused connection means nothing is there; a hang means something is
-    deployed = was or listening or isinstance(ctr, dict)
-    if isinstance(ctr, dict) or listening:
+    deployed = was or listening or present
+    if listening or present:
         cx.mark("website")
     cx.m["web"] = "answers" if code == 200 else "down" if deployed else "not deployed"
-    if isinstance(ctr, dict):
-        cx.m["web_container"] = ctr["status"]
-        hist = [h for h in (cx.state.get("web_rs") if isinstance(cx.state.get("web_rs"), list) else [])
-                if isinstance(h, list) and len(h) == 2 and _num(h[0]) is not None and isinstance(h[1], int) and 0 <= cx.now - h[0] <= 3600]
-        if not hist or hist[-1][1] != ctr["restarts"] or cx.now - hist[-1][0] >= 600:
-            hist = (hist + [[int(cx.now), ctr["restarts"]]])[-30:]
-        cx.state["web_rs"] = hist
-        recent = ctr["restarts"] - hist[0][1]                      # docker's RestartCount resets when the container is recreated: <= 0 then
-        if recent >= 3:
-            return _row("degraded", f"the container restarted {recent} times in the last hour", "website container is crash-looping", hint)
+    if service and svc:
+        cx.m["web_service"] = svc
+    name = service or f"{host}:{port}"
     if code == 200:
-        if isinstance(ctr, dict) and ctr["health"] == "unhealthy":
-            return _row("degraded", "/healthz answers but docker reports the container unhealthy", "website container is unhealthy", hint)
-        return _row("ok", f"/healthz 200 in {ms} ms" + (f", container {ctr['status']} ({ctr['health']})" if isinstance(ctr, dict) else ""))
+        if present and svc in ("inactive", "failed", "deactivating"):
+            return _row("degraded", f"{path} answers 200 but {name} is {svc}", f"website answers but {name} is {svc}", hint)
+        return _row("ok", f"GET {path} 200 in {ms} ms" + (f", {name} {svc}" if service and svc else ""))
     if code is not None:
         why = ""
         try:
             d = json.loads(body)
-            why = _ascii(d.get("reason") or d.get("error") or d.get("status") or "", 80) if isinstance(d, dict) else ""
+            why = _ascii(d.get("reason") or d.get("error") or d.get("message") or d.get("status") or "", 80) if isinstance(d, dict) else ""
         except ValueError:
             pass
-        return _row("degraded", f"/healthz answered HTTP {code}" + (f": {why}" if why else ""), f"website reports itself unhealthy (HTTP {code}{': ' + why if why else ''})", hint)
-    if isinstance(ctr, dict):
-        if ctr["status"] == "running":
-            if ctr["health"] == "starting" and ctr["started"] and 0 <= cx.now - ctr["started"] < 120:
-                return _row("info", "the website container is starting")
-            return _row("degraded", f"the container is running but /healthz does not answer ({err})", f"website container runs but /healthz does not answer ({err})", hint)
-        return _row("degraded", f"the container is {ctr['status']} (exit code {ctr['exit']})", f"website container is {ctr['status']}", hint)
+        return _row("degraded", f"{path} answered HTTP {code}" + (f": {why}" if why else ""),
+                    f"website reports itself unhealthy (HTTP {code}{': ' + why if why else ''})", hint)
+    if present:
+        if svc == "activating":
+            return _row("info", f"the website service {name} is starting")
+        if svc == "active":
+            return _row("degraded", f"{name} is active but GET {path} does not answer ({err})",
+                        f"website service runs but {path} does not answer ({err})", hint)
+        return _row("degraded", f"{name} is {svc}", f"website service is {svc}", hint)
     if not deployed:
-        return _row("info", f"the website is not deployed yet (no container {name}, nothing on {host}:{port})")
-    if ctr == "none":
-        return _row("degraded", f"container {name} is gone and /healthz does not answer", "website container has disappeared", hint)
-    return _row("degraded", f"/healthz does not answer ({err}) and docker could not be asked", "website is unreachable", hint)
+        return _row("info", f"the website is not deployed yet (nothing on {host}:{port}, no {name})")
+    if service and svc == "unknown":
+        return _row("degraded", f"{name} is gone and nothing answers on {host}:{port}", "website has disappeared", hint)
+    return _row("degraded", f"{path} does not answer ({err}) and {name} could not be asked", "website is unreachable", hint)
 
 
 # --------------------------------------------------------------------------- row: Kuma heartbeat

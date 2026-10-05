@@ -6,6 +6,12 @@ no touching existing containers). Allowed extras for the web part: `docker build
 named `maintenance-web-test-<n>` on a loopback port, removed afterwards. Do not edit files you do not own; list required glue edits to
 `cli.py`, `server.py`, `install.sh`, `etc/maint.toml` in your final report under `glue` (the lead applies them).
 
+> **Retired: the `maintenance-web` container described in this SPEC no longer exists.** It was replaced by the OhmzMaintainer
+> beszel hub (`beszel-hub.service` with its data collector `beszel-agent.service`), which listens on `127.0.0.1:8088` and is
+> published at `https://maintainer.ohmzhomelab.ca`. Nothing listens on 8098 and the `web/` directory is gone; `install.sh` no
+> longer deploys a website. The old hostname `maintenance.ohmzhomelab.ca` no longer resolves, and the container, port, hostname
+> and `web/` references below are kept as a historical design record.
+
 ## 1. Facts about this host
 - Sensors: `127.0.0.1:9110/` (sensor-exporter, JSON: cpu_temp, gpu_temp, nvme_temp, systin, cpu_fan, case_fan, gpu_fan, gpu_fan_rpm,
   fans{fan1..7 rpm}, fan_duty_cpu, fan_duty_case) is root-owned: DO NOT modify it; READ it (GET) and fall back to lm-sensors/nvidia-smi.

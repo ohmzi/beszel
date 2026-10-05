@@ -1488,7 +1488,7 @@ REQUIRED = {
     "svc-smartd", "svc-sensor-exporter", "svc-glances", "svc-ollama", "svc-plex", "ct-fleet", "public-seerr", "public-maintenance", "internet",
     # the umbrella itself
     "umbrella-status", "umbrella-probe-plane", "umbrella-live", "umbrella-metrics-ring", "umbrella-public-export", "umbrella-www",
-    "svc-hm-check", "svc-hm-daily", "svc-hm-weekly",
+    "svc-beszel-hub", "svc-hm-check", "svc-hm-daily", "svc-hm-weekly",
     # Hermes through its state files
     "hermes-api", "hermes-gateway", "hermes-ticker", "hermes-watchdog-alive", "hermes-canary-alive", "hermes-wd-delivery", "hermes-sc-chat",
 }
@@ -1498,7 +1498,8 @@ def test_shipped_config_has_every_required_probe(shipped):
     by = shipped[5]
     assert REQUIRED - set(by) == set()
     assert by["comfyui"].when_running == "comfyui"                           # only while the container is up
-    assert by["maintenance-site"].target == "http://127.0.0.1:8098/healthz" and by["maintenance-site"].optional
+    assert by["maintenance-site"].target == "http://127.0.0.1:8088/api/health" and by["maintenance-site"].optional
+    assert by["svc-beszel-hub"].target == "beszel-hub.service" and by["svc-beszel-hub"].optional
     assert by["umbrella-status"].target == "{STATE}/status.json" and by["umbrella-live"].target == "{STATE}/public/live.json"
     assert by["umbrella-metrics-ring"].target == "{STATE}/metrics-ring.json"
     assert by["svc-smartd"].target == "smartmontools.service"                # canonical Id: smartd.service is an alias
@@ -1520,7 +1521,7 @@ def test_shipped_config_probes_only_loopback_unless_external(shipped):
             assert p.external or p.target.startswith("127.0.0.1:"), p.name
         else:
             assert not p.external, p.name
-    assert ext_hosts == {"1.1.1.1", "seerr.ohmzhomelab.ca", "maintenance.ohmzhomelab.ca"}
+    assert ext_hosts == {"1.1.1.1", "seerr.ohmzhomelab.ca", "maintainer.ohmzhomelab.ca"}
 
 
 def test_shipped_config_is_read_only_and_secret_free(shipped):
@@ -2128,7 +2129,7 @@ def test_shipped_config_watches_the_scheduler_tick_beat_not_just_its_timer(shipp
 def test_shipped_fleet_probe_uses_the_learned_baseline(shipped):
     ct = shipped[5]["ct-fleet"]
     assert ct.target == "*" and ct.expect.get("baseline", True) is True and "forget_after_s" not in ct.expect
-    assert {"^comfyui$", r"^maintenance-web-test-\d+$"} == set(ct.expect["except"])    # the throw-away/stopped-by-design ones stay out of it
+    assert {"^comfyui$"} == set(ct.expect["except"])                                  # the stopped-by-design one stays out of it
 
 
 def test_shipped_job_that_drives_the_engine_is_managed_monitor_and_not_named_like_the_task():

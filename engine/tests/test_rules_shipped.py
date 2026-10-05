@@ -380,12 +380,13 @@ def test_the_destructive_flag_follows_the_task_class():
 
 
 def test_the_shipped_config_applies_nothing_but_the_reclaim_rung(an):
-    """INTEGRATION decision 12: every cleaner ships report-only and the owner enables apply per task. The one shipped apply is the pressure
-    ladder's reclaim rung (unloading idle models, no kill). Jobs: a job with a legacy driver is observe, only the umbrella's own engines are
-    managed from the start, mem-guard is retired. Nothing here may enable docker-prune.timer either: its job stays observe."""
+    """INTEGRATION decision 12: every cleaner ships report-only and the owner enables apply per task, with two deliberate exceptions:
+    the pressure ladder's reclaim rung (unloading idle models, no kill) and comfyui_idle_reclaim (flipped 2026-10-04, own 5-minute
+    schedule). Jobs: a job with a legacy driver is observe, only the umbrella's own engines are managed from the start, mem-guard is
+    retired. Nothing here may enable docker-prune.timer either: its job stays observe."""
     docs = an.comp.docs
     tasks = docs["maint.toml"]["tasks"]
-    assert sorted(t for t, tbl in tasks.items() if isinstance(tbl, dict) and tbl.get("mode") == "apply") == ["pressure_response"]
+    assert sorted(t for t, tbl in tasks.items() if isinstance(tbl, dict) and tbl.get("mode") == "apply") == ["comfyui_idle_reclaim", "pressure_response"]
     pr = tasks["pressure_response"]
     assert (pr["reclaim"], pr["throttle"], pr["restart"], pr["emergency"]) == ("apply", "report", "report", "report")
     modes = {j["name"]: j.get("mode") for j in docs["jobs.toml"]["job"]}
@@ -587,7 +588,10 @@ PINNED = {
     """,
 }
 PINNED_IDS = {i for s in PINNED.values() for i in s.split()}
-RETIRED: dict[str, str] = {}                                                    # id -> why it is gone (and what replaced it)
+RETIRED: dict[str, str] = {                                                     # id -> why it is gone (and what replaced it)
+    "probe.ct-maintenance-web": "the maintenance-web container was retired; the site is the systemd beszel-hub.service now, "
+                                "probed as probe.svc-beszel-hub (and its /api/health as probe.maintenance-site)",
+}
 
 
 def test_rule_ids_are_unique_across_all_registry_files_and_well_formed():

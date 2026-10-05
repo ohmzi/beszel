@@ -81,8 +81,7 @@ principle = "blind is not healthy: a probe that cannot run is reported, not assu
 owner_notes = """\
 comfyui is stopped on purpose and is the only entry in expected_stopped_containers. Its stopped container and its 14.9 \
 GiB hand-built image are what the legacy docker-prune.timer would have deleted (timer disabled 2026-10-02, see \
-task.docker_prune_exposure). The maintenance-web container reports unhealthy when overview.json is older than 45 \
-minutes, which this check then reports."""
+task.docker_prune_exposure)."""
 since = "2026-10-03"
 
 [[rule]]
@@ -640,7 +639,7 @@ homelab-maint-selfhealth.timer. It judges 14 parts, each ok, degraded, down, inf
 (manifest age, export errors), scheduler tick (late after 5 minutes), daily (30 hours) and weekly (9 days) runs, live \
 monitor (90 seconds), sensor ring (5 minutes), rules registry (applied and in sync, generated files not hand edited), \
 runner errors over 24 hours, state directory (free space, size, growth), acknowledge inbox backlog, alert delivery \
-(transport breaker, outbox), the website container and its /healthz on loopback, and the Kuma heartbeat keys. Verdict \
+(transport breaker, outbox), the dashboard's /api/health and its unit on loopback, and the Kuma heartbeat keys. Verdict \
 down is crit and degraded is warn. It is read-only and imports only the core module, so nothing it watches is needed \
 to report that it is down. It asks docker only when the daemon is demonstrably running, because docker is \
 socket-activated and a connect would start it."""
@@ -654,8 +653,8 @@ principle = "one umbrella: the monitor is monitored"
 owner_notes = """\
 Never acknowledge self_health: it would hide a blind monitor (it has an explicit issue key, the set of failing parts, \
 so the system would allow it). The refresher is a timer on purpose and not a tick job, because this check is the \
-dead-man of the tick. Every option is optional; the shipped table is empty and the defaults apply (web_container \
-maintenance-web, web_port 8098)."""
+dead-man of the tick. Every option is optional; the shipped table is empty and the defaults apply (web_port 8088, \
+web_path /api/health, web_service beszel-hub.service)."""
 since = "2026-10-03"
 
 [[rule]]

@@ -39,7 +39,6 @@ P1 = [
   "^tday_backend$", "^tday_db$", "^tday_ollama$",   # Tday app, its Postgres, and its dedicated small Ollama
   # --- personal sites and production apps
   "^ohmz-cloud$", "^omar-iqbal$", "^afsaane-prod$", "^afsaane-prod-db$",
-  "^maintenance-web$",              # this maintenance site (SPEC3: P1, so a spike never blanks the page that reports it)
   "^pa-driving-flashcards$",        # tiny (128 MiB limit) study app a person uses live; costs nothing to protect
 ]
 P2 = [
@@ -68,7 +67,6 @@ P3 = [
   "^ImmaculaterrDemo$",                             # demo instance
   "^buildx_buildkit_",                              # buildx builder: a quiet daemon that bursts during builds
   "^diun$",                                         # image-update notifier, runs on a timer
-  "^maintenance-web-test-\\d+$",                    # throw-away containers used while building the site
 ]
 
 # Host units. Only used for the class table on the website and to explain contributors: the ladder never
@@ -86,6 +84,7 @@ P1 = [
   "^snap\\.plexmediaserver\\.plexmediaserver\\.service$",   # Plex playback (the scanner/transcoder children are batch, same cgroup)
   "^ollama\\.service$",             # interactive chat; embedding batches share it, so only idle models are unloaded, over HTTP
   "^glances\\.service$", "^sensor-exporter\\.service$", "^homelab-maint-(www|live)\\.service$",
+  "^beszel-(hub|agent)\\.service$",   # the OhmzMaintainer dashboard and its data collector
   "^teamviewerd\\.service$",        # remote access: losing it locks the owner out
   "^notebook-db-alert\\.(service|timer)$",   # alert path for the notebook database
 ]

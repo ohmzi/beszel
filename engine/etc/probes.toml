@@ -84,8 +84,8 @@ probes = [
   { name = "umbrella-live", title = "Live monitor (live.json)", type = "json", target = "{STATE}/public/live.json", expect = { json = [{ path = "generated_at", age_max_s = 300, age_warn_s = 60 }] }, optional = true },
   { name = "umbrella-metrics-ring", title = "Metrics ring sampler", type = "file_age", target = "{STATE}/metrics-ring.json", expect = { max_age_s = 900, warn_age_s = 300 }, optional = true },
   { name = "umbrella-www", title = "Status server (:9111)", type = "http", target = "http://127.0.0.1:9111/overview", expect = { json = [{ path = "stale", equals = false }] } },
-  { name = "maintenance-site", title = "Maintenance site (:8098)", type = "http", target = "http://127.0.0.1:8098/healthz", optional = true },
-  { name = "ct-maintenance-web", title = "Maintenance site container", type = "docker", target = "maintenance-web", optional = true },
+  { name = "maintenance-site", title = "Maintenance site (:8088)", type = "http", target = "http://127.0.0.1:8088/api/health", optional = true },
+  { name = "svc-beszel-hub", title = "beszel-hub", type = "systemd", target = "beszel-hub.service", optional = true },
   { name = "svc-hm-www", title = "homelab-maint-www", type = "systemd", target = "homelab-maint-www.service" },
   { name = "svc-hm-live", title = "homelab-maint-live", type = "systemd", target = "homelab-maint-live.service", optional = true },
   { name = "svc-hm-check", title = "Check tier timer", type = "systemd", target = "homelab-maint-check.timer" },
@@ -262,7 +262,7 @@ probes = [
 # =====================================================================================================================
 # 6. Containers. The fleet probe judges EVERY container's state and Docker healthcheck in one row (details name the offenders);
 #    per-container probes below give the stateful stores and key apps their own availability history.
-#    Stopped by design: comfyui (expected_stopped_containers in maint.toml), the throw-away maintenance-web-test-N containers.
+#    Stopped by design: comfyui (expected_stopped_containers in maint.toml).
 # =====================================================================================================================
 [[probe]]
 name = "ct-fleet"
@@ -273,7 +273,7 @@ class = "P2"
 group = "Containers"
 interval_s = 120
 tags = ["containers"]
-expect = { except = ['^comfyui$', '^maintenance-web-test-\d+$'] }
+expect = { except = ['^comfyui$'] }
 kuma_push_key = "containers"
 
 [[group]]
@@ -388,5 +388,5 @@ interval_s = 300
 tags = ["public"]
 probes = [
   { name = "public-seerr", title = "Public hostname: Seerr", target = "https://seerr.ohmzhomelab.ca/" },
-  { name = "public-maintenance", title = "Public hostname: maintenance site", target = "https://maintenance.ohmzhomelab.ca/healthz", optional = true, expect = { status = ["200-299", "300-399", 401, 403] } },
+  { name = "public-maintenance", title = "Public hostname: maintenance site", target = "https://maintainer.ohmzhomelab.ca/", optional = true, expect = { status = ["200-299", "300-399", 401, 403] } },
 ]

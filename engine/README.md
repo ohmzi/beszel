@@ -27,7 +27,7 @@ Nothing else on the host should schedule maintenance, watch a service or send a 
 | state | `status.json`, `history.jsonl`, the audit log, the change log | `/var/lib/homelab-maint`, `/var/log/homelab-maint` |
 | monitoring plane | every service, container, endpoint and status file, debounced | `etc/probes.toml` |
 | notification path | alerts, recoveries, digests, reports, through the existing Hermes SMS and Gmail transports | `etc/notify.toml`, `notify.py` |
-| website | read-only mirror, fed by the public export; its only write is an acknowledge request | `web/`, `/var/lib/homelab-maint/public/`, `ack/inbox` |
+| dashboard | the OhmzMaintainer beszel hub: read-only view fed by the public export; its only write is a signed acknowledge request | `supplemental/systemd/`, `/var/lib/homelab-maint/public/`, `ack/inbox` |
 | rules registry | the one place that defines what the script does (checks, thresholds, cleanup rules, protections, routes, schedules, probes, jobs, limits) | `/etc/homelab-maint/rules.d/`, `homelab-maint rules` |
 | acknowledgements | "I know about this exact error, stay quiet for 90 days": an e-mail button or the logged-in website | `acks.py`, `acks_auth.py`, `ack.toml`, `ack/` |
 
@@ -56,7 +56,6 @@ etc/*.toml               config shipped as the defaults: maint.toml, protected.t
                          probes.toml, notify.toml, ack.toml, playbooks.toml (overrides template), legacy-retirement.toml
 etc/rules.d/             the rules registry's release files (00-baseline-invariants.toml: the safety floor; the rules follow)
 systemd/                 units and timers, plus dropins/<unit>.d/*.conf
-web/                     the maintenance website (container, see web/README.md)
 widgets/                 Homarr custom-widget JSON (ops-overview, ops-disk, ops-jobs, ops-guard, ops-reclaim, ops-thermals, ops-load)
 docs/                    EXTENDING.md (add things), MIGRATION.md (retire legacy things)
 install.sh uninstall.sh  idempotent installer and remover
@@ -77,7 +76,7 @@ Installed layout:
 | `/etc/homelab-maint/PAUSE`, `PAUSE.<task>`, `FREEZE` | kill switch files, freeze file | root |
 | `/var/lib/homelab-maint/` | `status.json` (world-readable), `history.jsonl`, `alerts.json`, `gates.json`, `sched.json`, `job-modes.json`, `metrics-ring.json`, `live-history.json`, `changes.jsonl`, `spikes.jsonl`, `incidents.jsonl`, `migration.json`, `tasks/`, `ledger/`, `approvals/`, `jobruns/` | root, 0755 dir |
 | `/var/lib/homelab-maint/public/` (+ `reports/`) | the public JSON export the website reads (`overview.json`, `live.json`, `self.json`, `rules.json`, `manifest.json`, `acks.json`, `reports/<id>.json`, ...), files 0644 | root, 0755 |
-| `/var/lib/homelab-maint/ack/` | the acknowledge postbox, see "Acknowledging a known issue": `inbox/` (1730 root:10001, the container may only create files in it), `inbox/rejected/` (0700), `web.key` (0640 root:10001, the HMAC key), `bootstrap.secret` (0600 root, first-run login), `tokens.json` (0644, hashes only, written by publish), `auth.json` (0640 root:10001, the owner's passphrase hash, written by the runner), `web_ready` (empty, the switch of the e-mail button) | root:10001, 0750 |
+| `/var/lib/homelab-maint/ack/` | the acknowledge postbox, see "Acknowledging a known issue": `inbox/` (1730 root:10001, a group-10001 writer may only create files in it), `inbox/rejected/` (0700), `web.key` (0640 root:10001, the HMAC key), `bootstrap.secret` (0600 root, first-run login; retired flow), `tokens.json` (0644, hashes only, written by publish), `auth.json` (0640 root:10001, the old site's passphrase hash, written by the runner; retired flow), `web_ready` (empty, the switch of the e-mail button) | root:10001, 0750 |
 | `/var/lib/homelab-maint/acks.json`, `acks.jsonl` | the acknowledged issues and their audit trail | root, 0600 |
 | `/var/lib/homelab-maint/rules/` | `current.json`, `history.jsonl`, `baseline.json`, `snapshots/<hash>/` (kept 20, for `rules rollback`), `orig/` (the originals of every adopted config file) | root |
 | `/var/log/homelab-maint/audit.jsonl`, `jobs/<job>/` | one JSON line per mutation attempt; the output of every job run (secrets scrubbed) | root |
@@ -90,8 +89,6 @@ Installed layout:
 sudo ./install.sh --dry-run      # preview; needs no root, writes nothing
 sudo ./install.sh                # install or upgrade
 sudo ./install.sh --first-check  # same, then run the check tier once in the background
-sudo ./install.sh --deploy-web   # same, then build and (re)create the maintenance-web container from ./web (and ack/web_ready once it is healthy)
-sudo ./install.sh --deploy-web --no-web-ready   # same, but leave the e-mail button off until you touch ack/web_ready yourself
 sudo ./install.sh --adopt-rules  # same, then adopt the rules registry (see "The rules registry"); never implied
 sudo ./uninstall.sh              # remove; keeps config, state and logs
 sudo ./uninstall.sh --purge --yes
@@ -107,11 +104,11 @@ Specifically:
 * Config under `/etc/homelab-maint` is installed only if absent. When you already have one and the shipped default differs, the
   shipped copy is saved next to it as `maint.toml.dist`, and the tables or named entries your copy lacks are listed; merge them by
   hand (`diff /etc/homelab-maint/maint.toml /etc/homelab-maint/maint.toml.dist`). `kuma.toml` is never installed (it holds tokens).
-* It creates `/var/lib/homelab-maint/public` and `public/reports` (0755) and never deletes and re-creates them: the website
-  container bind-mounts that directory, and a bind mount follows the directory's inode.
+* It creates `/var/lib/homelab-maint/public` and `public/reports` (0755) and never deletes and re-creates them: the dashboard's agent
+  bind-mounts that directory read-only, and a bind mount follows the directory's inode.
 * It creates the acknowledge postbox `/var/lib/homelab-maint/ack/` (0750, root:**10001**, the same as `homelab-maint ack init --group
-  10001`) with `inbox/` (1730, root, group 10001: the website container's gid, given as a number because no such group exists on the
-  host; the container may create a request file there but not list or read the others), `inbox/rejected/` (0700), `web.key` (0640,
+  10001`) with `inbox/` (1730, root, group 10001: the dashboard's web gid, given as a number because no such group exists on the
+  host; a process in that group may create a request file there but not list or read the others), `inbox/rejected/` (0700), `web.key` (0640,
   root:10001: 64 hex characters, the HMAC key both sides sign requests with) and `bootstrap.secret` (0600, root: the first-run login
   secret, 43 characters). Both secrets are generated **only when absent**, never overwritten and never printed. Their mode and group
   are put back if someone changed them (a 0755 `ack/` of an older install is closed to 0750). The gid is `HM_WEB_GID` if set, else the
@@ -130,15 +127,14 @@ Specifically:
 * It never touches a legacy unit. It also never puts back what `homelab-maint migrate cutover` retired: a timer or drop-in listed
   by `homelab-maint migrate retired` is skipped (`retired` in the output).
 * It installs the Immich gate drop-in only if `immich-server-recycle.service` exists, and never edits that unit.
-* `--deploy-web` runs `docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build` in `web/` (with
-  `--force-recreate` when this run had to create a directory the container mounts: it would keep serving the deleted one). Both
-  files are mandatory on this host (Docker's default address pools are exhausted; the override pins `10.88.0.0/24`). The container
-  mounts `public/` read-only; for the acknowledge feature it needs `ack/` read-only, `ack/inbox` writable and `ack/web.key` readable,
-  which is what the directories above are made for (the mounts themselves live in `web/docker-compose.yml`). The Cloudflare tunnel
-  and Access steps stay manual (`web/README.md`). **Only after docker reports the container healthy** (up to 2 minutes; its
-  healthcheck is `GET /healthz`) it creates `ack/web_ready`, which turns the e-mail Acknowledge button on; a container that does not get
-  healthy leaves it absent and says how to create it by hand. `--no-web-ready` leaves it absent on purpose (see "Acknowledging a
-  known issue"). The whole first install, in order, is the runbook in `docs/INTEGRATION.md`.
+* `install.sh` no longer deploys a website. The old `--deploy-web` / `--no-web-ready` flags built and (re)created the
+  `maintenance-web` Docker container from `web/`; that container is retired (nothing listens on 8098 and `web/` is gone). The
+  dashboard is the OhmzMaintainer beszel hub (`beszel-hub.service` with its data collector `beszel-agent.service`, on
+  `127.0.0.1:8088`), deployed separately: see `../supplemental/systemd/README.md`. The agent (running as root) mounts
+  `/var/lib/homelab-maint/public/` read-only and writes signed acknowledge requests into `ack/inbox`; `ack/web_ready`, the switch of
+  the e-mail Acknowledge button, is created by that deploy once the site answers, or by hand
+  (`sudo touch /var/lib/homelab-maint/ack/web_ready`). The Cloudflare tunnel and Access steps stay manual. The whole first install, in
+  order, is the runbook in `docs/INTEGRATION.md`.
 * At the end it prints which tasks have `mode = "apply"` (the ones that can mutate when a timer fires) and runs
   `homelab-maint doctor`. On a fresh install doctor shows FAIL for the sampler, the live monitor and the tick until their first
   run, under a minute later; run it again.
@@ -153,10 +149,10 @@ Specifically:
 
 Removing the drop-in means the Immich recycle timer goes back to restarting `immich_server` without checking whether Immich is
 busy. Without `--purge`, config and state stay: the acknowledgements, the `ack/` keys and the rules registry with its history and
-the originals of every adopted file are inside them. `--purge` deletes config, state and the audit log, needs `--yes`, and first
-removes the maintenance-web container when docker is already running (it bind-mounts the directories being deleted and would keep
-serving the deleted ones; `docker compose up` recreates it). Without `--purge` the container is not touched; remove it with
-`docker compose -f docker-compose.yml -f docker-compose.override.yml down` in `web/`.
+the originals of every adopted file are inside them. `--purge` deletes config, state and the audit log and needs `--yes`. The
+`maintenance-web` container that used to bind-mount those directories is retired; the dashboard's agent reads `public/` read-only
+and keeps nothing in the state directory, so there is no container to stop first (restart or redeploy the dashboard if it holds a
+stale mount; see `../supplemental/systemd/README.md`).
 
 For tests and image builds, `HM_ROOT=/some/dir ./install.sh` stages everything under that prefix and skips systemd.
 
@@ -209,7 +205,7 @@ homelab-maint report daily|weekly|index [--print]          generate a report int
 homelab-maint notify send|test|route|render|export|flush|doctor   the notification path
 homelab-maint notify-test [KIND] [--dry-run]               one clearly labelled TEST per notification kind
 homelab-maint ack list|add|remove|process|issue-token|explain|init|validate|doctor   acknowledged known issues (see below)
-homelab-maint web bootstrap   show the website's first-run login secret once (root terminal only; see "First-run web login")
+homelab-maint web bootstrap   the old site's first-run login secret (retired flow; root terminal only; see "First-run web login")
 homelab-maint swap [status] | relieve [--apply]   who holds the swap, whether anything waits on it, and a guarded way to empty it (see "Swap and disk readers")
 homelab-maint rules list|show|check|diff|sync|history|rollback|export|migrate|explain|where|orphans   the rules registry
 homelab-maint self-health [--json] [--check] [--published]   is the monitoring pipeline itself healthy (runner -> publish -> website)
@@ -395,34 +391,40 @@ dead-man's-switch body (`"ok":true`) an Uptime Kuma keyword monitor can poll.
 
 ## The maintenance website
 
+The public site is the OhmzMaintainer dashboard (this fork of Beszel), run on the host as `beszel-hub.service` with its data
+collector `beszel-agent.service`, listening on `127.0.0.1:8088` and published at `https://maintainer.ohmzhomelab.ca` behind
+Cloudflare Access.
+
 ```
-runner (root) --publish--> /var/lib/homelab-maint/public/ --bind mount, read-only--> container maintenance-web (uid 10001)
-live monitor --live.json-->                                                                 |
-                       browser --HTTPS--> Cloudflare Access --tunnel--> cloudflared --> 127.0.0.1:8098
+runner (root) --publish--> /var/lib/homelab-maint/public/ --bind mount, read-only--> beszel-agent (root)
+live monitor --live.json-->                                                                |
+                       browser --HTTPS--> Cloudflare Access --tunnel--> cloudflared --> 127.0.0.1:8088
 ```
 
 The runner writes the public export (`homelab-maint publish`, run after every tier run) into `public/`; the live monitor rewrites
-`public/live.json` every 5 s. The container mounts only that directory read-only and shows live monitoring, health, incidents,
-what was done, the routine, reports and capacity. It cannot write anything and holds no secrets. Deploy it with
-`sudo ./install.sh --deploy-web`; then add the public hostname and an Access policy in the Cloudflare dashboard (steps and the
-Basic-auth fallback in `web/README.md`). Until the sampler has run, the sensor section shows "No sensor history yet". Manual maintenance the runner cannot see can be
-added as JSON lines `{"ts": ..., "title": ..., "detail": ...}` to `/var/lib/homelab-maint/maintenance-journal.jsonl`; the site lists
-the newest 100. The container reports `(unhealthy)` when `overview.json` is older than 45 minutes, so `failed_units` warns about it
-whenever the check timer stalls; that is expected.
+`public/live.json` every 5 s. The hub reads that directory (through the agent, read-only) and shows live monitoring, health,
+incidents, what was done, the routine, reports and capacity; it also serves the `/ack` acknowledge page (see "Acknowledging a known
+issue"). It holds no docker socket, never edits a rule and writes nothing except acknowledge requests, which the agent signs into
+`/var/lib/homelab-maint/ack/inbox`. Deploy and run docs for the hub and agent are in `../supplemental/systemd/README.md`; then add the
+public hostname and an Access policy in the Cloudflare dashboard. Until the sampler has run, the sensor section shows "No sensor
+history yet". Manual maintenance the runner cannot see can be added as JSON lines `{"ts": ..., "title": ..., "detail": ...}` to
+`/var/lib/homelab-maint/maintenance-journal.jsonl`; the site lists the newest 100. The site's health is the `self_health` "website"
+row (`GET 127.0.0.1:8088/api/health` plus `systemctl is-active beszel-hub.service`). The old `maintenance-web` Docker container
+(`127.0.0.1:8098`, `GET /healthz`) and the `install.sh --deploy-web` flag are retired.
 
 ## Two sides: the registry and the website
 
 The script that runs on the host and the website are decoupled on purpose. There are exactly two places to audit.
 
 ```
-HOST (authoritative)                                                  WEBSITE CONTAINER (read-only mirror)
+HOST (authoritative)                                                  DASHBOARD (read-only mirror)
 /etc/homelab-maint/rules.d/*.toml   <- the registry: every rule the script follows, edited only here
         | rules sync   validate -> compile -> record the change -> "rules changed" notice
         v
 generated config files (maint, routine, jobs, probes, classes, notify, ack, protected .toml)
         | read, unchanged, by the runner modules
         v
-runner / tick / check / daily / weekly / live  --publish-->  /var/lib/homelab-maint/public/*.json  --bind mount :ro-->  web  -->  browser
+runner / tick / check / daily / weekly / live  --publish-->  /var/lib/homelab-maint/public/*.json  --bind mount :ro-->  hub  -->  browser
                                                                manifest.json  rules.json  self.json  acks.json  ...
 ```
 
@@ -433,7 +435,7 @@ runner / tick / check / daily / weekly / live  --publish-->  /var/lib/homelab-ma
 * The **website** displays what the script reports and which rules it ran under (`rules.json`, with when each rule last ran and fired).
   It never reads a script, never edits a rule, has no docker socket and writes nothing but acknowledge requests into `ack/inbox`.
   It also shows the health of the pipeline itself (`self.json`: runner, publish, tick, live monitor, ring, registry, ack inbox,
-  alert delivery, the container). If the runner dies the page says so instead of showing old numbers as current.
+  alert delivery, the site). If the runner dies the page says so instead of showing old numbers as current.
 * Acknowledging an alert is the one write the website can request. It is alert state, not a rule: it cannot change what the script does.
 
 ## Acknowledging a known issue
@@ -448,14 +450,13 @@ acknowledgement), and stays listed as an acknowledged issue instead of a red ale
   `docker_prune_exposure` name the error from the FULL failing set, not from the clipped summary. A worse severity (warn to crit), a different failing set or the next
   magnitude decade is a different error and alerts again. Expiry sends one notice. Recovery e-mails of an acknowledged issue stay
   quiet. The SLO is not changed (honesty), the incident stays open as `acknowledged` and the hero colour ignores it.
-* **E-mail button.** Every alert mail carries "Acknowledge for 90 days" and `https://maintenance.ohmzhomelab.ca/ack?id=ID&t=TOKEN&d=90&s=warn`.
+* **E-mail button.** Every alert mail carries "Acknowledge for 90 days" and `https://maintainer.ohmzhomelab.ca/ack?id=ID&t=TOKEN&d=90&s=warn`.
   The link only opens a review page (a mail scanner following it changes nothing); the button on that page POSTs, the page shows
   "Received" and flips to "Applied" when the runner has processed it. The token is single-use, valid 30 days and bound to that
   issue and severity; only its sha256 is stored. The button follows the site (`notify.toml [ack] button = "auto"`): mails carry only the
-  `Issue ID` line until `ack/web_ready` exists. `install.sh --deploy-web` creates it once the container is healthy; the manual way is
+  `Issue ID` line until `ack/web_ready` exists. The dashboard deploy creates it once the site answers; the manual way is
   `sudo touch /var/lib/homelab-maint/ack/web_ready` (or `button = true` in `notify.toml [ack]`). Wait for that until
-  `https://maintenance.ohmzhomelab.ca/ack` really opens (tunnel and Access done, `--no-web-ready` keeps the installer from creating
-  it earlier), or the button would be a dead link. A worsening of the same error (a longer failing set, another decade) alerts at once
+  `https://maintainer.ohmzhomelab.ca/ack` really opens (tunnel and Access done), or the button would be a dead link. A worsening of the same error (a longer failing set, another decade) alerts at once
   even while the old one is acknowledged.
 * **Logged in on the website** every warn card gets an Acknowledge control (days 7/30/90/365, optional note) and an
   Acknowledged-issues panel with Un-acknowledge. A crit issue gets no control at all: it must keep alerting. See "First-run web login".
@@ -505,18 +506,14 @@ same data (use it after hand-editing `/etc/homelab-maint/*.toml`).
 
 ## First-run web login
 
-The acknowledge buttons on the website are for the logged-in owner (the e-mail button needs no login: its token is the capability).
-The first visit to the site, with no passphrase set yet, is setup mode, protected by the **bootstrap secret** that `install.sh`
-generated on the host: `sudo homelab-maint web bootstrap` prints it once, on a root terminal (it refuses when not root, when setup is
-already complete, and when stdout is not a terminal; the secret is never logged; the file is `ack/bootstrap.secret`, 0600 root, which
-the container cannot read and the installer never prints or overwrites). You choose a passphrase there (an authenticator app is
-optional). The site queues the request; the runner's one-minute tick checks the proof (HMAC with a key derived from the secret), refuses
-if `ack/auth.json` already exists, writes `auth.json` (0640 root:10001, atomically, verified readable by the site's group) and an
-outcome file the setup page shows; a recovery code used at login is burned in `auth.json` the same way. After that the session cookie,
-CSRF value and rate limits of the site take over, and the login unlocks acknowledge and un-acknowledge only: never a rule. Put
-Cloudflare Access in front of the site as well (`web/README.md`). Until a passphrase exists the site shows no acknowledge buttons and
-only the e-mail links work. `homelab-maint doctor` says when setup is pending, when `auth.json` is unreadable for the site, and
-repeats the warnings of the site's own `/healthz`. The details of the setup page belong to the website (`web/README.md`).
+The old maintenance website had its own owner login in front of the acknowledge buttons: a first-run setup protected by the
+**bootstrap secret** that `install.sh` generated on the host. `sudo homelab-maint web bootstrap` printed it once, on a root terminal
+(the file is `ack/bootstrap.secret`, 0600 root; the secret itself is never logged, printed by the installer or overwritten), you
+chose a passphrase (an authenticator app and recovery codes optional) and the runner wrote `ack/auth.json`. **That flow is retired
+with the `maintenance-web` container**: the hub that serves the site now (`beszel-hub.service`) has its own accounts (see
+`../supplemental/systemd/README.md`), and no site reads `bootstrap.secret` or `auth.json` any more. The e-mail acknowledge link itself
+still needs no login — its one-time token is the capability — and the signed request path through `ack/inbox` is unchanged (see
+"Acknowledging a known issue"). Put Cloudflare Access in front of the site as well.
 
 ## Adding a task
 
@@ -599,5 +596,5 @@ README.
 * The rules registry is `blocked`, `invalid` or has `drift`: `homelab-maint rules check`, then `rules diff`; the runner keeps the last good
   config meanwhile (`rules_registry` and `self_health` say so). A generated file edited by hand is rewritten by the next sync and the
   edited copy is kept in `/var/lib/homelab-maint/rules/orig/`.
-* After `uninstall.sh --purge` and a new install the website shows stale or no data: its container still bound the deleted
-  directories. `install.sh --deploy-web` recreates it; by hand, `docker restart maintenance-web`.
+* After `uninstall.sh --purge` and a new install the site shows stale or no data: the dashboard still held the deleted directories
+  open. Restart or redeploy the hub and agent so they pick up the recreated `public/` (see `../supplemental/systemd/README.md`).

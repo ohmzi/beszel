@@ -743,42 +743,47 @@ since = "2026-10-03"
 
 [[rule]]
 id = "task.comfyui_idle_reclaim"
-title = "ComfyUI idle VRAM: restart after two idle checks"
+title = "ComfyUI idle reclaim: stop after 15 minutes idle"
 kind = "cleanup"
 why = """\
-  ComfyUI keeps models in GPU memory after a job ends and does not give them back, which leaves less VRAM for \
-  Ollama, Immich machine learning and the other GPU users while it sits idle; a restart is the only way to \
-  free it. Size alone is never the reason: the restart needs an empty queue and a large VRAM holding on two \
-  checks in a row, so a running job is never interrupted."""
+  ComfyUI is a batch GPU tool: when nobody is using it, it should not be holding the GPU at all. A rogue \
+  instance sits idle for hours with models resident, crowding the other GPU and memory users for nothing. \
+  The owner's rule is deliberately blunt: an empty queue for 15 minutes in a row means nobody is working, so \
+  the container is STOPPED, whatever it still holds. It is not restarted - the owner starts it again when \
+  they want it, so a wrong call costs one `docker start`, never lost work."""
 does = """\
-  Check tier, every 15 minutes, at any hour (it needs no routine window; an evening freeze holds it to \
-  report-only). When the comfyui container is running it asks \
-  ComfyUI's queue (http://127.0.0.1:8188/queue) and sums the VRAM held by the container's processes from \
-  nvidia-smi. An empty queue with more than threshold_mb (3000 MiB) held is a strike; the second strike within \
-  strike_ttl_min (45 minutes) and at least strike_min_gap_min (4 minutes) after the first runs `docker restart \
-  comfyui`. A job, an unreadable queue or light VRAM resets the strikes. At least min_gap_min (30 minutes) \
-  must pass between restarts, and apply mode asks the queue once more right before restarting and cancels if a \
-  job arrived. Report-only in the shipped config."""
+  Its own schedule (schedule = "*/5 * * * *"), at any hour (an evening freeze holds it to report-only). \
+  stop_idle_min (15) is the whole rule: when the comfyui container is running, it asks ComfyUI's queue \
+  (http://127.0.0.1:8188/queue) every run; an empty queue keeps an idle clock running, and any job, or an \
+  unreadable queue, resets it. After 15 minutes continuously idle it asks the queue once more (a job may have \
+  arrived since) and, still idle, runs `docker stop comfyui`. A stopped container is never started. Ships in \
+  apply mode (flipped 2026-10-04). Setting stop_idle_min = 0 turns the killer off and restores the legacy \
+  path below: restart when idle yet holding more than threshold_mb (3000 MiB) VRAM, or more than \
+  ram_threshold_mb (4000 MiB) RAM, on two strikes within strike_ttl_min (45 minutes)."""
 applies_to = ["comfyui_idle_reclaim"]
 file = "maint.toml"
 target = "tasks.comfyui_idle_reclaim"
-params = { unprotect = ["^comfyui$"] }
-mode = "report"
+params = { unprotect = ["^comfyui$"], stop_idle_min = 15, ram_threshold_mb = 4000, schedule = "*/5 * * * *" }
+mode = "apply"
 severity = "warn"
 destructive = true
 proof = """\
-  Fail closed: a queue error, non-JSON answer, an answer without both queue lists and a failing nvidia-smi all \
-  mean busy, so nothing happens. Strikes are kept in separate lanes for apply and report runs, so a \
-  report-mode run can never add the strike that makes an apply run restart. A stopped container is not \
-  started. 'comfyui' is protected, so the task has an unprotect for ^comfyui$ (baseline allow-listed). A \
-  freeze (evenings 18:00-23:30 or the FREEZE file) holds it to report-only and PAUSE stops it."""
-principle = "never kill by size; detect by saturation, not size"
+  Fail closed: a queue error, a non-JSON answer or an answer without both queue lists counts as busy, so \
+  nothing is ever stopped on an unreadable queue; the queue is read once more right before the stop and a job \
+  in the meantime cancels it. A stopped container is never started, and a container that is not running \
+  resets the clock. The idle clock and the strike counters are kept in separate lanes for apply and report \
+  runs, so a report-mode run can never trip the stop that an apply run performs. 'comfyui' is protected, so \
+  the task has an unprotect for ^comfyui$ (baseline allow-listed). A freeze (evenings 18:00-23:30 or the \
+  FREEZE file) holds it to report-only and PAUSE stops it."""
+principle = "an idle batch tool does not belong on the GPU; stop it and let the owner restart it"
 owner_notes = """\
-  Port of comfyui-idle-vram.sh (every 5 minutes). That legacy timer is still enabled and does the real work \
-  until the cutover. The check tier runs every 15 minutes, so two checks mean 15 to 30 minutes of idleness \
-  instead of the legacy 5 to 10. comfyui is listed as expected-stopped; at authoring time the container was \
-  exited."""
-since = "2026-10-03"
+  Port of comfyui-idle-vram.sh (every 5 minutes), reshaped on 2026-10-04 from "restart when idle and holding \
+  VRAM" to "stop after 15 minutes idle": the owner asked for the blunt version - a rogue ComfyUI sitting idle \
+  is killed, and if that ever cuts into a session the owner just restarts it. stop_idle_min = 0 restores the \
+  legacy VRAM/RAM restart path (the code keeps both). The legacy timer is STILL ENABLED until the cutover is \
+  earned: `homelab-maint migrate cutover comfyui-idle-vram` refuses until the task has 8 green runs over 48 \
+  hours (docs/MIGRATION.md). comfyui is listed as expected-stopped; at authoring time the container was exited."""
+since = "2026-10-04"
 
 [[rule]]
 id = "task.immich_recycle"

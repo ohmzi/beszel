@@ -154,7 +154,7 @@ CHANNELS = ("sms", "email")
 DEFAULTS: dict[str, Any] = {
     "transport": {"kind": "hermes", "handle": "", "user": "", "scripts_dir": "/home/ohmz/StudioProjects/ai-stack/scripts",
                   "bridge": "", "fallback": "bridge", "timeout_s": 90, "fallback_timeout_s": 20, "breaker_s": 300},
-    "site": {"url": "https://maintenance.ohmzhomelab.ca", "host_label": "", "sms_prefix": "homelab",
+    "site": {"url": "https://maintainer.ohmzhomelab.ca", "host_label": "", "sms_prefix": "homelab",
              "subject_prefix": "[homelab] ", "masthead": "Maintenance"},
     "routes": {"alert": {"crit": "both", "warn": "email", "info": "email"}, "recovery": "both",
                "maintenance": "email", "digest_daily": "email", "report_weekly": "email",
@@ -186,10 +186,11 @@ DEFAULTS: dict[str, Any] = {
               "notices_max": 20},
     # Acknowledged issues (SPEC5). `days` and `escalation_breaks` only word the email: the rule itself lives in acks.py / etc/ack.toml
     # (a test keeps `days` in step with etc/ack.toml). suppress_kinds / button_kinds are filtered against a hard whitelist in code.
-    # button: "auto" = the link/button appears once STATE_DIR/ack/web_ready exists (the site serves /ack: ack_web's deploy creates it),
+    # button: "auto" = the link/button appears once STATE_DIR/ack/web_ready exists (the hub serves /ack, so its deploy creates it),
     # true = always, false = never. Until then an email carries only the text line `Issue ID` (never a button that opens a 404).
     # require_rule / allow_tasks / deny_tasks / deny_prefixes: DEPRECATED fallback copy; etc/ack.toml [ack] decides (acks.ackable, see _ack_allowed).
-    "ack": {"enabled": True, "button": "auto", "base_url": "https://maintenance.ohmzhomelab.ca", "token_ttl_days": 30, "days": 90,
+    "ack": {"enabled": True, "button": "auto", "base_url": "https://maintainer.ohmzhomelab.ca",
+            "mint_url": "http://127.0.0.1:8088/api/beszel/maintenance/ack/mint", "token_ttl_days": 30, "days": 90,
             "button_text": "Acknowledge for {days} days", "escalation_breaks": True,
             "suppress_kinds": ["alert", "recovery", "incident_open", "incident_resolved"],
             "button_kinds": ["alert", "incident_open", "ack_expired"],

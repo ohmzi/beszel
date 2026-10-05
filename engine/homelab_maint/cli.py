@@ -580,43 +580,28 @@ def cmd_doctor(_a) -> int:
     site: dict = {}
 
     def site_health():
-        """GET http://127.0.0.1:<port>/healthz once (loopback only, 3 s): {"answered", "code", "doc"}. Nothing deployed = refused connection."""
+        """GET http://127.0.0.1:<port>/api/health once (loopback only, 3 s): {"answered", "code", "doc"}. Nothing deployed = refused connection."""
         if not site:
             from .tasks import self_health
             o = cfg.get("tasks", {}).get("self_health", {}) or {}
-            port = o.get("web_port") if isinstance(o.get("web_port"), int) and 0 < o.get("web_port") < 65536 else 8098
-            code, body, err, _ms = self_health.http_get("127.0.0.1", port, "/healthz", 3.0)
+            port = o.get("web_port") if isinstance(o.get("web_port"), int) and 0 < o.get("web_port") < 65536 else 8088
+            path = o.get("web_path") if isinstance(o.get("web_path"), str) and o["web_path"].startswith("/") else "/api/health"
+            code, body, err, _ms = self_health.http_get("127.0.0.1", port, path, 3.0)
             try:
                 doc = json.loads(body) if code is not None else None
             except ValueError:
                 doc = None
-            site.update(answered=code is not None, code=code, err=err, port=port, doc=doc if isinstance(doc, dict) else {})
+            site.update(answered=code is not None, code=code, err=err, port=port, path=path, doc=doc if isinstance(doc, dict) else {})
         return site
 
     def website_ok():
-        """SPEC6 s6/s7: what the site itself says is wrong ('warnings' of /healthz: no login yet, unreadable auth.json, nothing in front of
-        the login, inbox not writable). Not deployed (nothing listens) is fine here; the pipeline row says if it should be."""
+        """The OhmzMaintainer dashboard's own health endpoint answers on loopback. Not deployed (nothing listens) is fine here; the
+        pipeline row says if it should be up. The hub has no per-setup 'warnings' list (its login is PocketBase's), so a 200 is enough."""
         s = site_health()
-        if not s["answered"]:
+        if not s["answered"] or s["code"] == 200:
             return True, ""
-        warns = [str(w) for w in (s["doc"].get("warnings") or []) if isinstance(w, str)]
-        if s["code"] != 200:
-            warns.insert(0, f"/healthz answered HTTP {s['code']}: {str(s['doc'].get('reason') or '?')[:60]}")
-        return not warns, "; ".join(w[:110] for w in warns[:3]) + (f" (+{len(warns) - 3} more)" if len(warns) > 3 else "")
-
-    def login_ok():
-        """The acknowledge login: auth.json present, valid and readable by the site's group. Absent is only a problem once the site is up."""
-        from . import acks
-        if not (core.STATE_DIR / "ack").is_dir():
-            return True, ""
-        state, why = acks.auth_state()
-        if state == "ok":
-            return True, ""
-        if state == "absent":
-            return not site_health()["answered"], "first-run setup pending: sudo homelab-maint web bootstrap, open the site, enter the secret"
-        from . import acks_auth
-        return False, (f"auth.json {state}: {why}; fix: sudo chgrp {acks_auth.web_gid(core.STATE_DIR / 'ack')} {core.STATE_DIR / 'ack' / 'auth.json'} "
-                       f"(mode 0640), or remove it and run: sudo homelab-maint web bootstrap")
+        why = str(s["doc"].get("reason") or s["doc"].get("error") or s["doc"].get("message") or "?")[:80]
+        return False, f"{s['path']} answered HTTP {s['code']}: {why}"
 
     chk("config readable", bool(cfg.get("global")), str(core.CONF_DIR / "maint.toml"))
     chk("state dir writable", os.access(core.STATE_DIR, os.W_OK), str(core.STATE_DIR))
@@ -645,8 +630,7 @@ def cmd_doctor(_a) -> int:
     probe("metrics sampler running", sampler_ok)
     probe("live monitor running", live_ok)
     probe("ack policy equal in ack.toml and notify.toml", ack_policy_ok)
-    probe("website /healthz (when deployed) has no warnings", website_ok)
-    probe("website login set up and readable by the site (ack/auth.json)", login_ok)
+    probe("website answers on its loopback health endpoint (when deployed)", website_ok)
     probe("rules registry valid and in sync", registry_ok)
     probe("monitoring pipeline healthy, self.json fresh", pipeline_ok)
     chk("kill switch absent", not paused(), "global PAUSE present")

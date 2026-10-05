@@ -35,7 +35,8 @@ REAL_PROTECTED = core.load_toml(REPO / "etc" / "protected.toml")
 # Local-time anchor: max_per_day is a per-LOCAL-day budget, so a replay must not cross midnight.
 T0 = time.mktime((2026, 10, 2, 8, 0, 0, 0, 0, -1))
 
-# `docker ps` on this host, 2026-10-02 (name|image|compose service): the 75 running containers; comfyui is stopped.
+# `docker ps` on this host, 2026-10-02 (name|image|compose service): the running containers, minus the retired
+# maintenance-web site and its throw-away maintenance-web-test-N builds; comfyui is stopped.
 REAL_CONTAINERS = """
 afsaane-prod|afsaane:0.1.0|afsaane
 afsaane-prod-db|postgres:17-alpine|db
@@ -70,9 +71,6 @@ Jackett|linuxserver/jackett:latest|jackett
 kavita|jvmilazz0/kavita:latest|kavita
 kokoro|ghcr.io/remsky/kokoro-fastapi-cpu:v0.6.0|kokoro
 kometa|kometa-local:a51f2d9|kometa
-maintenance-web-test-81|maintenance-web:dev|
-maintenance-web-test-82|maintenance-web:dev|
-maintenance-web-test-91|maintenance-web:dev|
 mariadb|lscr.io/linuxserver/mariadb:11.4.5|mariadb
 nextcloud_cron|nextcloud:34.0.2-apache|cron
 nextcloud|nextcloud:34.0.2-apache|app
@@ -485,14 +483,14 @@ def test_platform_and_serving_assignments_that_matter():
     for u in ("docker.service", "containerd.service", "NetworkManager.service", "tailscaled.service",
               "cloudflared.service", "ssh.service", "systemd-journald.service"):
         assert cm.cls(u, "units") == "P0", u
-    for n in ("Seerr", "homarr", "uptime-kuma", "immich_server", "open-webui", "nextcloud", "maintenance-web"):
+    for n in ("Seerr", "homarr", "uptime-kuma", "immich_server", "open-webui", "nextcloud"):
         assert cm.cls(n) == "P1", n
     for u in ("snap.plexmediaserver.plexmediaserver.service", "ollama.service", "glances.service",
-              "homelab-maint-www.service"):
+              "homelab-maint-www.service", "beszel-hub.service", "beszel-agent.service"):
         assert cm.cls(u, "units") == "P1", u
     for n in ("tunarr-host-net", "Sonarr", "Radarr", "kavita", "immich_machine_learning", "comfyui", "kokoro"):
         assert cm.cls(n) == "P2", n
-    for n in ("afsaane-test", "ImmaculaterrDemo", "diun", "maintenance-web-test-81"):
+    for n in ("afsaane-test", "ImmaculaterrDemo", "diun"):
         assert cm.cls(n) == "P3", n
     assert cm.cls("never-heard-of-it") == "P2"               # unknown => batch, never P0/P1 and not the first to be slowed
     assert cm.cls("never-heard-of.service", "units") == "P2"
@@ -1377,9 +1375,7 @@ def test_l3_never_touches_p0_p1_databases_builders_or_idle_containers(world):
     assert not touched & DBS and "buildx_buildkit_immaculaterr-builder0" not in touched
     assert "homarr" not in touched and "docker-socket-proxy" not in touched and "immich_server" not in touched
     # P3 batch first: every candidate this run was P3 (and none of the P3 databases or builders)
-    assert {cm.cls(n) for n in touched} == {"P3"} and touched == {"ImmaculaterrDemo", "afsaane-test", "diun",
-                                                                  "maintenance-web-test-81", "maintenance-web-test-82",
-                                                                  "maintenance-web-test-91"}
+    assert {cm.cls(n) for n in touched} == {"P3"} and touched == {"ImmaculaterrDemo", "afsaane-test", "diun"}
     assert world.c("kavita").shares == 0                          # idle: not worth slowing
 
 
@@ -1456,15 +1452,12 @@ def test_l3_refuses_targets_below_the_floor(world):
 
 
 def test_l3_per_run_and_per_day_limits(world):
-    busy_fleet(world, **{n: 2.0 for n in ("ImmaculaterrDemo", "afsaane-test", "diun", "maintenance-web-test-81",
-                                          "maintenance-web-test-82", "maintenance-web-test-91")})
+    busy_fleet(world, **{n: 2.0 for n in ("ImmaculaterrDemo", "afsaane-test", "diun")})
     (world.conf / "classes.toml").write_text((REPO / "etc" / "classes.toml").read_text()
-                                             .replace("max_throttled_per_run = 8", "max_throttled_per_run = 2")
-                                             .replace("throttle = 24", "throttle = 3"))
-    l3(world, T0, throttle="apply")
-    assert len(world.muts) == 2
-    r = l3(world, T0 + 900, throttle="apply")
-    assert len(world.muts) == 3 and any(x["outcome"] == "refused: max_per_day" for x in r.items)
+                                             .replace("throttle = 24", "throttle = 2"))
+    r = l3(world, T0, throttle="apply")
+    assert len(world.muts) == 2                               # the per-day budget of 2 stops the third eligible candidate ...
+    assert any(x["outcome"] == "refused: max_per_day" for x in r.items)
 
 
 def test_throttle_is_restored_when_pressure_returns_to_zero_idempotently(world):

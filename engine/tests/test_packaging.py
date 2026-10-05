@@ -223,14 +223,15 @@ def test_install_required_strings():
         "homelab-maint-check.timer", "homelab-maint-daily.timer", "homelab-maint-weekly.timer",
         "homelab-maint-metrics.timer", "homelab-maint-tick.timer", "homelab-maint-selfhealth.timer",
         "homelab-maint-www.service", "homelab-maint-live.service", "systemd/dropins",
-        "--dry-run", "--no-start", "--first-check", "--deploy-web", "--no-web-ready", "--adopt-rules",
-        "wait_web_healthy", "mark_web_ready", "web bootstrap",                                # the e-mail button follows the site; the login secret
+        "--dry-run", "--no-start", "--first-check", "--adopt-rules",
+        "web bootstrap",                                    # the first-run web login secret
         "$STATE/ack/inbox", "$STATE/ack/web.key", "$STATE/ack/bootstrap.secret", "10001",     # the acknowledge postbox
         "rules sync --adopt", "00-baseline-invariants.toml",                                  # the registry's adoption command
-        "docker-compose.override.yml",                      # the website needs BOTH compose files on this host
         "plugins.d", "probes.d", "legacy-retirement.d",     # the owner's extension points
     ):
         assert needle in t, f"install.sh lacks {needle!r}"
+    # the old maintenance-web site is retired: this script no longer deploys a website (the dashboard is a separate install)
+    assert "--deploy-web" not in t and "--no-web-ready" not in t and "docker compose" not in t
 
 
 def test_install_idempotency_markers():
@@ -357,7 +358,7 @@ def test_tier_services():
 
 def test_timers():
     chk = parse_unit(SYSTEMD / "homelab-maint-check.timer")
-    assert chk["Timer"]["OnCalendar"] == ["*:0/15"]
+    assert chk["Timer"]["OnCalendar"] == ["*:0/5"]                # every 5 minutes since 2026-10-04 (was *:0/15)
     assert chk["Timer"]["RandomizedDelaySec"] == ["60"]
     day = parse_unit(SYSTEMD / "homelab-maint-daily.timer")
     assert day["Timer"]["OnCalendar"] == ["*-*-* 07:30:00"]
@@ -598,30 +599,37 @@ def test_maint_toml_names_only_real_tasks_and_covers_every_wired_one():
 
 
 def test_only_the_spike_ladders_reclaim_rung_ships_on():
-    """The check, daily and weekly services pass --apply, so this is what keeps 'report-only by default' true."""
+    """The check, daily and weekly services pass --apply, so this is what keeps 'report-only by default' true. Two reclaims may act on
+    the shipped config: pressure_response (the spike ladder's non-destructive reclaim rung) and comfyui_idle_reclaim (flipped to apply
+    on 2026-10-04, own 5-minute schedule; see test_the_check_tier_may_apply_because_only_reclaim_ships_on)."""
     reg, tasks = registry(), toml_file("maint.toml")["tasks"]
     on = sorted(n for n, t in tasks.items() if t.get("mode") == "apply")
-    assert on == ["pressure_response"], f"these ship in apply mode: {on}; the owner enables apply, the shipped file does not"
+    assert on == ["comfyui_idle_reclaim", "pressure_response"], f"these ship in apply mode: {on}; every other cleaner ships report"
     rungs = {k: tasks["pressure_response"].get(k) for k in ("reclaim", "throttle", "restart", "emergency")}
     assert rungs == {"reclaim": "apply", "throttle": "report", "restart": "report", "emergency": "report"}
     for n, (klass, _tier, _mod) in reg.items():
-        if klass in ("C1", "C2") and n in tasks and n != "pressure_response":
+        if klass in ("C1", "C2") and n in tasks and n not in ("pressure_response", "comfyui_idle_reclaim"):
             assert tasks[n].get("mode", "report") == "report", f"{n} must ship report-only"
     ladder = toml_file("classes.toml")
     assert ladder.get("emergency_stop", []) == [], "no container is on the emergency-stop list by default"
 
 
 def test_the_check_tier_may_apply_because_only_reclaim_ships_on():
-    """check.service passes --apply (the spike glue): every C1 task of that tier but pressure_response must be report-only."""
+    """check.service passes --apply (the spike glue): every C1 task of that tier must be report-only, except the reclaims
+    allowed to act — pressure_response always, and comfyui_idle_reclaim since its 2026-10-04 cutover, which carries its own
+    5-minute schedule so a 10-minute idle window does not depend on this tier's 15-minute cadence."""
     tasks = toml_file("maint.toml")["tasks"]
     assert "run --tier check --apply" in (SYSTEMD / "homelab-maint-check.service").read_text()
     c1 = sorted(n for n, (klass, tier, _mod) in registry().items() if tier == "check" and klass != "C0")
     assert {"pressure_response", "comfyui_idle_reclaim", "immich_recycle"} <= set(c1)
+    may_act = {"pressure_response", "comfyui_idle_reclaim"}
     for n in c1:
-        if n != "pressure_response":      # an unlisted task means mode "report", which is also fine
-            assert tasks.get(n, {}).get("mode", "report") == "report", f"{n} runs under --apply every 15 min and must ship report"
-    for n in ("comfyui_idle_reclaim", "immich_recycle"):
-        assert tasks[n]["mode"] == "report", "the ports are explicit about it"
+        if n in may_act:
+            continue
+        assert tasks.get(n, {}).get("mode", "report") == "report", f"{n} runs under --apply every 15 min and must ship report"
+    assert tasks["comfyui_idle_reclaim"]["mode"] == "apply", "the comfyui cutover is deliberate (PARITY difference 7)"
+    assert tasks["comfyui_idle_reclaim"]["schedule"] == "*/5 * * * *", "two strikes at 5 min = the 10-minute window"
+    assert tasks["immich_recycle"]["mode"] == "report", "immich_recycle still ships report: its cutover has not happened"
 
 
 def test_routine_steps_and_post_checks_name_registered_tasks():
@@ -1202,71 +1210,6 @@ def _install_funcs(*names: str) -> str:
     return "\n".join(out)
 
 
-def test_web_ready_is_created_in_one_place_and_only_after_the_container_reports_healthy():
-    """ack/web_ready turns the e-mail Acknowledge button on: a link to a site that is not up is worse than none. The only creation is
-    mark_web_ready, called once, in the branch that needed wait_web_healthy to succeed (and never with --no-web-ready or a dry run)."""
-    t = INSTALL.read_text()
-    assert t.count('-- /dev/null "$f"') == 1 and '-- /dev/null "$f"' in _install_funcs("mark_web_ready")
-    assert not re.search(r"\btouch\b[^\n]*web_ready", "\n".join(l for _n, l in code_lines(INSTALL))), "web_ready is made by mark_web_ready, not by a stray touch"
-    calls = list(re.finditer(r"^\s+mark_web_ready$", t, re.M))
-    assert len(calls) == 1
-    chain = t[t.rindex("if ((!WEB_READY)); then", 0, calls[0].start()):calls[0].end()]
-    assert re.search(r"elif \(\(DRY\)\); then.*elif wait_web_healthy; then\s+mark_web_ready$", chain, re.S), chain
-    assert "docker compose" in t[:t.rindex("if ((!WEB_READY)); then")] and t.index("up -d --build") < t.index("if ((!WEB_READY)); then")
-
-
-STUB_DOCKER_HEALTH = """#!/bin/sh
-# `docker inspect --format ... maintenance-web`: the next status from $STUB_HEALTH (one per line, the last one repeats); every call counted
-n=$(cat "$STUB_CNT" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$STUB_CNT"
-[ "$1" = inspect ] || exit 9
-sed -n "${n}p" "$STUB_HEALTH" | grep . || tail -n 1 "$STUB_HEALTH"
-"""
-
-
-def _wait_web(tmp_path: Path, statuses: list[str], wait: int = 5, mark: bool = False):
-    bindir = tmp_path / "hbin"
-    bindir.mkdir(exist_ok=True)
-    (bindir / "docker").write_text(STUB_DOCKER_HEALTH)
-    (bindir / "docker").chmod(0o755)
-    (tmp_path / "health").write_text("\n".join(statuses) + "\n")
-    (tmp_path / "cnt").unlink(missing_ok=True)
-    state = tmp_path / "state"
-    (state / "ack").mkdir(parents=True, exist_ok=True)
-    script = ("set -euo pipefail; DRY=0; STATE=\"$1\"\n"
-              "note() { printf '%s %s\\n' \"$1\" \"${2:-}\"; }; verb() { printf '%s' \"$1\"; }; changed() { :; }; run() { \"$@\"; }\n"
-              + _install_funcs("wait_web_healthy", "mark_web_ready")
-              + ("\nif wait_web_healthy; then mark_web_ready; echo READY; else echo NOT-HEALTHY; fi\n" if mark else "\nwait_web_healthy && echo HEALTHY || echo NOT-HEALTHY\n"))
-    cmd = ["unshare", "-r", "bash", "-c", script, "x", str(state)] if mark else ["bash", "-c", script, "x", str(state)]
-    env = {**os.environ, "PATH": f"{bindir}:{os.environ['PATH']}", "STUB_HEALTH": str(tmp_path / "health"), "STUB_CNT": str(tmp_path / "cnt"), "HM_WEB_WAIT_S": str(wait)}
-    r = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=60)
-    return r, state / "ack" / "web_ready", int((tmp_path / "cnt").read_text())
-
-
-def test_wait_web_healthy_polls_docker_until_healthy_and_stops_on_unhealthy_or_timeout(tmp_path):
-    r, _f, polls = _wait_web(tmp_path, ["starting", "starting", "healthy"], wait=10)
-    assert r.stdout.strip() == "HEALTHY" and polls == 3, (r.stdout, r.stderr)
-    r, _f, polls = _wait_web(tmp_path, ["starting", "unhealthy", "healthy"], wait=10)
-    assert r.stdout.strip() == "NOT-HEALTHY" and polls == 2                                    # an unhealthy container is not waited on
-    r, _f, polls = _wait_web(tmp_path, ["starting"], wait=2)
-    assert r.stdout.strip() == "NOT-HEALTHY" and 2 <= polls <= 4                              # never healthy: gives up after HM_WEB_WAIT_S
-    r, _f, _p = _wait_web(tmp_path, ["none"], wait=1)
-    assert r.stdout.strip() == "NOT-HEALTHY"                                                  # a container without a healthcheck does not count as healthy
-
-
-@needs_userns
-def test_web_ready_exists_only_when_the_container_was_healthy(tmp_path):
-    r, flag, _p = _wait_web(tmp_path, ["starting", "healthy"], wait=10, mark=True)
-    assert "READY" in r.stdout and flag.is_file() and flag.stat().st_mode & 0o777 == 0o644 and flag.read_bytes() == b""
-    flag.unlink()
-    r, flag, _p = _wait_web(tmp_path, ["starting"], wait=1, mark=True)
-    assert "NOT-HEALTHY" in r.stdout and not flag.exists()
-    r, flag, _p = _wait_web(tmp_path, ["unhealthy"], wait=5, mark=True)
-    assert "NOT-HEALTHY" in r.stdout and not flag.exists()
-    flag.write_text("")
-    r, flag, _p = _wait_web(tmp_path, ["healthy"], wait=5, mark=True)                          # an existing one is kept, not rewritten
-    assert "same" in r.stdout and flag.is_file()
-
-
 # --------------------------------------------------------------------------- runtime: the rules registry
 BASELINE = "00-baseline-invariants.toml"
 
@@ -1542,35 +1485,6 @@ def test_uninstall_fails_closed_when_systemd_gives_no_answer(tmp_path):
     assert "is running" in r.stderr and "state: unknown" in r.stderr
 
 
-def _purge_dry(tmp_path: Path, docker_state: str):
-    """A purge dry run with stub systemctl AND stub docker first on PATH; returns (result, docker calls)."""
-    dockerbin = tmp_path / "dockerbin"
-    dockerbin.mkdir()
-    (dockerbin / "docker").write_text('#!/bin/sh\necho "$*" >> "$STUB_LOG_DOCKER"\ncase $1 in ps) echo maintenance-web ;; esac\nexit 0\n')
-    (dockerbin / "docker").chmod(0o755)
-    path = f"{dockerbin}:{tmp_path / 'stubbin'}:{os.environ['PATH']}"
-    r, _calls = _uninstall_live_dry(tmp_path, {"docker.service": docker_state}, "--dry-run", "--purge", "--yes",
-                                    extra_env={"PATH": path, "STUB_LOG_DOCKER": str(tmp_path / "docker.log")})
-    log = tmp_path / "docker.log"
-    return r, (log.read_text().splitlines() if log.exists() else [])
-
-
-def test_a_purge_removes_the_website_container_it_would_leave_on_deleted_inodes_but_never_wakes_dockerd(tmp_path):
-    """The container bind-mounts public/ and ack/; a purge deletes them under it, and a reinstall would then serve stale data from the
-    deleted inodes. dockerd is socket-activated here, so docker is only asked when systemd says docker.service is already active."""
-    (tmp_path / "up").mkdir()
-    r, docker = _purge_dry(tmp_path / "up", "active")
-    assert r.returncode == 0, r.stderr
-    assert "+ docker rm -f maintenance-web" in r.stdout and not [c for c in docker if c.startswith(("rm", "stop", "kill"))], docker
-    (tmp_path / "down").mkdir()
-    r2, docker2 = _purge_dry(tmp_path / "down", "inactive")
-    assert r2.returncode == 0 and docker2 == [], f"dockerd is stopped: docker must not be asked (it would start it): {docker2}"
-    assert "docker rm" not in r2.stdout
-    t = UNINSTALL.read_text()
-    assert t.index("is-active --quiet docker.service") < t.index("docker rm -f maintenance-web") < t.index('rm_path "$CONF"')
-    assert t.index("if ((PURGE)); then") < t.index("docker rm -f maintenance-web"), "only a purge touches the container"
-
-
 # --------------------------------------------------------------------------- the live-systemd branch of install.sh (stubbed dry runs)
 # Which units get enabled, what a cutover keeps off, and the website deploy all live in the branch that HM_ROOT staging skips. It is run
 # here with --dry-run only (run() prints, nothing executes), with stub `systemctl` and `docker` first on PATH, from a throw-away project.
@@ -1645,45 +1559,6 @@ def test_install_dry_run_skips_a_unit_whose_module_is_not_in_the_source_tree(env
     for mod, unit in (("live.py", "homelab-maint-live.service"), ("metrics_ring.py", "homelab-maint-metrics.timer"),
                       ("scheduler.py", "homelab-maint-tick.timer"), ("tasks/self_health.py", "homelab-maint-selfhealth.timer")):
         assert f"homelab_maint/{mod} is missing" in r.stderr and f"{unit} not enabled" in r.stderr
-
-
-def test_deploy_web_dry_run_uses_both_compose_files_and_builds_nothing(env):
-    web = env.proj / "web"
-    web.mkdir()
-    (web / "docker-compose.yml").write_text("services: {}\n")
-    (web / "docker-compose.override.yml").write_text("networks: {}\n")
-    r, _c, docker = _install_live_dry(env, "--dry-run", "--deploy-web")
-    assert r.returncode == 0, r.stdout + r.stderr
-    up = [ln for ln in r.stdout.splitlines() if "docker compose" in ln and "up -d --build" in ln]
-    assert len(up) == 1 and f"-f {web}/docker-compose.yml -f {web}/docker-compose.override.yml" in up[0], up
-    assert docker == ["compose version"], f"a dry run may only ask whether compose exists: {docker}"
-    assert "would-deploy" in r.stdout and "web/README.md" in r.stdout
-    assert re.search(r"would-wait\s+for maintenance-web to report healthy .*then create ack/web_ready", r.stdout)       # the button follows the site
-    assert not re.search(r"^\s+\+ .*web_ready", r.stdout, re.M), "a dry run creates nothing"
-    (env.tmp / "docker.log").unlink()
-    r3, _c, docker3 = _install_live_dry(env, "--dry-run", "--deploy-web", "--no-web-ready")
-    assert r3.returncode == 0 and "would-wait" not in r3.stdout and re.search(r"skipped\s+ack/web_ready \(--no-web-ready\).*sudo touch /var/lib/homelab-maint/ack/web_ready", r3.stdout)
-    assert docker3 == ["compose version"]
-    # without --deploy-web nothing about docker happens at all
-    (env.tmp / "docker.log").unlink()
-    r2, _c, docker2 = _install_live_dry(env, "--dry-run")
-    assert docker2 == [] and "docker compose" not in r2.stdout
-
-
-def test_deploy_web_refuses_without_the_override_compose_file(env):
-    web = env.proj / "web"
-    web.mkdir()
-    (web / "docker-compose.yml").write_text("services: {}\n")                  # the override pins the subnet: a plain `up` fails here
-    r, _c, docker = _install_live_dry(env, "--dry-run", "--deploy-web")
-    assert r.returncode == 0 and "docker-compose.override.yml is missing" in r.stderr and "NOT deployed" in r.stderr
-    assert docker == [] and "up -d" not in r.stdout
-
-
-@needs_userns
-def test_deploy_web_is_skipped_in_a_staged_install(env):
-    r = env.install("--deploy-web")
-    assert r.returncode == 0, r.stderr
-    assert "docker compose (staging root)" in r.stdout
 
 
 def test_uninstall_removes_exactly_the_units_install_puts_down():
@@ -1790,57 +1665,3 @@ def test_import_check_imports_the_staged_tree_not_a_stale_one_on_the_path(env, t
     assert r.returncode != 0 and "NameError" in r.stderr
 
 
-# --------------------------------------------------------------------------- the deploy branch, for real, in a staged install with a stub docker
-STUB_DOCKER_DEPLOY = """#!/bin/sh
-# compose version / compose ... up: succeed and are logged; inspect: the health status in $STUB_HEALTH. Anything else is refused.
-echo "$*" >> "$STUB_LOG_DOCKER"
-case "$1" in
-  compose) exit 0 ;;
-  inspect) cat "$STUB_HEALTH" ;;
-  *) exit 9 ;;
-esac
-"""
-
-
-def _staged_deploy(env: Env, health: str, *args: str):
-    """install.sh --deploy-web on the staging root, with the 'staging skips docker' guard cut out of a COPY of the script (the project copy) and a stub
-    docker first on PATH: every other line is the shipped one, so what runs after `up -d --build` (the health wait, the web_ready marker) is the
-    real code. The real docker is never reached: the stub is on PATH for every call this helper makes, and it is the only way the copy is run."""
-    web = env.proj / "web"
-    web.mkdir(exist_ok=True)
-    (web / "docker-compose.yml").write_text("services: {}\n")
-    (web / "docker-compose.override.yml").write_text("networks: {}\n")
-    script = env.proj / "install.sh"
-    guard = '  if [[ -n $ROOT ]]; then\n    note skipped "docker compose (staging root)"\n  elif'
-    src = script.read_text()
-    if guard in src:
-        script.write_text(src.replace(guard, '  if false; then\n    note skipped "docker compose (staging root)"\n  elif', 1))
-    bindir = env.tmp / "dbin"
-    bindir.mkdir(exist_ok=True)
-    (bindir / "docker").write_text(STUB_DOCKER_DEPLOY)
-    (bindir / "docker").chmod(0o755)
-    (env.tmp / "health").write_text(health + "\n")
-    return env._run("install.sh", "--deploy-web", *args, extra_env={"PATH": f"{bindir}:{os.environ['PATH']}", "STUB_HEALTH": str(env.tmp / "health"),
-                                                                   "STUB_LOG_DOCKER": str(env.tmp / "docker.log"), "HM_WEB_WAIT_S": "2"})
-
-
-@needs_userns
-def test_a_deployed_healthy_site_gets_web_ready_and_an_unhealthy_one_does_not(env):
-    r = _staged_deploy(env, "healthy")
-    assert r.returncode == 0, r.stdout + r.stderr
-    flag = env.p(f"{ACK}/web_ready")
-    assert flag.is_file() and flag.stat().st_mode & 0o777 == 0o644 and flag.read_bytes() == b""
-    assert re.search(r"create\s+\S+/ack/web_ready \(the e-mail Acknowledge button is on\)", r.stdout)
-    calls = (env.tmp / "docker.log").read_text().splitlines()
-    assert any(c.startswith("compose") and "up -d --build" in c for c in calls) and any(c.startswith("inspect") and c.endswith("maintenance-web") for c in calls)
-    flag.unlink()
-    r = _staged_deploy(env, "unhealthy")
-    assert r.returncode == 0 and not flag.exists(), r.stdout
-    assert "maintenance-web did not report healthy: ack/web_ready was NOT created" in r.stderr and "sudo touch /var/lib/homelab-maint/ack/web_ready" in r.stderr
-    r = _staged_deploy(env, "starting")                                                      # never healthy inside HM_WEB_WAIT_S
-    assert r.returncode == 0 and not flag.exists() and "did not report healthy" in r.stderr
-    r = _staged_deploy(env, "healthy", "--no-web-ready")                                     # healthy, but the owner asked to wait
-    assert r.returncode == 0 and not flag.exists() and re.search(r"skipped\s+ack/web_ready \(--no-web-ready\)", r.stdout)
-    assert _staged_deploy(env, "healthy").returncode == 0 and flag.is_file()
-    again = _staged_deploy(env, "healthy")                                                   # the marker is kept, not rewritten
-    assert again.returncode == 0 and re.search(r"same\s+\S+/ack/web_ready", again.stdout)

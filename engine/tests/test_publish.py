@@ -161,7 +161,7 @@ NEW_SCHEMAS = {
                           "history": ListOf(Sub({"t": NUM, "level": int}), 96), "spikes": ListOf(dict, 30), "actions": ListOf(dict, 50),
                           "classes": ListOf(Sub({"class": str, "members": ListOf(str), "policy": str}))}),
     "jobs.json": Sub({"generated_at": NUM,
-                      "jobs": ListOf(Sub({"job": str, "title": str, "source": Enum("native", "adapter", "os", "external"), "mode": str,
+                      "jobs": ListOf(Sub({"job": str, "title": str, "source": Enum("native", "adapter", "os", "external", "task"), "mode": str,
                                           "class": str, "schedule": str, "next_due": Opt(NUM), "last_start": Opt(NUM),
                                           "last_end": Opt(NUM), "last_status": Opt(str)}))}),
     "monitors.json": Sub({"generated_at": NUM,
@@ -1457,8 +1457,8 @@ def real_env(env, monkeypatch, tmp_path):
     for seam, fn in REAL_SEAMS.items():
         monkeypatch.setattr(P, seam, fn)
     monkeypatch.setattr(P, "_find_source", REAL_FIND_SOURCE)
-    from homelab_maint.tasks import self_health                       # the real self.json, but it may not ask this host's docker or website
-    monkeypatch.setattr(self_health, "dockerd_up", lambda: False)
+    from homelab_maint.tasks import self_health                       # the real self.json, but it may not ask this host's systemd or website
+    monkeypatch.setattr(self_health, "service_state", lambda *a, **k: ("unknown", False))
     monkeypatch.setattr(self_health, "http_get", lambda *a, **k: (None, b"", "refused", 1))
     return env
 

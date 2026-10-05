@@ -1,9 +1,12 @@
 """Tiny read-only JSON server for the Homarr widgets: 127.0.0.1:<www_port> (default 9111).
 
-Routes (GET only): /overview /disk /jobs /guard /reclaim /status  /thermal /load /metrics /heartbeat
+Routes (GET only): /overview /disk /jobs /guard /reclaim /status  /thermal /load /metrics /heartbeat /pipeline
   * /thermal and /load are the 7-day sensor widgets (payloads_metrics, fed by the metrics ring); /metrics is the raw ring export;
     /heartbeat is the dead-man's switch for an external watcher (tasks.monitors.heartbeat_payload; HTTP 200 whatever "ok" says,
     so a Kuma keyword monitor can match '"ok":true'). None of them needs status.json;
+  * /pipeline is the monitoring pipeline (tasks/self_health): the effective verdict a consumer must show, plus every part whose
+    state is not ok or info. It reads STATE_DIR/public/self.json, so a widget can name the broken stage instead of only saying
+    that something is wrong;
   * every answer is HTTP 200 JSON, because Homarr shows a red triangle for any non-200; trouble (no status file,
     unreadable file, payload bug) is reported in-band as {"error": ..., "stale": true};
   * unknown paths 404 and every other verb 405; there is no file or directory serving at all;
@@ -23,6 +26,7 @@ import signal
 import socket
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -105,6 +109,32 @@ def render_extra(route: str, source: StatusSource) -> bytes:
         return _encode(payloads.error_payload(f"payload failure: {type(exc).__name__}"))
 
 
+PIPELINE_ROUTE = "pipeline"
+
+
+def render_pipeline(source: StatusSource) -> bytes:
+    """The monitoring pipeline for a widget: the verdict a consumer must show, plus the parts that are not healthy.
+
+    self_health.effective() is the page rule the web strip implements too (a stale "ok" is not believed); this adds the
+    rows, so a board can name the stage that is broken instead of only saying that something is. Never raises: a widget
+    must always get a 200."""
+    try:
+        from .tasks import self_health                       # lazy: the widgets need no check engine at import
+        now = source.fixed_now if source.fixed_now is not None else time.time()
+        doc = read_json(STATE_DIR / "public" / "self.json")
+        body = dict(self_health.effective(doc, now))
+        rows = doc.get("checks") if isinstance(doc, dict) else None
+        body["unhealthy"] = [
+            {"id": r.get("id"), "title": r.get("title"), "state": r.get("state")}
+            for r in (rows if isinstance(rows, list) else [])
+            if isinstance(r, dict) and r.get("state") not in ("ok", "info")
+        ]
+        return _encode(body)
+    except Exception as exc:  # noqa: BLE001 - a widget must always get a 200
+        print(f"homelab-maint-www: pipeline: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return _encode(payloads.error_payload(f"payload failure: {type(exc).__name__}"))
+
+
 class Handler(BaseHTTPRequestHandler):
     source: StatusSource                    # set on the subclass by make_server()
     server_version = "homelab-maint"
@@ -125,7 +155,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         route = urlsplit(self.path).path.strip("/")
-        if route in payloads.ROUTES or route == "status":
+        if route == PIPELINE_ROUTE:
+            self._send(200, render_pipeline(self.source))
+        elif route in payloads.ROUTES or route == "status":
             self._send(200, render(route, self.source))
         elif route in EXTRA_ROUTES:
             self._send(200, render_extra(route, self.source))

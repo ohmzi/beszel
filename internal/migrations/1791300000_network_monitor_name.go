@@ -6,7 +6,7 @@ import (
 )
 
 // Ohmz fork: give network monitors an optional human name, so a monitor on
-// 127.0.0.1:8098 can read "maintenance-web" instead of repeating the address.
+// 127.0.0.1:8088 can read "maintenance site" instead of repeating the address.
 func init() {
 	m.Register(func(app core.App) error {
 		collection, err := app.FindCollectionByNameOrId("network_monitors")

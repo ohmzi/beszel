@@ -213,8 +213,8 @@ order = 11
 id = "probe-group.umbrella"
 title = "Group Umbrella: the monitoring system watching itself"
 kind = "probe"
-why = "A monitor that cannot notice its own death is dangerous. These probes watch what the umbrella writes (status, probes, public export, live file, ring), its own services and timers and the maintenance website, from the one-minute engine, which is a different process from the check tier."
-does = "Defaults for the 17 members: class P1 (a confirmed problem is a warning), availability objective 99.5 percent, every minute, tag umbrella. Members override any of it (umbrella-tick is P0). Files are judged by age, services by systemd state, the website by its healthz."
+why = "A monitor that cannot notice its own death is dangerous. These probes watch what the umbrella writes (status, probes, public export, live file, ring), its own services and timers and the OhmzMaintainer dashboard, from the one-minute engine, which is a different process from the check tier."
+does = "Defaults for the 17 members: class P1 (a confirmed problem is a warning), availability objective 99.5 percent, every minute, tag umbrella. Members override any of it (umbrella-tick is P0). Files are judged by age, services by systemd state, the dashboard by its /api/health and its unit."
 file = "probes.toml"
 target = "group[]"
 merge = "append"
@@ -304,7 +304,7 @@ title = "Public export is fresh"
 kind = "probe"
 severity = "warn"
 principle = "classes of service P0-P3"
-why = "overview.json is the file the website container reads. If it goes stale the website must say so instead of showing old data as current."
+why = "overview.json is the file the dashboard reads. If it goes stale the site must say so instead of showing old data as current."
 does = "Checks the age of {STATE}/public/overview.json: its modification time must be under 2700 s (degraded from 1800 s). Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
 applies_to = ["umbrella-public-export"]
 file = "probes.toml"
@@ -389,6 +389,52 @@ title = "Status server (:9111)"
 type = "http"
 target = "http://127.0.0.1:9111/overview"
 expect = { json = [{ path = "stale", equals = false }] }
+
+[[rule]]
+id = "probe.maintenance-site"
+title = "Maintenance site answers on :8088"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The OhmzMaintainer dashboard (this fork of Beszel) is where the maintenance surfaces live now that the old maintenance-web container on :8098 is retired. Its /api/health is the site's own liveness answer."
+does = "GET http://127.0.0.1:8088/api/health (redirects are not followed); expects HTTP 200-299. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["maintenance-site"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-04"
+order = 8
+owner_notes = "The port and path are written into the target: keep them in step with [tasks.self_health] web_port/web_path."
+
+[rule.params]
+name = "maintenance-site"
+title = "Maintenance site (:8088)"
+type = "http"
+target = "http://127.0.0.1:8088/api/health"
+optional = true
+
+[[rule]]
+id = "probe.svc-beszel-hub"
+title = "Maintenance site service is active"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "The dashboard runs as beszel-hub.service (its data collector as beszel-agent.service); /api/health answering while the unit is inactive would be a stray server, so the unit is what should be up."
+does = "Asks systemd (`systemctl show`) whether beszel-hub.service is active. Every minute; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). Availability objective 99.5 percent. optional: never seen up means 'skipped' (not deployed yet), not an alert."
+applies_to = ["svc-beszel-hub"]
+file = "probes.toml"
+target = "@probe-group.umbrella:probes[]"
+merge = "append"
+since = "2026-10-04"
+order = 9
+
+[rule.params]
+name = "svc-beszel-hub"
+title = "beszel-hub"
+type = "systemd"
+target = "beszel-hub.service"
+optional = true
+
 [[rule]]
 id = "probe.svc-hm-www"
 title = "Status server service is active"
@@ -3169,6 +3215,29 @@ order = 1
 name = "public-seerr"
 title = "Public hostname: Seerr"
 target = "https://seerr.ohmzhomelab.ca/"
+
+[[rule]]
+id = "probe.public-maintenance"
+title = "Public hostname answers: maintenance site"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Proves the whole path works for the dashboard: DNS, Cloudflare, the tunnel and the hub. The old maintenance.ohmzhomelab.ca hostname is retired; the site answers on maintainer.ohmzhomelab.ca now."
+does = "GET https://maintainer.ohmzhomelab.ca/ (redirects are not followed); expects HTTP 200-299, 300-399, 401 or 403 (Cloudflare Access fronts it, so an unauthenticated GET gets the Access login, which still proves tunnel plus DNS). Every 5 minutes; 2 bad runs to go down, 2 good runs to recover. P1, warning: a confirmed outage emails (a text only if it persists). external: allowed to leave the host (GET only, nothing sent). optional: never seen up means 'skipped'."
+applies_to = ["public-maintenance"]
+file = "probes.toml"
+target = "@probe-group.public:probes[]"
+merge = "append"
+since = "2026-10-04"
+order = 2
+
+[rule.params]
+name = "public-maintenance"
+title = "Public hostname: maintenance site"
+target = "https://maintainer.ohmzhomelab.ca/"
+optional = true
+expect = { status = ["200-299", "300-399", 401, 403] }
+
 [[rule]]
 id = "probe.ct-fleet"
 title = "All containers are running and healthy"
@@ -3176,14 +3245,14 @@ kind = "probe"
 severity = "warn"
 principle = "classes of service P0-P3"
 why = "With about 70 containers one probe per container would be noise. The fleet probe judges every container's state and health in a single row and names the offenders."
-does = "Looks at every container in `docker ps -a`: any that is not running, or is unhealthy, or that was established (running at least 6 h) and vanished within the last 3 days (`docker rm`, compose down) makes it down, except names matching ^comfyui$, ^maintenance-web-test-\\d+$. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Pushes its result to the Kuma push monitor 'containers' (a no-op until kuma.toml holds a token)."
+does = "Looks at every container in `docker ps -a`: any that is not running, or is unhealthy, or that was established (running at least 6 h) and vanished within the last 3 days (`docker rm`, compose down) makes it down, except names matching ^comfyui$. Every 2 minutes; 2 bad runs to go down, 2 good runs to recover. P2, warning: a confirmed outage emails (a text only if it persists). Pushes its result to the Kuma push monitor 'containers' (a no-op until kuma.toml holds a token)."
 applies_to = ["ct-fleet"]
 file = "probes.toml"
 target = "probe[]"
 merge = "append"
 since = "2026-10-03"
 order = 1
-owner_notes = "comfyui (stopped by design) and the throw-away maintenance-web-test-N containers are excluded. A container that vanishes (docker rm, compose down) leaves no stopped corpse, so established ones are remembered and reported 'missing' for 3 days; `probes forget NAME` ends it."
+owner_notes = "comfyui (stopped by design) is the only exclusion. A container that vanishes (docker rm, compose down) leaves no stopped corpse, so established ones are remembered and reported 'missing' for 3 days; `probes forget NAME` ends it."
 
 [rule.params]
 name = "ct-fleet"
@@ -3194,7 +3263,7 @@ class = "P2"
 group = "Containers"
 interval_s = 120
 tags = ["containers"]
-expect = { except = ["^comfyui$", '^maintenance-web-test-\d+$', "^maintenance-web$"] }
+expect = { except = ["^comfyui$"] }
 kuma_push_key = "containers"
 
 [[rule]]

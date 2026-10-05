@@ -34,7 +34,7 @@ breaker_s = 300                  # the transport itself failed (nothing reported
                                  # costs one timeout per window instead of one per pending message; callers get skipped = "breaker" and retry later
 
 [site]
-url = "https://maintenance.ohmzhomelab.ca"           # links appear in email only, never in SMS (the carrier drops them)
+url = "https://maintainer.ohmzhomelab.ca"            # links appear in email only, never in SMS (the carrier drops them)
 host_label = ""                  # empty = this machine's hostname
 sms_prefix = "homelab"
 subject_prefix = "[homelab] "
@@ -153,7 +153,7 @@ notices_max = 20                 # expiry notices (ack_expired) kept on their ow
 # acknowledge "this error", not "at this size"; only a worse SEVERITY re-alerts). To opt a number-blind task in on purpose: allow_tasks.
 [ack]
 enabled = true                   # false: no button and nothing is ever held (a kill switch that can only make alerts MORE frequent)
-button = "auto"                  # "auto": the button/link appears once STATE_DIR/ack/web_ready exists (the site serves /ack: ack_web's deploy creates it);
+button = "auto"                  # "auto": the button/link appears once STATE_DIR/ack/web_ready exists (the hub serves /ack, so its deploy creates it);
                                  # true: always; false: never. Until then an email carries only the "Issue ID" line (and `homelab-maint ack add <id>` works)
 base_url = "https://maintainer.ohmzhomelab.ca"      # the link is <base_url>/ack?...; empty = [site] url
 token_ttl_days = 30              # how long a link in an email works (single use)

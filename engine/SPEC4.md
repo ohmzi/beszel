@@ -51,7 +51,7 @@ Existing umbrella pieces: core.Notifier (state-change alerts: debounce, reminder
   crit = sms+email; recovery = sms short + email; maintenance = email only (+ sms when `facts.significant`); digest = email only).
 - Delivery goes ONLY through the existing Hermes transports: call the Hermes code as user ohmz exactly like `backup-notify-hermes.py` does (reuse that script's calling convention or import `alert_transports` under runuser; do not copy credentials). Provide
   `render_email_html(event)` in the Ohmz Cloud palette consistent with `backup_report_html.py` (read it, import its palette/helpers when possible; fall back to plain text if rendering fails: an unreadable report beats none) with templates for each kind: header band with host + status colour,
-  headline, summary, facts table, "what was done" list, "what to do" (playbook text for alerts), footer with a link line to https://maintenance.ohmzhomelab.ca (plain text only in SMS; links allowed in email).
+  headline, summary, facts table, "what was done" list, "what to do" (playbook text for alerts), footer with a link line to https://maintainer.ohmzhomelab.ca (plain text only in SMS; links allowed in email).
 - SMS builder: ASCII fold, one segment <= 130 chars, no URLs; prefix like `homelab: CRIT disk / 4% free`.
 - Delivery log `STATE_DIR/notifications.jsonl` (`{"ts","kind","severity","title","channels":["sms","email"],"ok":bool,"note":short,"dedupe_key"}` no bodies, no addresses/phones) and `export() -> dict` for the website (`notifications.json`: last 100 + counts 24h/7d + failure count).
 - Replace `core.Notifier._send` with `notify.send` via a small adapter (glue: lead edits core): the debounce state machine stays in core; delivery, templates, budgets and logging live here.

@@ -6,7 +6,10 @@ glue lives now, what was left out on purpose and what is still open. Pass 2 (dec
 pipeline self-health) and the cleaners-v2 / website-v2 glue into the code and landed the packaging side (`install.sh`, `systemd/`, `etc/*.toml`, `homelab_maint/data/playbooks.toml`);
 the pass-2 verification fixes are decisions 34-40. Pass 3 (decisions 41-47) closed the runner-side glue the website lane left open (first-run login
 handlers, `ack/` modes, the e-mail button switch, one ack policy, explicit issue keys, `web bootstrap`) and ends with the **first install runbook**. The final pass (decisions 48-51) closed what the last verification found: the first-hour registry warning, the un-acknowledge dedupe, a browser-test freeze and a stale probe assertion.
-The website (`web/`) is another lane; its open items are listed below.
+The old website lane (the `web/` app and its `maintenance-web` Docker container) was retired and replaced by the OhmzMaintainer
+beszel hub (`beszel-hub.service`, `127.0.0.1:8088`, `https://maintainer.ohmzhomelab.ca`); the `web/`, container and
+`--deploy-web` details kept in the pass-1..3 decisions below are a historical record, and the current first-install steps are the
+runbook at the bottom.
 
 ## Decisions (one line of reason each)
 
@@ -265,38 +268,28 @@ Run on the host, in this checkout, in this order. Nothing here turns a cleaner o
    homelab-maint doctor                       # on a fresh host the sampler, live monitor and tick show FAIL for up to a minute: run it again
    homelab-maint run --tier check && homelab-maint status        # the first check run takes about 22 s; `rules_registry` reads "in sync"
    ```
-4. **Deploy the website** (docker compose with BOTH `-f` files; the container listens on 127.0.0.1:8098 only). `--no-web-ready` keeps the e-mail Acknowledge button off until step 7, because the link in a mail points at the public hostname, which does not exist yet.
+4. **Deploy the dashboard** (the OhmzMaintainer beszel hub + agent; `../../supplemental/systemd/README.md` builds and runs them as `beszel-hub.service` and `beszel-agent.service`, listening on `127.0.0.1:8088` only). The agent (root) mounts `/var/lib/homelab-maint/public/` read-only and writes signed acknowledge requests into `ack/inbox`. Keep the e-mail Acknowledge button off until step 7 by leaving `ack/web_ready` absent: the link in a mail points at the public hostname, which does not exist yet.
    ```
-   sudo ./install.sh --deploy-web --no-web-ready
-   docker ps --filter name=maintenance-web    # STATUS ... (healthy) after about 30 s; it is only healthy while the runner has published in the last 45 min (step 3's check run did)
-   curl -s http://127.0.0.1:8098/healthz      # "warnings" lists what is still to do (setup not complete, nothing in front of the login)
+   # follow ../../supplemental/systemd/README.md to build and start both units
+   systemctl is-active beszel-hub.service beszel-agent.service
+   curl -s http://127.0.0.1:8088/api/health   # {"message":"API is healthy.","code":200,"data":{}}
    ```
-5. **Bootstrap the website login** while the site is reachable only from this host. The command prints the first-run secret once, on this terminal, and never logs it.
-   ```
-   sudo homelab-maint web bootstrap
-   ```
-   Open `http://127.0.0.1:8098/` in a browser on this host (from another machine: `ssh -L 8098:127.0.0.1:8098 ohmz@<host>`, then the same URL), choose a passphrase (an authenticator app and recovery codes are optional) and paste the secret. The runner's one-minute tick answers; the screen says when it is done.
-   If the browser refuses the site's cookies on plain http, or the runner does not answer within 4 minutes: `sudo python3 web/tools/set-ack-passphrase.py` sets the passphrase from this terminal without a browser. Check: `homelab-maint doctor` shows "website login set up and readable by the site (ack/auth.json)" ok.
-6. **Cloudflare: hostname and Access policy** (dashboard steps with every field in `web/README.md`, "Cloudflare: public hostname and Access policy"). Zero Trust > Networks > Tunnels > your tunnel > Public Hostname: `maintenance.ohmzhomelab.ca`, type HTTP, URL `localhost:8098`, Host header empty. Access > Applications > Self-hosted for the same hostname with an Allow policy for your address(es) and no Bypass.
-   Then tell the app Access is in front (it only silences the `/healthz` hint) and recreate the container:
-   ```
-   grep -qs '^OUTER_AUTH=' web/.env || echo 'OUTER_AUTH=access' >> web/.env
-   sudo ./install.sh --deploy-web --no-web-ready
-   ```
-   In a private browser window `https://maintenance.ohmzhomelab.ca` must show the Access login first, then the dashboard (the owner login of step 5 is a second lock for acknowledge actions only).
-7. **Turn the e-mail Acknowledge button on.** `install.sh --deploy-web` without `--no-web-ready` does this by itself once docker says the container is healthy; after step 6 do it by hand:
+5. **Site login.** The old first-run website login (the bootstrap secret, the chosen passphrase and `web/tools/set-ack-passphrase.py`) is retired with the `maintenance-web` container; the hub has its own account system (set it up per `../../supplemental/systemd/README.md`). Nothing on the engine side needs bootstrapping: the e-mail acknowledge link needs no login, its one-time token is the capability.
+6. **Cloudflare: hostname and Access policy.** Zero Trust > Networks > Tunnels > your tunnel > Public Hostname: `maintainer.ohmzhomelab.ca`, type HTTP, URL `localhost:8088`, Host header empty. Access > Applications > Self-hosted for the same hostname with an Allow policy for your address(es) and no Bypass.
+   In a private browser window `https://maintainer.ohmzhomelab.ca` must show the Access login first, then the dashboard.
+7. **Turn the e-mail Acknowledge button on.** The dashboard's deploy creates `ack/web_ready` once the site answers; after step 6 do it by hand:
    ```
    sudo touch /var/lib/homelab-maint/ack/web_ready
    ```
 8. **Verify.**
    ```
-   curl -s http://127.0.0.1:8098/healthz                    # "warnings": []
-   homelab-maint doctor                                      # the two website rows ok; read any remaining FAIL
-   homelab-maint self-health                                 # the pipeline: runner -> publish -> website
+   curl -s http://127.0.0.1:8088/api/health                 # {"message":"API is healthy.","code":200,"data":{}}
+   homelab-maint doctor                                      # the website rows ok; read any remaining FAIL
+   homelab-maint self-health                                 # the pipeline: runner -> publish -> site
    sudo homelab-maint notify-test --dry-run alert.warn       # renders and routes a TEST mail, sends nothing
    ```
    Optional drill, only if something is failing right now: `homelab-maint ack explain TASK` prints its id, then `homelab-maint ack add ID --days 1 --note drill`, `homelab-maint ack list`, `homelab-maint ack remove ID`.
-   Roll back with `sudo ./uninstall.sh` (keeps config, state and logs; `--purge --yes` deletes them and removes the container).
+   Roll back with `sudo ./uninstall.sh` (keeps config, state and logs; `--purge --yes` deletes them).
 
 ## Verification
 

@@ -1,10 +1,13 @@
 [Unit]
-Description=Run the homelab-maint check tier every 15 minutes
+Description=Run the homelab-maint check tier every 5 minutes
 
 [Timer]
-# One early run after boot so the dashboard has data before the first quarter hour.
+# One early run after boot so the dashboard has data before the first five minutes.
 OnBootSec=3min
-OnCalendar=*:0/15
+# Every 5 minutes since 2026-10-04 (was *:0/15): a board wants current health, and status.json is only as fresh as
+# the run that wrote it. Cost: a check run takes 15-20 s, so this is ~6% duty instead of ~2%, and anything the
+# tier's cadence implies moves with it -- alert_confirm_runs = 2 pages after 10 min instead of 30.
+OnCalendar=*:0/5
 RandomizedDelaySec=60
 AccuracySec=10s
 

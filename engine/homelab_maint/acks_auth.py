@@ -26,9 +26,9 @@ with ack/web.key are already checked when a handler runs):
     "kind":"auth_setup|auth_change","at":ts}}} (0644, newest 20): the website shows the outcome of a setup attempt to the person who made it.
   auth.json {"v":1,"updated_at":ts,"pw":{...as above},"totp":{"secret","digits":6,"period":30}|absent,"recovery":["<32 hex>",...]}  (0640 root:<web gid>)
 
-WHICH GROUP. The container runs as uid/gid 10001 with no supplementary groups, so auth.json must be group-readable by THAT gid. web_gid() asks
-the files already shared with the website: $HM_WEB_GID, else the group of ack/web.key, else of ack/inbox (ignoring root), else 10001. The write
-verifies the result: a chgrp that was refused is reported (unreadable), never a silent success nobody can log in after.
+WHICH GROUP. The dashboard's ack-side reader runs as uid/gid 10001 with no supplementary groups, so auth.json must be group-readable by THAT gid.
+web_gid() asks the files already shared with it: $HM_WEB_GID, else the group of ack/web.key, else of ack/inbox (ignoring root), else 10001. The
+write verifies the result: a chgrp that was refused is reported (unreadable), never a silent success nobody can log in after.
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class Unreadable(OSError):
 
 # --------------------------------------------------------------------------- the website's group
 def detect_web_gid(ack_dir, env=None, stat=os.lstat) -> int | None:
-    """The gid the website container reads files as, from what is already shared with it, or None when nothing says."""
+    """The gid the dashboard reads ack files as, from what is already shared with it, or None when nothing says."""
     env = os.environ if env is None else env
     raw = (env.get("HM_WEB_GID") or "").strip()
     if raw.isdigit() and int(raw) > 0:

@@ -71,6 +71,9 @@ collector can read the published state. `maintenance-web` is retired only at the
 - **Deploy** — `supplemental/systemd/` runs the built hub and agent as services; the agent runs as
   root to read the published state and write the inbox.
 
-Remaining for a full cut-over: the acknowledge *e-mail link* page (`/ack`) still lives on the old
-`maintenance-web` container, and the public hostname still points at it. Retire that container only
-after `/ack` (or an equivalent) is served here, or keep it solely for the e-mail links.
+Remaining for a full cut-over: none. The `/ack` acknowledge page is now served by the hub
+(`beszel-hub.service`, `127.0.0.1:8088`) and the public hostname
+`https://maintainer.ohmzhomelab.ca` points at it, so the old `maintenance-web` container is retired
+(nothing listens on 8098 and the `web/` directory is gone). Beszel's own account system covers the
+logged-in surfaces; the e-mail acknowledge link still needs no login (its one-time token is the
+capability).

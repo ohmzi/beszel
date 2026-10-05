@@ -4,6 +4,10 @@ Builds on SPEC.md (runner contract, rules) and SPEC2.md (public export, 7-day ri
 NEVER mutate the live system while developing (no installs, no systemctl changes, nothing under /etc,/usr,/var/lib,/var/log, no touching existing containers);
 write only your owned files; list glue edits (cli.py, server.py, install.sh, etc/*.toml, publish.py) under `glue`. No secrets in any public file.
 
+> **Retired: the `web/` front-end described in this SPEC no longer exists.** It was replaced by the OhmzMaintainer beszel hub
+> (`beszel-hub.service`, `127.0.0.1:8088`, `https://maintainer.ohmzhomelab.ca`); the route list below (`web/app.py`, the website's
+> `/healthz`) is kept as a historical design record. The engine surfaces it describes now render through the hub.
+
 ## 0. Principles (from the research on how operators manage load without hurting users) and how each lands on this ONE host
 1. **Detect by saturation and stall, never by size.** A big process is not a problem; a stalled one is. Signals: memory/io/cpu PSI (some/full), swap-in rate, MemAvailable,
    queue depth of the app, no-progress (cpu/io/network/GPU flat) AND growth. (Google SRE golden signals/USE, Meta oomd/PSI.)

@@ -528,7 +528,7 @@ def test_doctor_flags_an_ack_policy_that_differs_between_the_pager_and_the_dashb
     assert "[ok] ack policy equal in ack.toml and notify.toml" in capsys.readouterr().out
 
 
-def doctor_out(w, monkeypatch, capsys, healthz=None, ack=None):
+def doctor_out(w, monkeypatch, capsys, healthz=None):
     """Run cmd_doctor in the tiny world with the pipeline row stubbed; `healthz` = (status, body dict) of the website or None (nothing listens)."""
     from homelab_maint import routine
     from homelab_maint.tasks import self_health
@@ -537,64 +537,32 @@ def doctor_out(w, monkeypatch, capsys, healthz=None, ack=None):
     asked = []
     if healthz is not None:
         monkeypatch.setattr(self_health, "http_get", lambda host, port, path, timeout: asked.append((host, port, path)) or (healthz[0], json.dumps(healthz[1]).encode(), "", 3))
-    if ack:
-        (w.state / "ack").mkdir(exist_ok=True)
-        for name, text in ack.items():
-            (w.state / "ack" / name).write_text(text)
     cli.cmd_doctor(ns())
     return capsys.readouterr().out, asked
 
 
-WEB_ROWS = ("website /healthz (when deployed) has no warnings", "website login set up and readable by the site (ack/auth.json)")
+WEB_ROW = "website answers on its loopback health endpoint (when deployed)"
 
 
 def test_doctor_does_not_mind_a_website_that_is_not_deployed(w, monkeypatch, capsys):
     out, _ = doctor_out(w, monkeypatch, capsys)
-    for row in WEB_ROWS:
-        assert f"[ok] {row}" in out, row
+    assert f"[ok] {WEB_ROW}" in out
 
 
-def test_doctor_repeats_the_warnings_of_the_websites_healthz_when_it_is_deployed(w, monkeypatch, capsys):
-    warns = ["ack: first-run setup is not complete (open the site)", "ack: nothing in front of the owner login (set BASIC_AUTH_FILE)", "x3", "x4"]
-    out, asked = doctor_out(w, monkeypatch, capsys, healthz=(200, {"ok": True, "reason": "", "warnings": warns}))
-    assert asked == [("127.0.0.1", 8098, "/healthz")]                                        # loopback only, GET /healthz and nothing else
-    assert "[FAIL] website /healthz (when deployed) has no warnings  (ack: first-run setup is not complete (open the site); ack: nothing in front" in out and "(+1 more)" in out
-    ok, _ = doctor_out(w, monkeypatch, capsys, healthz=(200, {"ok": True, "warnings": []}))
-    assert "[ok] website /healthz (when deployed) has no warnings" in ok
-    stale, _ = doctor_out(w, monkeypatch, capsys, healthz=(503, {"ok": False, "reason": "overview.json is stale", "warnings": []}))
-    assert "[FAIL] website /healthz (when deployed) has no warnings  (/healthz answered HTTP 503: overview.json is stale" in stale
+def test_doctor_asks_the_sites_health_endpoint_on_its_loopback_port(w, monkeypatch, capsys):
+    out, asked = doctor_out(w, monkeypatch, capsys, healthz=(200, {"message": "API is healthy."}))
+    assert asked == [("127.0.0.1", 8088, "/api/health")]                                     # loopback only, GET /api/health and nothing else
+    assert f"[ok] {WEB_ROW}" in out
+    bad, _ = doctor_out(w, monkeypatch, capsys, healthz=(503, {"reason": "database is locked"}))
+    assert f"[FAIL] {WEB_ROW}  (/api/health answered HTTP 503: database is locked" in bad
 
 
 def test_doctor_asks_the_port_the_self_health_task_is_configured_for(w, monkeypatch, capsys):
-    (w.conf / "maint.toml").write_text("[global]\nnotify_handle = 'x'\n[tasks.self_health]\nweb_port = 9099\n")
-    _out, asked = doctor_out(w, monkeypatch, capsys, healthz=(200, {"warnings": []}))
-    assert asked == [("127.0.0.1", 9099, "/healthz")]
+    (w.conf / "maint.toml").write_text("[global]\nnotify_handle = \'x\'\n[tasks.self_health]\nweb_port = 9099\n")
+    _out, asked = doctor_out(w, monkeypatch, capsys, healthz=(200, {}))
+    assert asked == [("127.0.0.1", 9099, "/api/health")]
 
 
-def test_doctor_says_what_to_do_about_the_login_only_once_the_site_is_up(w, monkeypatch, capsys):
-    out, _ = doctor_out(w, monkeypatch, capsys, ack={"web.key": "k" * 64})                    # ack/ exists, no auth.json, no site: first install, nothing to do yet
-    assert "[ok] website login set up" in out
-    out, _ = doctor_out(w, monkeypatch, capsys, healthz=(200, {"warnings": []}), ack={})
-    assert "[FAIL] website login set up and readable by the site (ack/auth.json)  (first-run setup pending: sudo homelab-maint web bootstrap" in out
-    good = {"v": 1, "pw": {"alg": "pbkdf2-sha256", "iter": 600000, "salt": "ab" * 16, "hash": "cd" * 32}}
-    (w.state / "ack" / "auth.json").write_text(json.dumps(good))
-    os.chmod(w.state / "ack" / "auth.json", 0o644)
-    out, _ = doctor_out(w, monkeypatch, capsys, healthz=(200, {"warnings": []}))
-    assert "[ok] website login set up" in out
-    os.chmod(w.state / "ack" / "auth.json", 0o600)                                           # the site's group could not read it
-    out, _ = doctor_out(w, monkeypatch, capsys)
-    assert "[FAIL] website login set up" in out and "unreadable" in out and str(w.state / "ack" / "auth.json") in out
-    assert f"sudo chgrp {os.getgid()} " in out                                               # the site's gid is the one web.key has (here: this user's group)
-    (w.state / "ack" / "auth.json").write_text("{}")
-    os.chmod(w.state / "ack" / "auth.json", 0o644)
-    out, _ = doctor_out(w, monkeypatch, capsys)
-    assert "[FAIL] website login set up" in out and "unusable" in out and "web bootstrap" in out
-
-
-def test_doctor_without_the_ack_postbox_has_nothing_to_say_about_the_login(w, monkeypatch, capsys):
-    assert not (w.state / "ack").exists()
-    out, _ = doctor_out(w, monkeypatch, capsys, healthz=(200, {"warnings": []}))
-    assert "[ok] website login set up" in out
 
 
 # =========================================================================== core.Notifier -> notify adapter
@@ -659,6 +627,27 @@ def test_server_answers_the_metric_and_monitor_routes_with_200_json_even_with_no
         assert d["error"]
     if route == "heartbeat":
         assert "ok" in d and "total" in d
+
+
+def test_server_serves_the_monitoring_pipeline_with_the_parts_that_are_not_healthy(server, w, monkeypatch):
+    """/pipeline carries the verdict AND the rows: a board can name the broken stage, not only that something is wrong."""
+    from homelab_maint import server as srv
+    monkeypatch.setattr(srv, "STATE_DIR", w.state)          # the module bound it at import time
+    doc = {"schema": 1, "generated_at": NOW, "level": "degraded",
+           "verdict": {"level": "degraded", "reasons": ["runner stopped 12 min ago"], "since": NOW - 720},
+           "checks": [{"id": "runner", "title": "Runner (check tier)", "state": "degraded", "detail": "stale"},
+                      {"id": "tick", "title": "Scheduler tick", "state": "ok", "detail": "fine"},
+                      {"id": "kuma", "title": "Kuma heartbeat", "state": "info", "detail": "not configured"},
+                      {"id": "live", "title": "Live monitor", "state": "down", "detail": "stopped"}]}
+    (w.state / "public").mkdir(parents=True, exist_ok=True)
+    (w.state / "public" / "self.json").write_text(json.dumps(doc))
+
+    code, body = get(server, "/pipeline")
+    d = json.loads(body)
+    assert code == 200 and d["level"] == "degraded"
+    assert [u["id"] for u in d["unhealthy"]] == ["runner", "live"]      # ok and info are not unhealthy
+    assert d["unhealthy"][0]["title"] == "Runner (check tier)"          # the board prints the maintainer's own title
+    assert d["headline"].startswith("Monitoring pipeline: degraded")
 
 
 def test_server_routes_are_get_only_and_unknown_paths_404(server):

@@ -167,7 +167,7 @@ alert_mode = "task"              # "task": the check tier pages on the task leve
 # budget_s, workers, force: see homelab_maint/tasks/monitors.py
 
 [tasks.self_health]              # the monitoring pipeline itself: runner -> publish -> website, tick, live, ring, registry, ack inbox, website, Kuma
-# every key optional (homelab_maint/tasks/self_health.py): check_interval_s = 900, web_port = 8098, web_container = "maintenance-web",
+# every key optional (homelab_maint/tasks/self_health.py): check_interval_s = 900, web_port = 8088, web_path = "/api/health", web_service = "beszel-hub.service",
 # web_check = true, kuma_keys = ["tier-check", "umbrella-probes"], kuma_required = false, registry_check_generated = true,
 # refresh_s = 60, stale_factor = 3, stale_down_factor = 10, outbox_warn_s, breaker_fail_n, kuma_fail_n
 # public/self.json is rewritten every minute by homelab-maint-selfhealth.timer (NOT the tick: it is the dead-man of the tick)
@@ -346,12 +346,18 @@ mode = "report"
 retention_days = 7
 unprotect = ["^/volume1/docker/comfyui/output/owui_"]
 
-# ---- ports of legacy scripts that run in the CHECK tier (every 15 min). Report-only here; the legacy timers keep doing the real work
-# until `homelab-maint migrate cutover ITEM` retires them (docs/MIGRATION.md: the cutover refuses unless the mode is "apply").
-[tasks.comfyui_idle_reclaim]     # port of comfyui-idle-vram.sh: restart ComfyUI when idle and holding VRAM (two strikes, 15-30 min here)
-mode = "report"
-unprotect = ["^comfyui$"]        # protected.toml names comfyui; this exempts the restart for THIS task only
-# threshold_mb = 3000, strikes = 2, strike_ttl_min = 45, min_gap_min = 30, match_cgroup = true, queue_url (default: protected.toml [busy])
+# ---- ports of legacy scripts that run in the CHECK tier (every 15 min). Report-only until the cutover is earned
+# (`homelab-maint migrate cutover ITEM`, docs/MIGRATION.md: it refuses unless the mode is "apply" AND the task has 8 green
+# runs over 48 h). comfyui_idle_reclaim was flipped to "apply" on 2026-10-04 and soaks towards that cutover; the legacy
+# 5-minute timer still does the real work until then, so both would act — harmless, the task's min_gap_min of 30 stops
+# either from thrashing. Keep this table in step with rules.d/30-cleanup.toml (the registry compiles the same values).
+[tasks.comfyui_idle_reclaim]     # Ohmz rule: stop ComfyUI after 15 min idle (or, with stop_idle_min = 0, restart it when idle yet holding VRAM/RAM)
+mode = "apply"                   # flipped 2026-10-04
+schedule = "*/5 * * * *"         # its own cadence; the idle clock is measured in wall time, the schedule just polls it
+unprotect = ["^comfyui$"]        # protected.toml names comfyui; this exempts the stop/restart for THIS task only
+stop_idle_min = 15               # an empty queue for 15 min in a row => `docker stop comfyui`, whatever it holds. 0 = off (the legacy VRAM/RAM restart path below)
+ram_threshold_mb = 4000          # only used when stop_idle_min = 0 (PARITY difference 7): also restart when a model is held in system RAM. 0 = the legacy VRAM-only signal
+# threshold_mb = 3000, strikes = 2, strike_ttl_min = 45, strike_min_gap_min = 4, min_gap_min = 30, match_cgroup = true, queue_url (default: protected.toml [busy])
 
 [tasks.immich_recycle]           # port of immich-server-recycle.service: `docker restart immich_server`, gated like the drop-in
 mode = "report"

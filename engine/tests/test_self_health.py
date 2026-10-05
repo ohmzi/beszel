@@ -29,25 +29,23 @@ H = 3600.0
 
 # --------------------------------------------------------------------------- scripted host
 class FakeSh:
-    """`systemctl is-active docker.service` and `docker inspect`; every other command is 'not found'."""
+    """`systemctl is-active <unit>`: the exit code follows systemd's (0 active, 3 inactive/failed, 4 = no such unit, which is-active
+    prints as "inactive"). Every other command is 'not found'."""
 
     def __init__(self):
         self.calls: list[list[str]] = []
-        self.active = "active"
-        started = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(NOW - 3600)) + ".123456789Z"
-        self.inspect = (f"running|healthy|{started}|0|0", 0, "")
+        self.active = "active"                                     # beszel-hub.service, by default running
 
     def __call__(self, cmd, timeout=60, **kw):
         self.calls.append(list(cmd))
         if cmd[:2] == ["systemctl", "is-active"]:
-            return subprocess.CompletedProcess(cmd, 0 if self.active == "active" else 3, self.active + "\n", "")
-        if cmd[:2] == ["docker", "inspect"]:
-            out, rc, err = self.inspect
-            return subprocess.CompletedProcess(cmd, rc, out, err)
+            rc = 4 if self.active == "unknown" else 0 if self.active == "active" else 3
+            out = "inactive" if self.active == "unknown" else self.active
+            return subprocess.CompletedProcess(cmd, rc, out + "\n", "")
         return subprocess.CompletedProcess(cmd, 127, "", "not found")
 
-    def docker_calls(self):
-        return [c for c in self.calls if c[:1] == ["docker"]]
+    def service_calls(self):
+        return [c for c in self.calls if c[:2] == ["systemctl", "is-active"]]
 
 
 def closed_port() -> int:
@@ -59,7 +57,7 @@ def closed_port() -> int:
 
 
 class Web:
-    """A fake maintenance-web on 127.0.0.1: answers GET /healthz with whatever .code/.body/.delay say."""
+    """A fake dashboard on 127.0.0.1: answers GET /api/health with whatever .code/.body/.delay say."""
 
     def __init__(self):
         outer = self
@@ -105,15 +103,7 @@ class World:
         self.units.mkdir()
         mp.setattr(sh_mod, "UNIT_DIR", self.units)
         self.opts = {"web_port": web.port}
-        mp.setitem(sh_mod.DEFAULTS, "web_port", web.port)           # export() reads maint.toml options: never reach for the real :8098
-        # fake /proc + docker pidfile: dockerd is alive
-        proc = tmp / "proc" / "4242"
-        proc.mkdir(parents=True)
-        (proc / "comm").write_text("dockerd\n")
-        (tmp / "docker.pid").write_text("4242\n")
-        mp.setattr(sh_mod, "PROC", tmp / "proc")
-        mp.setattr(sh_mod, "DOCKER_PIDFILE", tmp / "docker.pid")
-        mp.setattr(sh_mod, "DOCKER_PROCS", tmp / "nope-cgroup-procs")
+        mp.setitem(sh_mod.DEFAULTS, "web_port", web.port)           # export() reads maint.toml options: never reach for the real :8088
         mp.setattr(sh_mod, "sh", self.fake)
         self.build()
 
@@ -751,18 +741,16 @@ def test_inbox_absent_then_gone(w):
     assert row(w.assess(state=st), "acks")["state"] == "degraded"
 
 
-# =========================================================================== website: container + /healthz
+# =========================================================================== website: /api/health + beszel-hub.service
 def test_website_healthy(w):
     r = row(w.assess(), "website")
-    assert r["state"] == "ok" and "200" in r["detail"] and "running (healthy)" in r["detail"]
-    assert w.web.paths == ["/healthz"] and w.fake.docker_calls()[0][:2] == ["docker", "inspect"]
+    assert r["state"] == "ok" and "200" in r["detail"] and "beszel-hub.service active" in r["detail"]
+    assert w.web.paths == ["/api/health"] and w.fake.service_calls()[-1][-1] == "beszel-hub.service"
 
 
-def test_website_inspect_asks_only_for_the_state_fields(w):
-    w.assess()
-    cmd = w.fake.docker_calls()[0]
-    fmt = cmd[cmd.index("--format") + 1]
-    assert cmd[-1] == "maintenance-web" and ".Config" not in fmt and "Env" not in fmt                 # no environment can come back
+def test_website_service_is_asked_as_one_argv_element_never_a_shell(w):
+    w.assess(web_service="bad name; rm -rf /")
+    assert w.fake.service_calls()[-1] == ["systemctl", "is-active", "beszel-hub.service"]     # a bad name falls back, never reaches a shell
 
 
 def test_website_says_it_is_unhealthy(w):
@@ -775,7 +763,7 @@ def test_website_says_it_is_unhealthy(w):
 
 def test_website_not_deployed_is_info_not_an_error(w):
     w.opts["web_port"] = closed_port()
-    w.fake.inspect = ("", 1, "Error: No such object: maintenance-web")
+    w.fake.active = "unknown"                                       # is-active prints "inactive" (rc 4) for a unit that does not exist
     rep = w.assess()
     r = row(rep, "website")
     assert r["state"] == "info" and "not deployed" in r["detail"] and rep["level"] == "ok" and rep["metrics"]["web"] == "not deployed"
@@ -785,77 +773,44 @@ def test_website_gone_after_it_was_seen(w):
     st: dict = {}
     assert row(w.assess(state=st), "website")["state"] == "ok"
     w.opts["web_port"] = closed_port()
-    w.fake.inspect = ("", 1, "Error: No such object: maintenance-web")
+    w.fake.active = "unknown"
     r = row(w.assess(state=st), "website")
     assert r["state"] == "degraded" and "disappeared" in r["reason"]
 
 
-def test_website_container_states_without_an_answer(w):
+def test_website_service_states_without_an_answer(w):
     w.opts["web_port"] = closed_port()
-    w.fake.inspect = ("exited|none|2023-11-14T20:00:00Z|2|137", 0, "")
+    w.fake.active = "failed"
+    assert "is failed" in row(w.assess(), "website")["reason"]
+    w.fake.active = "inactive"
+    assert "is inactive" in row(w.assess(), "website")["reason"]
+    w.fake.active = "activating"
     r = row(w.assess(), "website")
-    assert r["state"] == "degraded" and "exited" in r["reason"] and "137" in r["detail"]
-    w.fake.inspect = ("running|healthy|2023-11-14T20:00:00Z|0|0", 0, "")
+    assert r["state"] == "info" and "is starting" in r["detail"]
+
+
+def test_website_answering_while_the_unit_is_down_is_a_fault(w):
+    w.fake.active = "inactive"                                      # a stray server on the port: /api/health answers but the unit is not running
     r = row(w.assess(), "website")
-    assert r["state"] == "degraded" and "runs but /healthz does not answer (refused)" in r["reason"]
-    started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(NOW - 30))
-    w.fake.inspect = (f"running|starting|{started}|0|0", 0, "")
-    assert row(w.assess(), "website")["state"] == "info"                                           # still starting, not a fault yet
+    assert r["state"] == "degraded" and "website answers but beszel-hub.service is inactive" in r["reason"]
 
 
-def test_website_docker_unhealthy_and_crash_loop(w):
-    started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(NOW - 9000))
-    w.fake.inspect = (f"running|unhealthy|{started}|0|0", 0, "")
+def test_website_service_up_but_no_answer_is_a_fault(w):
+    w.opts["web_port"] = closed_port()
     r = row(w.assess(), "website")
-    assert r["state"] == "degraded" and "unhealthy" in r["reason"]
-    st: dict = {}
-    w.fake.inspect = (f"running|healthy|{started}|1|0", 0, "")
-    assert row(w.assess(state=st), "website")["state"] == "ok"
-    w.fake.inspect = (f"running|healthy|{started}|2|0", 0, "")                                      # +1 in 10 min: not a loop
-    assert row(w.assess(state=st, now=NOW + 600), "website")["state"] == "ok"
-    w.fake.inspect = (f"running|healthy|{started}|4|0", 0, "")                                      # +3 within the hour, spread over minutes
-    r = row(w.assess(state=st, now=NOW + 1200), "website")
-    assert r["state"] == "degraded" and "crash-looping" in r["reason"] and "3 times in the last hour" in r["detail"]
-    r = row(w.assess(state=st, now=NOW + 1200 + 7200), "website")                                   # two hours later and quiet: forgotten
-    assert r["state"] == "ok"
-    w.fake.inspect = (f"running|healthy|{started}|0|0", 0, "")                                      # recreated: the counter restarts at 0
-    assert row(w.assess(state=st, now=NOW + 1200 + 7300), "website")["state"] == "ok"
+    assert r["state"] == "degraded" and "website service runs but /api/health does not answer (refused)" in r["reason"]
 
 
-def test_website_never_touches_docker_while_dockerd_is_down(w, monkeypatch):
-    (w.tmp / "docker.pid").unlink()                                                                # no dockerd process: socket activation would START it
-    r = row(w.assess(), "website")
-    assert r["state"] == "ok"                                                                       # /healthz alone answers
-    assert w.fake.docker_calls() == [] and w.fake.calls == []                                       # not even systemctl
-
-
-def test_website_never_touches_docker_while_the_service_is_not_active(w):
-    w.fake.active = "deactivating"                                                                  # dockerd still alive but stopping
-    row(w.assess(), "website")
-    assert w.fake.docker_calls() == [] and w.fake.calls == [["systemctl", "is-active", "docker.service"]]
-
-
-def test_website_dockerd_found_through_the_service_cgroup(w):
-    (w.tmp / "docker.pid").write_text("999999\n")                                                    # stale pidfile: wrong comm
-    (w.tmp / "cg").write_text("1\n4242\n")
-    sh_mod.DOCKER_PROCS = w.tmp / "cg"
-    try:
-        w.assess()
-        assert w.fake.docker_calls()
-    finally:
-        sh_mod.DOCKER_PROCS = w.tmp / "nope-cgroup-procs"
-
-
-def test_website_unreachable_without_docker_after_it_was_seen(w):
+def test_website_unreachable_without_a_unit_after_it_was_seen(w):
     st: dict = {}
     w.assess(state=st)
     w.opts["web_port"] = closed_port()
-    (w.tmp / "docker.pid").unlink()
+    w.fake.active = "unknown"
     r = row(w.assess(state=st), "website")
-    assert r["state"] == "degraded" and "unreachable" in r["reason"]
+    assert r["state"] == "degraded" and "disappeared" in r["reason"]
 
 
-def test_website_hang_is_bounded_by_the_timeout_and_counts_as_deployed(w):
+def test_website_hang_is_bounded_by_the_timeout(w):
     w.web.delay = 1.2
     t0 = time.perf_counter()
     r = row(w.assess(web_timeout_s=0.3), "website")
@@ -871,15 +826,22 @@ def test_website_only_ever_talks_to_loopback_and_caps_the_timeout(w, monkeypatch
         return 200, b"{}", "", 1
     monkeypatch.setattr(sh_mod, "http_get", fake_get)
     w.assess(web_host="evil.example.com", web_timeout_s=60, web_port=8123)
-    assert seen == [("127.0.0.1", 8123, "/healthz", 3.0)]
+    assert seen == [("127.0.0.1", 8123, "/api/health", 3.0)]                                        # loopback only, the fixed path, the timeout capped
     seen.clear()
-    w.assess(web_host="localhost", web_container="bad name; rm -rf /")
-    assert seen[0][0] == "localhost" and w.fake.docker_calls()[-1][-1] == "maintenance-web"        # a bad container name falls back
+    w.assess(web_host="localhost")
+    assert seen[0][0] == "localhost" and seen[0][2] == "/api/health"
+
+
+def test_website_path_and_service_fall_back_when_malformed(w, monkeypatch):
+    seen = []
+    monkeypatch.setattr(sh_mod, "http_get", lambda host, port, path, timeout: seen.append((host, port, path)) or (200, b"{}", "", 1))
+    w.assess(web_path="not-a-path", web_service="a b")
+    assert seen == [("127.0.0.1", w.web.port, "/api/health")] and w.fake.service_calls()[-1][-1] == "beszel-hub.service"
 
 
 def test_website_check_can_be_switched_off(w):
     r = row(w.assess(web_check=False), "website")
-    assert r["state"] == "info" and w.web.paths == [] and w.fake.docker_calls() == []
+    assert r["state"] == "info" and w.web.paths == [] and w.fake.calls == []
 
 
 # =========================================================================== Kuma heartbeat config
