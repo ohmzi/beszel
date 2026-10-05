@@ -1226,13 +1226,13 @@ title = "Check-tier tasks that restart things wait out a freeze"
 kind = "safety"
 principle = "throttle before kill; classes of service P0-P3"
 why = "Some tasks run every 15 minutes and must be able to act at any hour (the spike ladder), but a restart of a service the family is using is not allowed during peak hours. The rule is enforced per task and per rung, so the protective rungs keep working while only the destructive ones wait."
-does = "disruptive = [immich_recycle, comfyui_idle_reclaim]: these check-tier tasks run report-only while the FREEZE file or a freeze window is active. frozen_rungs = [restart, emergency]: the spike ladder's destructive rungs go report-only in a freeze, while its reclaim and throttle rungs (which protect people) keep running. emergency_level = 4: at pressure level 4 or higher the freeze no longer holds the ladder."
+does = "disruptive = [immich_recycle]: this check-tier task runs report-only while the FREEZE file or a freeze window is active. comfyui_idle_reclaim is deliberately NOT disruptive: its queue has to be empty for 15 minutes before it acts, so stopping it frees the GPU and interrupts nobody -- and a rogue ComfyUI sitting idle is exactly what the owner wants killed at any hour. frozen_rungs = [restart, emergency]: the spike ladder's destructive rungs go report-only in a freeze, while its reclaim and throttle rungs (which protect people) keep running. emergency_level = 4: at pressure level 4 or higher the freeze no longer holds the ladder."
 file = "routine.toml"
 target = "continuous"
 since = "2026-10-03"
 
 [rule.params]
-disruptive = ["immich_recycle", "comfyui_idle_reclaim"]
+disruptive = ["immich_recycle"]
 frozen_rungs = ["restart", "emergency"]
 emergency_level = 4
 

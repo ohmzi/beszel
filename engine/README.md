@@ -171,7 +171,8 @@ For tests and image builds, `HM_ROOT=/some/dir ./install.sh` stages everything u
 
 `--apply` on the check, daily and weekly services only permits mutation. Whether a task actually mutates is decided per task by its
 `mode` in `maint.toml`, and `homelab-maint pause` or a freeze overrides both. On the check tier that means: the checks cannot
-mutate, `comfyui_idle_reclaim` and `immich_recycle` are `report`, and the one thing that acts is the spike ladder's reclaim rung.
+mutate, `immich_recycle` is `report`, and what acts is the spike ladder's reclaim rung plus `comfyui_idle_reclaim` (it stops an
+idle ComfyUI after 15 minutes and is deliberately exempt from the evening freeze, because freeing an idle GPU interrupts nobody).
 
 What the tick runs (`homelab-maint schedule` prints the whole list with next runs; `etc/jobs.toml` is where it is declared):
 
@@ -280,7 +281,8 @@ What ships on, and what each switch means:
 | `[tasks.pressure_response] mode` + `reclaim` | `apply` | unload idle Ollama models and free idle ComfyUI VRAM at memory or GPU pressure level 2 or more; budgeted, audited, non-destructive |
 | `pressure_response` `throttle` / `restart` / `emergency` | `report` | lower cpu-shares of batch containers / restart one proven-stuck container / stop containers from `classes.toml` `emergency_stop` |
 | `[tasks.qos_classes]`, `docker_cache`, `docker_images`, `apt_clean`, `snap_revisions`, `retention`, `trash`, `gradle_reaper`, `caps` | `report` | the daily cleaners |
-| `openwebui_media_prune`, `docker_containers_prune`, `comfyui_idle_reclaim`, `immich_recycle` | `report` | ports of legacy scripts; their cutovers refuse until the mode is `apply` (`docs/MIGRATION.md`) |
+| `[tasks.comfyui_idle_reclaim] mode` + `stop_idle_min` | `apply` | stop ComfyUI after 15 minutes with an empty queue, whatever it holds (`stop_idle_min = 0` restores the legacy VRAM/RAM restart); not held by the evening freeze |
+| `openwebui_media_prune`, `docker_containers_prune`, `immich_recycle` | `report` | ports of legacy scripts; their cutovers refuse until the mode is `apply` (`docs/MIGRATION.md`) |
 | `[tasks.routine_rotate]` | `report` | archive old audit, change and spike records (monthly) |
 
 Pressure thresholds, class assignments (P0 never touched ... P3 shed first), budgets and the `emergency_stop` list are in

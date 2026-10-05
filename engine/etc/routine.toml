@@ -44,11 +44,12 @@ relax_after = 1                   # canary runs that applied nothing because of 
 
 # Check-tier tasks run all day (the spike ladder must be able to act at any hour), but one that RESTARTS a user-facing service
 # waits out a freeze: report-only while the FREEZE file or a freeze window is active. [tasks.X] disruptive = true in maint.toml
-# adds a task. pressure_response is held rung by rung: only the rungs in frozen_rungs (its destructive ones, if they are set to
-# apply) go to report-only; its reclaim and throttle rungs protect people and keep running. At emergency_level and above
-# (a host-wide stall) the freeze no longer holds the ladder.
+# adds a task. comfyui_idle_reclaim is deliberately NOT here: it only acts after 15 minutes of an empty queue, so stopping it
+# frees the GPU and interrupts nobody. pressure_response is held rung by rung: only the rungs in frozen_rungs (its destructive
+# ones, if they are set to apply) go to report-only; its reclaim and throttle rungs protect people and keep running. At
+# emergency_level and above (a host-wide stall) the freeze no longer holds the ladder.
 [continuous]
-disruptive = ["immich_recycle", "comfyui_idle_reclaim"]
+disruptive = ["immich_recycle"]
 frozen_rungs = ["restart", "emergency"]
 emergency_level = 4
 

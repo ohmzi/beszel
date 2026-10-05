@@ -355,6 +355,7 @@ unprotect = ["^/volume1/docker/comfyui/output/owui_"]
 mode = "apply"                   # flipped 2026-10-04
 schedule = "*/5 * * * *"         # its own cadence; the idle clock is measured in wall time, the schedule just polls it
 unprotect = ["^comfyui$"]        # protected.toml names comfyui; this exempts the stop/restart for THIS task only
+disruptive = false               # an apply task-derived job is otherwise held out of the evening freeze; this stop interrupts nobody
 stop_idle_min = 15               # an empty queue for 15 min in a row => `docker stop comfyui`, whatever it holds. 0 = off (the legacy VRAM/RAM restart path below)
 ram_threshold_mb = 4000          # only used when stop_idle_min = 0 (PARITY difference 7): also restart when a model is held in system RAM. 0 = the legacy VRAM-only signal
 # threshold_mb = 3000, strikes = 2, strike_ttl_min = 45, strike_min_gap_min = 4, min_gap_min = 30, match_cgroup = true, queue_url (default: protected.toml [busy])

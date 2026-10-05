@@ -1986,9 +1986,12 @@ EVENING = at(2026, 10, 2, 20, 24)                    # the owner's movie night: 
 # ---- 1. the freeze holds check-tier tasks that restart a user-facing service --------------------------------------------
 def test_continuous_restart_tasks_wait_out_the_freeze(w):
     conts(w)
-    for name in ("immich_recycle", "comfyui_idle_reclaim"):
+    for name in ("immich_recycle",):
         d = begin(w, name, now=EVENING)[1]                                   # the evening freeze window
         assert d.run and not d.apply and not d.applying and d.reason == "freeze: report only (freeze window evenings)", name
+    # comfyui_idle_reclaim is NOT a restart task (it stops an idle container): it acts at any hour, like the ladder's reclaim
+    d = begin(w, "comfyui_idle_reclaim", now=EVENING)[1]
+    assert d.applying and d.apply and d.reason == "continuous task: not window-governed"
     (w.conf / "FREEZE").write_text("x")                                      # the owner's FREEZE file, any hour
     d = begin(w, "immich_recycle", now=FRI)[1]
     assert d.run and not d.applying and "FREEZE file present" in d.reason
@@ -2582,7 +2585,7 @@ def test_a_task_disabled_in_maint_toml_does_not_hold_the_closing_steps_up(w):
 def test_shipped_continuous_and_canary_settings_and_their_parsing(world):
     rc = routine.load_config(ROOT / "etc" / "routine.toml")
     assert rc.valid and rc.errors == []
-    assert rc.restart_tasks == ["immich_recycle", "comfyui_idle_reclaim"] == list(routine.RESTART_TASKS)
+    assert rc.restart_tasks == ["immich_recycle"] == list(routine.RESTART_TASKS)      # comfyui_idle_reclaim is NOT held by a freeze
     assert rc.frozen_rungs == ["restart", "emergency"] and rc.emergency_level == 4 and rc.canary_relax_after == 1
     assert rc.tick_unit == "homelab-maint-tick.timer"
     assert "freezes everything now" not in (ROOT / "etc" / "routine.toml").read_text()       # the comment no longer overpromises
@@ -2593,5 +2596,5 @@ def test_shipped_continuous_and_canary_settings_and_their_parsing(world):
     assert rc.tick_unit == "x.timer"
     world.routine_toml(MAIN)
     rc = routine.load_config()                                                                 # absent: the safe defaults
-    assert rc.restart_tasks == ["immich_recycle", "comfyui_idle_reclaim"] and rc.canary_relax_after == 1 and rc.emergency_level == 4
+    assert rc.restart_tasks == ["immich_recycle"] and rc.canary_relax_after == 1 and rc.emergency_level == 4
     assert routine.RoutineConfig(valid=False).restart_tasks == list(routine.RESTART_TASKS)    # a broken file still holds restarts

@@ -20,7 +20,8 @@ WHAT IT DECIDES (this module never touches the host itself: the runner executes,
     caps, dependencies); after() marks the state, writes the change log, runs the post-check and halts further changes of the
     occurrence if it regressed. Tasks of the check tier are CONTINUOUS: never window-governed and never throttled by the
     routine (the spike ladder must be able to act at any hour) with ONE exception, the freeze: a check-tier task that
-    RESTARTS a user-facing service (immich_recycle, comfyui_idle_reclaim, [continuous] disruptive) is held to report-only while
+    RESTARTS a user-facing service (immich_recycle, [continuous] disruptive -- comfyui_idle_reclaim was removed from this list
+    when it became a plain idle-killer: stopping a container whose queue has been empty for 15 minutes interrupts nobody) is held to report-only while
     a freeze is active, and the spike ladder's destructive rungs (restart, emergency) are too unless the pressure level is an
     emergency (>= [continuous] emergency_level); its reclaim and throttle rungs are protective and keep running. A task that
     no routine names is UNMANAGED: it runs, but a C1/C2 one is held to report-only.
@@ -110,8 +111,10 @@ CHANGE_KIND = {"caps": "config", "qos_classes": "config", "gradle_reaper": "main
                "snap_revisions": "maintenance", "stale_driver_packages": "maintenance", "apt_autoremove_unused": "maintenance",
                "flatpak_unused": "maintenance", "swap_auto_relief": "maintenance"}      # cleaners v2 (pkgs): package upkeep, not a cleanup of data; a swap relief moves pages, deletes nothing
 NA = "n/a"                                   # record_change(verified=NA): no post-change window exists (written as null)
-# check-tier tasks (continuous, never window-governed) whose apply RESTARTS a user-facing service: they wait out a freeze
-RESTART_TASKS = ("immich_recycle", "comfyui_idle_reclaim")
+# check-tier tasks (continuous, never window-governed) whose apply RESTARTS a user-facing service: they wait out a freeze.
+# comfyui_idle_reclaim is deliberately absent: it only stops a container whose queue has been empty for 15 minutes, which
+# interrupts nobody and should run at any hour (the same reason the spike ladder's reclaim rung is exempt).
+RESTART_TASKS = ("immich_recycle",)
 PRESSURE_TASK = "pressure_response"          # the spike ladder: only its destructive rungs wait out a freeze (see RunGuard)
 TICK_UNIT = "homelab-maint-tick.timer"       # the scheduler timer that runs the `routine-run` job (retries, monthly window)
 

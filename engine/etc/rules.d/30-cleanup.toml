@@ -752,7 +752,9 @@ why = """\
   the container is STOPPED, whatever it still holds. It is not restarted - the owner starts it again when \
   they want it, so a wrong call costs one `docker start`, never lost work."""
 does = """\
-  Its own schedule (schedule = "*/5 * * * *"), at any hour (an evening freeze holds it to report-only). \
+  Its own schedule (schedule = "*/5 * * * *"), at any hour: it sets disruptive = false (an apply-mode task-derived job is \
+  otherwise treated as disruptive and held out of the evening freeze window), because freeing an idle GPU interrupts \
+  nobody. PAUSE and the protected list still stop it. \
   stop_idle_min (15) is the whole rule: when the comfyui container is running, it asks ComfyUI's queue \
   (http://127.0.0.1:8188/queue) every run; an empty queue keeps an idle clock running, and any job, or an \
   unreadable queue, resets it. After 15 minutes continuously idle it asks the queue once more (a job may have \
@@ -763,7 +765,7 @@ does = """\
 applies_to = ["comfyui_idle_reclaim"]
 file = "maint.toml"
 target = "tasks.comfyui_idle_reclaim"
-params = { unprotect = ["^comfyui$"], stop_idle_min = 15, ram_threshold_mb = 4000, schedule = "*/5 * * * *" }
+params = { unprotect = ["^comfyui$"], stop_idle_min = 15, ram_threshold_mb = 4000, schedule = "*/5 * * * *", disruptive = false }
 mode = "apply"
 severity = "warn"
 destructive = true
@@ -773,8 +775,8 @@ proof = """\
   in the meantime cancels it. A stopped container is never started, and a container that is not running \
   resets the clock. The idle clock and the strike counters are kept in separate lanes for apply and report \
   runs, so a report-mode run can never trip the stop that an apply run performs. 'comfyui' is protected, so \
-  the task has an unprotect for ^comfyui$ (baseline allow-listed). A freeze (evenings 18:00-23:30 or the \
-  FREEZE file) holds it to report-only and PAUSE stops it."""
+  the task has an unprotect for ^comfyui$ (baseline allow-listed). PAUSE stops it; a freeze window does NOT hold it, \
+  because it only acts after 15 minutes of an empty queue (freeing the GPU then interrupts nobody)."""
 principle = "an idle batch tool does not belong on the GPU; stop it and let the owner restart it"
 owner_notes = """\
   Port of comfyui-idle-vram.sh (every 5 minutes), reshaped on 2026-10-04 from "restart when idle and holding \
