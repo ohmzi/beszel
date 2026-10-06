@@ -3305,3 +3305,28 @@ file = "probes.toml"
 target = "kuma"
 params = { groups = { "Media Stack" = "Media Stack" }, ignore = [] }
 since = "2026-10-03"
+
+[[rule]]
+id = "probe.plex-livetv-sessions"
+title = "Plex LiveTV sessions are not dying"
+kind = "probe"
+severity = "warn"
+principle = "classes of service P0-P3"
+why = "Plex's own livetv transcode session collapses (\"Session appears to have died from under us\") when the tuner stream stalls. Nothing on the Tunarr side logs it -- Tunarr only sees a client disconnect and reports the exit as expected -- so this was invisible until a session failure was traced by hand on 2026-10-05."
+does = "Runs /usr/local/sbin/plex-livetv-check.py as root: it scans Plex's own log for the livetv session-death signatures inside a 15 minute window and, when it finds any, prints the count plus context (live Tunarr ffmpeg processes, stale stream dirs, GPU utilisation) and exits 1. Clean exits 0. Every 5 minutes; 2 bad runs to go down, 2 good runs to recover."
+applies_to = ["plex-livetv-sessions"]
+file = "probes.toml"
+target = "@probe-group.media-stack:probes[]"
+merge = "append"
+since = "2026-10-05"
+order = 50
+owner_notes = "Needs root to read the Plex snap log directory. Written after 2026-10-05, when a LiveTV failure could not be reproduced from outside Plex: direct streaming, 45s soaks and rapid channel-surfing all succeeded, while Plex logged 14 session deaths in 5 hours with the GPU at ~94 percent."
+
+[rule.params]
+name = "plex-livetv-sessions"
+title = "Plex LiveTV sessions survive"
+type = "command"
+target = ["/usr/local/sbin/plex-livetv-check.py"]
+needs_root = true
+interval_s = 300
+class = "P2"

@@ -404,7 +404,7 @@ since = "2026-10-03"
 order = 5
 
 [rule.params]
-path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles"
+path = "/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache/subtitles"
 warn_gib_per_day = 0.5
 
 [[rule]]

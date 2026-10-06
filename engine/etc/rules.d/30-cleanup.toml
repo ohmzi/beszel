@@ -28,7 +28,7 @@ applies_to = ["docker_cache"]
 file = "maint.toml"
 target = "tasks.docker_cache"
 params = { high_gib = 15, low_gib = 8, max_gib_per_run = 30 }
-mode = "report"
+mode = "apply"
 severity = "warn"
 destructive = true
 proof = """\
@@ -46,7 +46,9 @@ owner_notes = """\
   once a builder passes high_gib). With max_gib_per_run = 30 a cache like the 46 GB one \
   seen once (42.8 GiB, estimate about 35 GiB) is refused as over the cap (checked with a stubbed run), so a \
   cache that size needs a manual prune or a higher cap. docker-prune.timer was disabled by the owner on \
-  2026-10-02."""
+  2026-10-02.
+  Switched to apply on 2026-10-05: the cache had reached 38.6 GB and was only reclaimed by hand. The
+  high/low water marks (15/8 GiB), the per-run cap and the busy gate are unchanged."""
 since = "2026-10-03"
 
 [[rule]]
@@ -454,8 +456,8 @@ owner_notes = """\
 since = "2026-10-03"
 
 [rule.params]
-allowed_roots = ["/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache", "/volume1/docker/kavita/config"]
-unprotect = ['^/home/ohmz/StudioProjects/tunarr/\.docker-data/tunarr/cache/subtitles(/|$)']
+allowed_roots = ["/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache", "/volume1/docker/kavita/config"]
+unprotect = ['^/home/ohmz/docker-container-data/tunarr/\.docker-data/tunarr/cache/subtitles(/|$)']
 max_gib_per_run = 15
 max_items_per_run = 100
 batch_files = 2000
@@ -475,7 +477,7 @@ why = """\
   regenerated on demand, so removing old ones costs only a little extraction time later. growth_watch also \
   watches this folder."""
 does = """\
-  In /home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles, removes regular files whose \
+  In /home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache/subtitles, removes regular files whose \
   modification time is older than 30 days, root-owned ones included (root_owned_ok, because the cache files \
   are root-owned), in 2000-file batches. The container tunarr-host-net must be running and its web UI at \
   http://127.0.0.1:8000/ must answer before, during and after. Only the subtitles folder is un-protected; the \
@@ -500,7 +502,7 @@ order = 1
 
 [rule.params]
 name = "tunarr-subtitles"
-path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles"
+path = "/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache/subtitles"
 max_age_days = 30
 root_owned_ok = true
 container = "tunarr-host-net"
@@ -1328,3 +1330,4 @@ owner_notes = """\
 Ships in report mode like every cleaner. Switch it on with mode = apply on this rule in the host registry, then rules check and rules sync. \
 Pause it with homelab-maint pause (the kill switch) or set mode back to report: either also stops a relief that is already running, which leaves the swap in service. A freeze holds it (disruptive = true). Its safety limits are the relief_* options of task.swap_audit. The same relief by hand: homelab-maint swap relieve --apply (no window, no persistence: the owner decides). If swap that /etc/fstab lists is found off (a relief killed between swapoff and swapon), this task switches it back on with swapon -a."""
 since = "2026-10-03"
+
