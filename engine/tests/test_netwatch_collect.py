@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from homelab_maint.netwatch import entities, store
+from homelab_maint.netwatch import entities, protect, store
 from homelab_maint.netwatch.cloudflare import CFUnavailable
 from homelab_maint.netwatch.collect import Collector
 from homelab_maint.netwatch.model import EdgeRow, NetEvent
@@ -22,6 +22,7 @@ CFG = {
 
 UFW = ("2027-01-01T00:19:00.000000+00:00 host kernel: [UFW BLOCK] IN=eth0 OUT= SRC=198.51.100.9 DST=203.0.113.10 "
        "LEN=40 PROTO=TCP DPT=23")
+SSH_OK = "2027-01-01T00:19:45.000000+00:00 host sshd[100]: Accepted publickey for ohmz from 198.51.100.9 port 4001 ssh2"
 SSH_FAIL = "2027-01-01T00:19:30.000000+00:00 host sshd[99]: Failed password for root from 198.51.100.9 port 4000 ssh2"
 ESTAB = "ESTAB 0 0 203.0.113.10:22 203.0.113.7:50000\n\t cubic bytes_sent:100 bytes_acked:100 bytes_received:200\n"
 
@@ -107,7 +108,7 @@ def test_one_tick_writes_flow_edge_and_event_rows(tmp_path):
     status = col.tick(NOW)
 
     assert status == {
-        "sockets": "ok", "kernel": "ok", "auth": "ok", "plex": "ok", "cloudflare": "ok", "tunnel": "ok",
+        "sockets": "ok", "kernel": "ok", "auth": "ok", "plex": "ok", "signins": "ok", "cloudflare": "ok", "tunnel": "ok",
     }
     assert _count(db, "flows") >= 1
     assert _count(db, "edge") == 1
@@ -260,3 +261,28 @@ def test_a_quiet_codec_file_is_reported_once_across_ticks(tmp_path):
     col._due["plex"] = 0.0
     col.tick(NOW + 120)
     assert _count(db, "events WHERE kind = 'codec_unexplained'") == 1
+
+
+def test_signins_source_records_sshd_sign_ins_and_the_plex_source_is_called_with_the_config(tmp_path, monkeypatch):
+    seen_cfg = []
+    monkeypatch.setattr(protect, "plex_session_ips", lambda cfg, **kw: seen_cfg.append(cfg) or ["198.51.100.4"])
+    monkeypatch.setattr(protect, "_internet", lambda addr: True)
+    db, col = _collector(tmp_path, cf=None, sh=fake_sh(journal_ssh=SSH_OK + "\n"))
+    status = col.tick(NOW)
+    assert status["signins"] == "ok"
+    assert store.meta_get(db, "source:signins") == f"ok|{NOW}"
+    assert protect.protection("198.51.100.9", db, entities.Topology.empty_stale(), NOW)[0] == "signin"
+    assert protect.protection("198.51.100.4", db, entities.Topology.empty_stale(), NOW) == ("signin", "plex 2027-01-01")
+    assert seen_cfg and seen_cfg[0]["plex_dir"] == str(tmp_path / "plex")
+
+
+def test_signins_failure_is_stale_and_the_other_sources_still_run(tmp_path, monkeypatch):
+    def boom(db, now, cfg, plex_sessions=None):
+        raise RuntimeError("disk gone")
+    monkeypatch.setattr(protect, "record_signins", boom)
+    db, col = _collector(tmp_path, cf=None, sh=fake_sh(journal_k=UFW + "\n"))
+    status = col.tick(NOW)
+    assert status["signins"] == "stale:RuntimeError"
+    assert store.meta_get(db, "source:signins") == f"stale:RuntimeError|{NOW}"
+    assert status["sockets"] == "ok"
+    assert store.meta_get(db, "source:kernel") == f"ok|{NOW}"

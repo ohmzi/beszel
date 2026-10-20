@@ -445,7 +445,18 @@ cloudflare_every_s = 300
 cloudflare_window_s = 900
 plex_dir = "/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server"
 keep_days = 30
-path_classes = {}
+
+# Ordered: the first regex that matches a request path names its class (TOML keeps key order). Shipped defaults are generic; no hostnames.
+[netwatch.path_classes]
+"^/api/auth/(login|sign-in)" = "auth_login"
+"^/(login|signin|auth/login|index\\.php/login|api/v1/auth/login)" = "auth_login"
+"^/api/" = "auth_api"
+"^/(ocs|remote\\.php)/" = "auth_api"
+"^/library/" = "auth_api"
+
+# Hosts where a 2xx on an auth_api path proves a signed-in session (never-block set). Empty until the owner lists them.
+[netwatch.signin]
+hosts = []
 
 # ------------------------------------------------------------------ live monitor (homelab-maint-live.service, 5 s heartbeat -> public/live.json)
 # Optional: with no [live] section the built-in defaults are identical (tests/test_live.py pins that). Listing it here makes the service

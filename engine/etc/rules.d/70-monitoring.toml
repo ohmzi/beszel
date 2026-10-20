@@ -76,7 +76,16 @@ cloudflare_every_s = 300
 cloudflare_window_s = 900
 plex_dir = "/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server"
 keep_days = 30
-path_classes = {}
+
+[rule.params.path_classes]
+"^/api/auth/(login|sign-in)" = "auth_login"
+"^/(login|signin|auth/login|index\\.php/login|api/v1/auth/login)" = "auth_login"
+"^/api/" = "auth_api"
+"^/(ocs|remote\\.php)/" = "auth_api"
+"^/library/" = "auth_api"
+
+[rule.params.signin]
+hosts = []
 
 [[rule]]
 id = "live.service.plex"

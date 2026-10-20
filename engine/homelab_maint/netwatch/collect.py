@@ -7,6 +7,8 @@ others still run. Every run writes meta["source:<name>"] = "<status>|<epoch>", w
 (Cloudflare disabled). Sampling intervals double, up to 4x, while the 1-minute load is at or above the CPU count.
 
 Metadata only. Nothing here reads packet contents or request bodies.
+
+The sign-in source (protect.py) runs every 5 minutes and feeds the never-block set; it reads the Plex token locally and never logs it.
 """
 import json
 import os
@@ -17,13 +19,14 @@ import time
 from pathlib import Path
 
 from homelab_maint import core
-from homelab_maint.netwatch import entities, logs, plex, sockets, store
+from homelab_maint.netwatch import entities, logs, plex, protect, sockets, store
 from homelab_maint.netwatch.cloudflare import CF, CFUnavailable
 from homelab_maint.netwatch.plex import CODEC_WINDOW
 
 TICK_S = 5                 # the loop's wake-up; every source runs on its own interval, checked each tick
 TUNNEL_S = 3600
 PRUNE_S = 3600
+SIGNINS_S = 300            # sign-ins are read from the edge, sshd and Plex every 5 minutes
 MAX_STRETCH = 4            # the load back-off never multiplies an interval by more than this
 PLEX_LOG = "Plex Media Server.log"
 PLEX_CURSOR_STEP = 0.001  # the cursor sits just past the newest consumed line, so that line is never read again
@@ -82,6 +85,7 @@ class Collector:
             ("auth", cfg["journal_every_s"], self._auth, True),
             ("plex", cfg["plex_every_s"], self._plex, True),
             ("cloudflare", cfg["cloudflare_every_s"], self._cloudflare, True),
+            ("signins", SIGNINS_S, self._signins, True),
             ("tunnel", TUNNEL_S, self._tunnel, False),
         )
         ran: dict[str, str] = {}
@@ -153,6 +157,10 @@ class Collector:
             fresh = [e for e in self._cf.security_events(zone, now - window, now) if e.ts > since]
             store.add_events(self._db, fresh)
             store.meta_set(self._db, f"cf:events:{zone}", str(now))
+        return "ok"
+
+    def _signins(self, now: float) -> str:
+        protect.record_signins(self._db, now, self._cfg, plex_sessions=lambda: protect.plex_session_ips(self._cfg))
         return "ok"
 
     def _tunnel(self, now: float) -> str:
