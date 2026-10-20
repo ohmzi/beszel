@@ -380,13 +380,14 @@ def test_the_destructive_flag_follows_the_task_class():
 
 
 def test_the_shipped_config_applies_nothing_but_the_reclaim_rung(an):
-    """INTEGRATION decision 12: every cleaner ships report-only and the owner enables apply per task, with two deliberate exceptions:
-    the pressure ladder's reclaim rung (unloading idle models, no kill) and comfyui_idle_reclaim (flipped 2026-10-04, own 5-minute
-    schedule). Jobs: a job with a legacy driver is observe, only the umbrella's own engines are managed from the start, mem-guard is
+    """INTEGRATION decision 12: every cleaner ships report-only and the owner enables apply per task, with three deliberate exceptions:
+    the pressure ladder's reclaim rung (unloading idle models, no kill), comfyui_idle_reclaim (flipped 2026-10-04, own 5-minute
+    schedule) and docker_cache (flipped 2026-10-05 after its build cache reached 38.6 GB; water marks and caps unchanged).
+    Jobs: a job with a legacy driver is observe, only the umbrella's own engines are managed from the start, mem-guard is
     retired. Nothing here may enable docker-prune.timer either: its job stays observe."""
     docs = an.comp.docs
     tasks = docs["maint.toml"]["tasks"]
-    assert sorted(t for t, tbl in tasks.items() if isinstance(tbl, dict) and tbl.get("mode") == "apply") == ["comfyui_idle_reclaim", "pressure_response"]
+    assert sorted(t for t, tbl in tasks.items() if isinstance(tbl, dict) and tbl.get("mode") == "apply") == ["comfyui_idle_reclaim", "docker_cache", "pressure_response"]
     pr = tasks["pressure_response"]
     assert (pr["reclaim"], pr["throttle"], pr["restart"], pr["emergency"]) == ("apply", "report", "report", "report")
     modes = {j["name"]: j.get("mode") for j in docs["jobs.toml"]["job"]}
@@ -475,7 +476,7 @@ PINNED = {
         task.disk_forecast task.failed_units task.backup_freshness task.docker_df task.memory_health task.smart_trend
         task.alert_path_health task.growth_watch growth.-volume1-docker-kavita-config-logs growth.-var-log
         growth.-var-lib-docker-containers growth.-var-log-journal
-        growth.-home-ohmz-studioprojects-tunarr-.docker-data-tunarr-cac-54cece task.plex_media_mount_check task.config_drift
+        growth.-home-ohmz-docker-container-data-tunarr-.docker-data-tun-b552cb task.plex_media_mount_check task.config_drift
         task.os_jobs task.docker_prune_parity task.legacy_audit task.docker_prune_exposure task.surrealdb_health
         task.self_health
     """,
@@ -591,6 +592,8 @@ PINNED_IDS = {i for s in PINNED.values() for i in s.split()}
 RETIRED: dict[str, str] = {                                                     # id -> why it is gone (and what replaced it)
     "probe.ct-maintenance-web": "the maintenance-web container was retired; the site is the systemd beszel-hub.service now, "
                                 "probed as probe.svc-beszel-hub (and its /api/health as probe.maintenance-site)",
+    "growth.-home-ohmz-studioprojects-tunarr-.docker-data-tunarr-cac-54cece": "the tunarr container data moved to "
+                                "~/docker-container-data (2026-10-05); the growth rule is re-minted from its new path",
 }
 
 

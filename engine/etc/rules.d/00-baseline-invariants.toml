@@ -91,7 +91,7 @@ why = "an acknowledgement silences an exact error for at most a year"
 [[baseline.unprotect]]
 file = "maint.toml"
 path = "tasks.app_cache_trim.unprotect"
-allow = ['^/home/ohmz/StudioProjects/tunarr/\.docker-data/tunarr/cache/subtitles(/|$)']
+allow = ['^/home/ohmz/docker-container-data/tunarr/\.docker-data/tunarr/cache/subtitles(/|$)']
 why = "a disposable subtitle cache inside the protected tunarr app dir"
 
 [[baseline.unprotect]]

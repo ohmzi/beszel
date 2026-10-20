@@ -74,7 +74,7 @@ paths = [
   { path = "/var/log", warn_gib_per_day = 0.5 },
   { path = "/var/lib/docker/containers", warn_gib_per_day = 0.5 },
   { path = "/var/log/journal", warn_gib_per_day = 0.5 },
-  { path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles", warn_gib_per_day = 0.5 },   # trimmed by app_cache_trim
+  { path = "/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache/subtitles", warn_gib_per_day = 0.5 },   # trimmed by app_cache_trim
 ]
 
 [tasks.spike_sampler]
@@ -220,7 +220,7 @@ emergency = "report"             # L5: stop containers from classes.toml emergen
 
 # ------------------------------------------------------------------ C1: safe clean (daily 07:30-09:30) -- REPORT ONLY
 [tasks.docker_cache]
-mode = "report"
+mode = "apply"
 high_gib = 15
 low_gib = 8
 max_gib_per_run = 30
@@ -281,9 +281,9 @@ min_samples = 2               # consecutive daily samples, >= idle_minutes apart
 [tasks.app_cache_trim]           # generalised cache trimmer: rules {name, path, max_age_days, container, health_url ...}, health-checked
 mode = "report"
 # a rule path must be a STRICT descendant of an allowed root; the code's never-touch list then limits both roots to their cache dirs
-allowed_roots = ["/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache", "/volume1/docker/kavita/config"]
+allowed_roots = ["/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache", "/volume1/docker/kavita/config"]
 # anchored on the canonical path (the code refuses any . or ..): a disposable cache inside the protected tunarr app dir, for THIS task only
-unprotect = ["^/home/ohmz/StudioProjects/tunarr/\\.docker-data/tunarr/cache/subtitles(/|$)"]
+unprotect = ["^/home/ohmz/docker-container-data/tunarr/\\.docker-data/tunarr/cache/subtitles(/|$)"]
 max_gib_per_run = 15
 max_items_per_run = 100          # one item = ONE batch of up to batch_files files (a 131k-file cache is ~60 items)
 batch_files = 2000
@@ -295,7 +295,7 @@ warn_after_runs = 2              # a rule refused/skipped this many runs in a ro
 manifest_keep_days = 30          # every unlinked file is listed in STATE_DIR/manifests/app_cache_trim.<ts>.jsonl
 # Tunarr has no Docker HEALTHCHECK, so health = container running + the app answering health_url (liveness only; mitigated by the canary).
 rules = [
-  { name = "tunarr-subtitles", path = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache/subtitles", max_age_days = 30, root_owned_ok = true, container = "tunarr-host-net", health_url = "http://127.0.0.1:8000/" },
+  { name = "tunarr-subtitles", path = "/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache/subtitles", max_age_days = 30, root_owned_ok = true, container = "tunarr-host-net", health_url = "http://127.0.0.1:8000/" },
   # second example (verified read-only; never files_only = false on an app dir without need):
   # { name = "kavita-cache", path = "/volume1/docker/kavita/config/cache", max_age_days = 14, container = "kavita", health_url = "http://127.0.0.1:5000/api/health" },
 ]

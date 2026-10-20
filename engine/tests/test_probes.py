@@ -1534,7 +1534,7 @@ def test_shipped_config_is_read_only_and_secret_free(shipped):
     assert not re.search(r"://[^/\s\"']*@", text)                              # no userinfo in any URL
     assert not re.search(r"\b[A-Za-z0-9]{32,}\b", text)                          # no long opaque blobs
     verbs = {"restart", "stop", "start", "enable", "disable", "mask", "kill", "rm", "update", "prune", "delete", "reload", "reboot", "poweroff"}
-    allowed = {"tailscale", "fail2ban-client", "nvidia-smi"}
+    allowed = {"tailscale", "fail2ban-client", "nvidia-smi", "/usr/local/sbin/plex-livetv-check.py"}
     for p in ps:
         if p.type == "command":
             assert p.target[0] in allowed, p.name

@@ -1381,7 +1381,7 @@ PROTECTED_FLOOR = (
     "pgdata")
 # Every `unprotect` regex the release knows: (file, dotted path of the list, regexes, why). Anything else needs the owner's override.
 UNPROTECT_ALLOW = (
-    ("maint.toml", "tasks.app_cache_trim.unprotect", ("^/home/ohmz/StudioProjects/tunarr/\\.docker-data/tunarr/cache/subtitles(/|$)",),
+    ("maint.toml", "tasks.app_cache_trim.unprotect", ("^/home/ohmz/docker-container-data/tunarr/\\.docker-data/tunarr/cache/subtitles(/|$)",),
      "a disposable subtitle cache inside the protected tunarr app dir"),
     ("maint.toml", "tasks.caps.unprotect", ("^tunarr-host-net$", "^kavita$", "^sabnzbd$", "^omnivoice-studio-gpu$", "^comfyui$"),
      "a memory ceiling is not a kill"),

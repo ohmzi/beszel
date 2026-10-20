@@ -46,8 +46,7 @@ owner_notes = """\
   once a builder passes high_gib). With max_gib_per_run = 30 a cache like the 46 GB one \
   seen once (42.8 GiB, estimate about 35 GiB) is refused as over the cap (checked with a stubbed run), so a \
   cache that size needs a manual prune or a higher cap. docker-prune.timer was disabled by the owner on \
-  2026-10-02.
-  Switched to apply on 2026-10-05: the cache had reached 38.6 GB and was only reclaimed by hand. The
+  2026-10-02. Switched to apply on 2026-10-05: the cache had reached 38.6 GB and was only reclaimed by hand. The \
   high/low water marks (15/8 GiB), the per-run cap and the busy gate are unchanged."""
 since = "2026-10-03"
 

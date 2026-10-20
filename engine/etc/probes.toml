@@ -170,6 +170,7 @@ probes = [
   { name = "seerr", title = "Seerr", type = "http", target = "http://127.0.0.1:5056/api/v1/status", class = "P1", slo = 99.5, kuma = "Seerr", expect = { json = [{ path = "version", exists = true }] } },
   { name = "immich", title = "Immich", type = "http", target = "http://127.0.0.1:2283/api/server/ping", class = "P1", slo = 99.5, kuma = "Immich", expect = { json = [{ path = "res", equals = "pong" }] } },
   { name = "ct-kometa", title = "Kometa (container)", type = "docker", target = "kometa", interval_s = 300, kuma = "Kometa" },
+  { name = "plex-livetv-sessions", title = "Plex LiveTV sessions survive", type = "command", target = ["/usr/local/sbin/plex-livetv-check.py"], needs_root = true, interval_s = 300, class = "P2" },
 ]
 
 # =====================================================================================================================

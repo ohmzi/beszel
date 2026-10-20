@@ -1945,7 +1945,7 @@ def test_cli_list_and_show(cli, capsys):
     assert len(json.loads(out)) == sum(1 for x in R.load_registry(rdir=cli.rd, trust=False).rules if x.kind == "protection") >= 2
     assert f"0 of {cli.n}" in run(capsys, "list", "--disabled")[1]
     rc, out, _ = run(capsys, "show", "task.docker_cache")
-    assert rc == 0 and "destructive  True" in out and "mode         report" in out and "writes       maint.toml  tasks.docker_cache" in out and "high_gib = 15" in out
+    assert rc == 0 and "destructive  True" in out and "mode         apply" in out and "writes       maint.toml  tasks.docker_cache" in out and "high_gib = 15" in out
     rc, out, _ = run(capsys, "show", "task.docker_cache", "--json")
     assert json.loads(out)["params"]["high_gib"] == 15
     rc, out, err = run(capsys, "show", "task.docker_cach")
@@ -2412,7 +2412,7 @@ def test_unprotect_entries_must_be_on_the_baseline_allow_list(tmp_path):
     errs = analysis(tmp_path / "a", {"30-cleanup.toml": [unp("docker_containers_prune", [".*"])]}, patterns=("postgres", "immich_postgres")).errors
     assert any("unprotect '.*' in maint.toml tasks.docker_containers_prune.unprotect is not on the baseline allow-list" in e for e in errs), errs
     assert any("it would exempt from protected.toml (postgres, immich_postgres" in e for e in errs)                               # names what it would expose
-    for i, (task, rx) in enumerate([("caps", ["^tunarr-host-net$", "^kavita$"]), ("comfyui_idle_reclaim", ["^comfyui$"]), ("app_cache_trim", ["^/home/ohmz/StudioProjects/tunarr/\\.docker-data/tunarr/cache/subtitles(/|$)"])]):
+    for i, (task, rx) in enumerate([("caps", ["^tunarr-host-net$", "^kavita$"]), ("comfyui_idle_reclaim", ["^comfyui$"]), ("app_cache_trim", ["^/home/ohmz/docker-container-data/tunarr/\\.docker-data/tunarr/cache/subtitles(/|$)"])]):
         assert not errs_of(tmp_path / f"ok{i}", {"30-cleanup.toml": [unp(task, rx)]}), task
     assert errs_of(tmp_path / "b", {"30-cleanup.toml": [unp("docker_cache", ["^comfyui$"])]})                                    # the right regex under the WRONG task
     assert errs_of(tmp_path / "c", {"30-cleanup.toml": [unp("caps", ["^comfyui$ "])]})                                           # not an exact entry

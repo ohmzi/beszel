@@ -378,7 +378,7 @@ since = "2026-10-03"
 order = 4
 
 [[rule]]
-id = "growth.-home-ohmz-studioprojects-tunarr-.docker-data-tunarr-cac-54cece"
+id = "growth.-home-ohmz-docker-container-data-tunarr-.docker-data-tun-b552cb"
 title = "Growth limit: Tunarr subtitle cache"
 kind = "check"
 why = """\
@@ -386,7 +386,7 @@ Tunarr's subtitle cache is a cache that nothing bounds on its own: it holds tens
 22,000 and 1.5 GiB when this was written), which is why app_cache_trim exists for it. This watch shows how fast it \
 grows and whether the trim keeps up."""
 does = """\
-Adds the cache directory (tunarr/.docker-data/tunarr/cache/subtitles under StudioProjects) to growth_watch with a \
+Adds the cache directory (tunarr/.docker-data/tunarr/cache/subtitles under docker-container-data) to growth_watch with a \
 limit of 0.5 GiB per day (net growth or bytes written in 24 hours). app_cache_trim (report-only until enabled) removes \
 files older than 30 days from this directory; the written figure ignores those deletions, so the trim cannot hide a \
 fast writer."""

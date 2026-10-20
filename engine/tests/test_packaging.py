@@ -600,16 +600,16 @@ def test_maint_toml_names_only_real_tasks_and_covers_every_wired_one():
 
 
 def test_only_the_spike_ladders_reclaim_rung_ships_on():
-    """The check, daily and weekly services pass --apply, so this is what keeps 'report-only by default' true. Two reclaims may act on
-    the shipped config: pressure_response (the spike ladder's non-destructive reclaim rung) and comfyui_idle_reclaim (flipped to apply
-    on 2026-10-04, own 5-minute schedule; see test_the_check_tier_may_apply_because_only_reclaim_ships_on)."""
+    """The check, daily and weekly services pass --apply, so this is what keeps 'report-only by default' true. Three reclaims may act on
+    the shipped config: pressure_response (the spike ladder's non-destructive reclaim rung), comfyui_idle_reclaim (flipped to apply
+    on 2026-10-04, own 5-minute schedule) and docker_cache (flipped 2026-10-05 after its build cache reached 38.6 GB)."""
     reg, tasks = registry(), toml_file("maint.toml")["tasks"]
     on = sorted(n for n, t in tasks.items() if t.get("mode") == "apply")
-    assert on == ["comfyui_idle_reclaim", "pressure_response"], f"these ship in apply mode: {on}; every other cleaner ships report"
+    assert on == ["comfyui_idle_reclaim", "docker_cache", "pressure_response"], f"these ship in apply mode: {on}; every other cleaner ships report"
     rungs = {k: tasks["pressure_response"].get(k) for k in ("reclaim", "throttle", "restart", "emergency")}
     assert rungs == {"reclaim": "apply", "throttle": "report", "restart": "report", "emergency": "report"}
     for n, (klass, _tier, _mod) in reg.items():
-        if klass in ("C1", "C2") and n in tasks and n not in ("pressure_response", "comfyui_idle_reclaim"):
+        if klass in ("C1", "C2") and n in tasks and n not in ("pressure_response", "comfyui_idle_reclaim", "docker_cache"):
             assert tasks[n].get("mode", "report") == "report", f"{n} must ship report-only"
     ladder = toml_file("classes.toml")
     assert ladder.get("emergency_stop", []) == [], "no container is on the emergency-stop list by default"
@@ -707,12 +707,12 @@ def test_retention_no_longer_owns_what_the_new_cleaners_own():
     ret, trim = tables["retention"], tables["app_cache_trim"]
     assert [r["name"] for r in ret["rules"]] == ["kavita-logs", "kavita-backups"], "tunarr-subtitles is app_cache_trim's, crash-dumps is crash_dumps'"
     assert ret["allowed_roots"] == ["/volume1/docker/kavita/config", "/var/log"] and "unprotect" not in ret
-    cache = "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/cache"
+    cache = "/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/cache"
     rule = next(r for r in trim["rules"] if r["name"] == "tunarr-subtitles")
     assert rule["path"] == cache + "/subtitles" and rule["container"] == "tunarr-host-net" and rule["max_age_days"] == 30
     assert cache in trim["allowed_roots"] and rule["path"].startswith(cache + "/"), "a rule path must be strictly below an allowed root"
     assert all(re.search(u, rule["path"]) for u in trim["unprotect"]), "the narrow exemption must cover the rule's own path"
-    assert not re.search(trim["unprotect"][0], "/home/ohmz/StudioProjects/tunarr/.docker-data/tunarr/config"), "and nothing else of the app dir"
+    assert not re.search(trim["unprotect"][0], "/home/ohmz/docker-container-data/tunarr/.docker-data/tunarr/config"), "and nothing else of the app dir"
     assert {"path": rule["path"], "warn_gib_per_day": 0.5} in tables["growth_watch"]["paths"], "the cache is watched for growth"
 
 
