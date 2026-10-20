@@ -1301,7 +1301,10 @@ def test_capacity_review(w):
     assert not r.alert                                                                           # the real alert is disk_forecast's
 
 
-def test_smart_selftest(w):
+def test_smart_selftest(w, monkeypatch):
+    real_text = routine._text
+    # The host's real /etc/smartd.conf decides whether it schedules tests; keep the test independent of it.
+    monkeypatch.setattr(routine, "_text", lambda p, limit=1_000_000: "" if str(p) == "/etc/smartd.conf" else real_text(p, limit))
     scan = "/dev/sda -d scsi # /dev/sda, SCSI device\n/dev/sdb -d scsi # b\n/dev/sdc -d scsi # c\n/dev/sdd -d scsi # d\n/dev/nvme0 -d nvme # n\n"
     w.sh.when(["smartctl", "--scan"], scan)
     ok_test = {"ata_smart_self_test_log": {"standard": {"table": [
@@ -2163,7 +2166,7 @@ def one_day(w, t, day, hour=7, minute=40):
     g = guard(w, now)
     cfg = core.load_config()
     d = g.begin(t, True)
-    res, dur = core.run_task(t, g.task_cfg(cfg, t, d), True and d.apply) if d.run else (None, 0)
+    res, dur = core.run_task(t, g.task_cfg(cfg, t, d), True and d.apply, now) if d.run else (None, 0)
     rec = g.after(t, d, res, dur) if d.run else None
     return d, res, rec
 
