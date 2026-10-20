@@ -11,6 +11,7 @@ Blocks never happen automatically. Every row lands in the `blocks` table and eve
 import hashlib
 import ipaddress
 import re
+import sqlite3
 from datetime import datetime, timezone
 
 from homelab_maint import core
@@ -136,16 +137,36 @@ def _open(db):
     return (store.open_db(), True) if db is None else (db, False)
 
 
+def _field(req: dict, key: str, n: int) -> str:
+    value = req.get(key) if isinstance(req, dict) else None
+    return value[:n] if isinstance(value, str) else ""
+
+
+def _log(db, now: float, kind: str, ip: str, target: str, outcome: tuple[bool, str]) -> None:
+    """One block_requests row per outcome, accepted or refused, so the dashboard shows what the engine did with a request.
+    Best effort: the outcome is returned and applied whether or not the row lands."""
+    ok, reason = outcome
+    try:
+        db.execute("INSERT INTO block_requests (ts, kind, ip, target, ok, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                   (now, kind, ip[:64], target[:40], int(ok), reason[:120]))
+        db.commit()
+    except sqlite3.Error:
+        pass
+
+
 def apply_block(req: dict, now: float, *, cf=None, sh=core.sh, db=None) -> tuple[bool, str]:
     """Validate and apply one owner-confirmed block. Returns (ok, reason); nothing is written unless ok is True.
-    `db` defaults to the Network Watch database (opened and closed here)."""
+    `db` defaults to the Network Watch database (opened and closed here). Every outcome is logged to block_requests."""
     db, own = _open(db)
     try:
-        return _apply_block(req, now, cf, sh, db)
-    except _Refuse as exc:
-        return False, exc.reason
-    except Exception:  # noqa: BLE001  (the inbox never sees a traceback)
-        return False, "error"
+        try:
+            outcome = _apply_block(req, now, cf, sh, db)
+        except _Refuse as exc:
+            outcome = (False, exc.reason)
+        except Exception:  # noqa: BLE001  (the inbox never sees a traceback)
+            outcome = (False, "error")
+        _log(db, now, "block", _field(req, "ip", 64), _field(req, "target", 40), outcome)
+        return outcome
     finally:
         if own:
             db.close()
@@ -189,14 +210,22 @@ def _apply_block(req: dict, now: float, cf, sh, db) -> tuple[bool, str]:
 
 
 def apply_unblock(req: dict, now: float, *, cf=None, sh=core.sh, db=None) -> tuple[bool, str]:
-    """Reverse an open block. An expired or unknown block is already off, so it is a success too."""
+    """Reverse an open block. An expired or unknown block is already off, so it is a success too. Logged like apply_block."""
     db, own = _open(db)
     try:
-        return _apply_unblock(req, now, cf, sh, db)
-    except _Refuse as exc:
-        return False, exc.reason
-    except Exception:  # noqa: BLE001
-        return False, "error"
+        try:
+            outcome = _apply_unblock(req, now, cf, sh, db)
+        except _Refuse as exc:
+            outcome = (False, exc.reason)
+        except Exception:  # noqa: BLE001
+            outcome = (False, "error")
+        bid = req.get("block_id") if isinstance(req, dict) else None
+        row = None
+        if isinstance(bid, str) and _HEX16.fullmatch(bid):
+            row = db.execute("SELECT ip, target FROM blocks WHERE id = ?", (bid,)).fetchone()
+        ip, target = (row[0], row[1]) if row else ("", "")
+        _log(db, now, "unblock", ip, target, outcome)
+        return outcome
     finally:
         if own:
             db.close()

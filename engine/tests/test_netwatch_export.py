@@ -212,3 +212,30 @@ def test_a_known_source_with_no_row_is_stale_and_listed_as_missing(db):
     doc = _build(db)
     assert "plex" in doc["stale"]
     assert doc["sources"]["plex"] == {"status": "missing", "age_s": None}
+
+
+def test_recent_requests_list_the_engine_outcome_newest_first(db):
+    from homelab_maint.netwatch import block
+    cf = type("CF", (), {"create_access_rule": lambda self, *a: "rule-1", "delete_access_rule": lambda self, *a: None})()
+    sh = lambda argv: type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+    ok_req = {"finding": "0123456789abcdef", "ip": "203.0.113.9", "target": "cloudflare", "zone": "example.test", "days": 2,
+              "permanent": False, "override_reason": ""}
+    refused = {"finding": "0123456789abcdef", "ip": "192.168.40.7", "target": "host", "zone": "", "days": 2, "permanent": False,
+               "override_reason": ""}
+    block.apply_block(ok_req, NOW, cf=cf, sh=sh, db=db)
+    block.apply_block(refused, NOW + 1, cf=cf, sh=sh, db=db)
+    requests = _build(db)["requests"]
+    assert [(r["ip"], r["ok"], r["reason"]) for r in requests] == [
+        ("192.168.40.7", False, "hard:192.168.40.0/24"),
+        ("203.0.113.9", True, "ok"),
+    ]
+    assert requests[0]["kind"] == "block" and requests[0]["target"] == "host"
+
+
+def test_recent_requests_are_the_last_twenty(db):
+    for i in range(25):
+        db.execute("INSERT INTO block_requests (ts, kind, ip, target, ok, reason) VALUES (?, 'block', ?, 'host', 1, 'ok')",
+                   (NOW + i, f"203.0.113.{i}"))
+    db.commit()
+    requests = _build(db)["requests"]
+    assert len(requests) == 20 and requests[0]["ip"] == "203.0.113.24"

@@ -1,8 +1,9 @@
 """netwatch.store: the Network Watch SQLite database (STATE_DIR/netwatch.db, mode 0600, WAL).
 
 One owner for the schema. Tables: meta (key/value), flows and edge (hourly aggregates), events (log lines), baseline (what each
-entity has been seen talking to), blocks (approved blocks) and signins (last successful sign-in per address and source).
-Retention: prune() drops flows, edge, events and signins older than keep_days. meta, baseline and blocks are never pruned.
+entity has been seen talking to), blocks (approved blocks), signins (last successful sign-in per address and source) and
+block_requests (what the engine did with each block or unblock request, accepted or refused).
+Retention: prune() drops flows, edge, events, signins and block_requests older than keep_days. meta, baseline and blocks are never pruned.
 """
 import os
 import sqlite3
@@ -75,6 +76,15 @@ CREATE TABLE IF NOT EXISTS signins (
     last_seen REAL NOT NULL,
     PRIMARY KEY (ip, source)
 );
+CREATE TABLE IF NOT EXISTS block_requests (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts      REAL    NOT NULL,
+    kind    TEXT    NOT NULL,
+    ip      TEXT    NOT NULL,
+    target  TEXT    NOT NULL,
+    ok      INTEGER NOT NULL,
+    reason  TEXT    NOT NULL
+);
 """
 
 
@@ -141,7 +151,7 @@ def add_events(db: sqlite3.Connection, rows: list[NetEvent]) -> int:
 
 
 def prune(db: sqlite3.Connection, now: float, keep_days: int = 30) -> int:
-    """Delete flows, edge rows, events and signins older than keep_days. Returns the total number of rows deleted.
+    """Delete flows, edge rows, events, signins and block requests older than keep_days. Returns the total number of rows deleted.
 
     Flows and edge rows are compared by their hour bucket (epoch seconds at the start of the hour), events and signins by ts and last_seen.
     meta, baseline and blocks are never pruned.
@@ -154,6 +164,7 @@ def prune(db: sqlite3.Connection, now: float, keep_days: int = 30) -> int:
             ("DELETE FROM edge WHERE bucket < ?", (cutoff,)),
             ("DELETE FROM events WHERE ts < ?", (cutoff,)),
             ("DELETE FROM signins WHERE last_seen < ?", (cutoff,)),
+            ("DELETE FROM block_requests WHERE ts < ?", (cutoff,)),
         ):
             deleted += db.execute(sql, params).rowcount
     return deleted

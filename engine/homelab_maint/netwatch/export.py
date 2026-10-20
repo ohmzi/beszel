@@ -28,6 +28,7 @@ TALKERS_MAX = 50
 SERVICES_MAX = 100
 HOSTS_PER_TALKER = 5
 ROWS_MAX = 200                      # blocks and sign-ins: bounded even though they are small in practice
+REQUESTS_MAX = 20                   # the Recent requests list on the Blocks tab
 FLOW_DIRECTIONS = ("in", "out", "svc", "lan")
 TEXT_MAX = 200
 
@@ -168,6 +169,13 @@ def _sources(db, now: float) -> tuple[dict, list[str]]:
     return out, sorted(set(stale))
 
 
+def _requests(db) -> list[dict]:
+    """The last REQUESTS_MAX block and unblock requests, newest first, with what the engine did with each."""
+    rows = db.execute("SELECT ts, kind, ip, target, ok, reason FROM block_requests ORDER BY id DESC LIMIT ?", (REQUESTS_MAX,)).fetchall()
+    return [{"ts": ts, "kind": _text(kind, 20), "ip": _text(ip, 64), "target": _text(target, 40), "ok": bool(ok),
+             "reason": _text(reason, 120)} for ts, kind, ip, target, ok, reason in rows]
+
+
 def _learning_until(db) -> float | None:
     try:
         return float(store.meta_get(db, "first_run")) + judge.LEARNING_S
@@ -243,6 +251,7 @@ def build_network(status: dict, now: float, db=None, findings_path: Path | None 
             "services": _services(db, now),
             "findings": _findings(Path(findings_path) if findings_path is not None else _findings_path()),
             "blocks": _blocks(db, now),
+            "requests": _requests(db),
             "protected": {"signins": _signins(db, now), "hard_ranges": [str(n) for n in entities.HARD_RANGES(topo, cfg)]},
         }
         return _fit(doc)

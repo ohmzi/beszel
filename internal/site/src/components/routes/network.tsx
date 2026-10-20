@@ -70,8 +70,10 @@ type Network = {
 	services?: Service[]
 	findings?: Finding[]
 	blocks?: Block[]
+	requests?: Request[]
 	protected?: { signins?: { ip: string; source: string; last_seen: number }[]; hard_ranges?: string[] }
 }
+type Request = { ts: number; kind: string; ip: string; target: string; ok: boolean; reason: string }
 type Note = { key: string; text: string; ok: boolean }
 
 const SEV_DOT: Record<string, string> = { crit: "bg-red-500", warn: "bg-yellow-500" }
@@ -86,6 +88,7 @@ export default memo(() => {
 	const talkers = net?.talkers ?? []
 	const findings = net?.findings ?? []
 	const blocks = net?.blocks ?? []
+	const requests = net?.requests ?? []
 	const host = systems.find((s) => s.info?.mt)
 	// The engine names the stale sources; an older export without the list falls back to each source's status.
 	const stale = net?.stale ?? Object.entries(net?.sources ?? {})
@@ -143,7 +146,7 @@ export default memo(() => {
 	}
 
 	function ack(key: string, err: string | null) {
-		setNote(err ? { key, text: err, ok: false } : { key, text: t`Requested — applied within a minute`, ok: true })
+		setNote(err ? { key, text: err, ok: false } : { key, text: t`Sent — see Recent requests for the result`, ok: true })
 	}
 
 	return (
@@ -450,6 +453,47 @@ export default memo(() => {
 													>
 														{busy === b.id ? t`Sending…` : t`Unblock`}
 													</button>
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							)}
+							<h2 className="mt-8 mb-2 text-sm font-medium">
+								<Trans>Recent requests</Trans>
+							</h2>
+							{requests.length === 0 ? (
+								<Empty>
+									<Trans>No requests yet.</Trans>
+								</Empty>
+							) : (
+								<Table>
+									<TableHeader className="sticky top-0 z-10 bg-table-header">
+										<TableRow>
+											<TableHead className="w-44">
+												<Trans>Time</Trans>
+											</TableHead>
+											<TableHead className="w-24">
+												<Trans>Kind</Trans>
+											</TableHead>
+											<TableHead>
+												<Trans>Address</Trans>
+											</TableHead>
+											<TableHead>
+												<Trans>Result</Trans>
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{requests.map((r) => (
+											<TableRow key={`${r.ts}-${r.kind}-${r.ip}`}>
+												<TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">{when(r.ts)}</TableCell>
+												<TableCell className="text-muted-foreground">
+													{r.kind === "unblock" ? t`Unblock` : t`Block`}
+												</TableCell>
+												<TableCell className="font-mono text-xs">{r.ip || "-"}</TableCell>
+												<TableCell className={`text-sm ${r.ok ? "text-green-500" : "text-red-500"}`}>
+													{r.ok ? t`applied` : t`refused: ${r.reason}`}
 												</TableCell>
 											</TableRow>
 										))}
