@@ -209,7 +209,7 @@ class CF:
     def edge_requests(self, zone_id: str, start: float, end: float, path_classes: dict[str, str]) -> list[EdgeRow]:
         """Edge request counts for one zone and window. Raw paths are reduced to a path_class label (the first regex
         in `path_classes` that matches, else "other") and rows that land on the same key are summed."""
-        compiled = [(name, re.compile(pattern)) for name, pattern in path_classes.items()]
+        compiled = [(name, re.compile(pattern)) for pattern, name in path_classes.items()]
 
         def path_class(path: str | None) -> str:
             for name, rx in compiled:

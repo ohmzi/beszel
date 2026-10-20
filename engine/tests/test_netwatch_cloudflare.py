@@ -20,7 +20,7 @@ API = "/client/v4"
 TOKEN = "tok-SECRET-123"
 T0 = "2026-10-19T00:00:00Z"
 T1 = "2026-10-19T12:00:00Z"
-CLASSES = {"api": r"^/api/", "login": r"login|wp-"}
+CLASSES = {r"^/api/": "api", r"login|wp-": "login"}          # regex -> class, the [netwatch.path_classes] shape
 
 
 def _epoch(text: str) -> int:
