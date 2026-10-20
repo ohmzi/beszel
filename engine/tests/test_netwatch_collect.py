@@ -189,7 +189,29 @@ def test_edge_windows_cover_the_configured_span(tmp_path):
     cf = FakeCF()
     db, col = _collector(tmp_path, cf=cf, sh=fake_sh())
     col.tick(NOW)
-    assert cf.edge_calls == [("zone1", NOW - 900, NOW)]
+    assert cf.edge_calls == [("zone1", BUCKET, NOW)]     # NOW - 900 starts inside the hour: the read starts at its boundary
+
+
+def test_overlapping_edge_reads_of_one_hour_keep_the_latest_full_count(tmp_path):
+    class GrowingCF(FakeCF):
+        def __init__(self):
+            super().__init__()
+            self.counts = [3, 7, 12]
+
+        def edge_requests(self, zone_id, start, end, path_classes):
+            count = self.counts.pop(0)
+            self.edge_calls.append((zone_id, start, end))
+            return [EdgeRow(bucket=BUCKET, zone=zone_id, host="app.example.test", client_ip="198.51.100.20", country="US",
+                            asn=64500, status=200, path_class="page", count=count, bytes=900)]
+
+    cf = GrowingCF()
+    db, col = _collector(tmp_path, cf=cf, sh=fake_sh())
+    col.tick(NOW)
+    col.tick(NOW + 300)
+    col.tick(NOW + 600)
+    assert {start for _, start, _ in cf.edge_calls} == {BUCKET}     # every read covers the same hour from its start
+    (count,) = db.execute("SELECT count FROM edge").fetchone()
+    assert count == 12                                                # the latest read replaces the earlier ones, no sum
 
 
 

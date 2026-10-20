@@ -26,6 +26,7 @@ from homelab_maint.netwatch.plex import CODEC_WINDOW
 TICK_S = 5                 # the loop's wake-up; every source runs on its own interval, checked each tick
 TUNNEL_S = 3600
 PRUNE_S = 3600
+HOUR_S = 3600
 SIGNINS_S = 300            # sign-ins are read from the edge, sshd and Plex every 5 minutes
 MAX_STRETCH = 4            # the load back-off never multiplies an interval by more than this
 PLEX_LOG = "Plex Media Server.log"
@@ -155,8 +156,11 @@ class Collector:
         window = int(self._cfg["cloudflare_window_s"])
         path_classes = self._cfg.get("path_classes") or {}
         zones = list(self._cfg.get("cf_zones") or self._cf.zones().values())
+        # The window starts at the hour boundary, so every hour bucket it returns is a complete count since that hour began.
+        # The upsert then replaces like with like on each read, and overlapping reads never double or shrink a count.
+        start = (int(now - window) // HOUR_S) * HOUR_S
         for zone in zones:
-            store.upsert_edge(self._db, self._cf.edge_requests(zone, now - window, now, path_classes))
+            store.upsert_edge(self._db, self._cf.edge_requests(zone, start, now, path_classes))
             # Security events are not keyed, so only those after this zone's last read are stored: windows overlap.
             mark = store.meta_get(self._db, f"cf:events:{zone}")
             since = float(mark) if mark else now - window
