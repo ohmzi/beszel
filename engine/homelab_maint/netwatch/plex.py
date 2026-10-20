@@ -1,8 +1,8 @@
 """netwatch.plex: Plex Media Server log lines and codec downloads turned into NetEvents.
 
 Read-only. Two rules:
-- exploit_attempts: requests seen in the server log that match a known exploit shape (a companion-proxy subscribe for a
-  `searchOne` agent, or a timeline poll carrying a `protocol=` parameter). Only the request id is kept, never the URL.
+- exploit_attempts: Plex's own "unsupported protocol '" rejection of a request (a companion-proxy subscribe to a `searchOne`
+  agent is the known shape; any such rejection is suspicious). Only the request id is kept, never the URL.
 - unexplained_codecs: a codec library written to disk that no `CodecManager: obtaining` line in the log accounts for.
   Plex downloads codecs on demand and logs the request first, so a codec file with no matching request was put there
   by something else.
@@ -17,7 +17,7 @@ from homelab_maint.netwatch.model import NetEvent
 
 PLEX_DIR_DEFAULT = Path("/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server")
 PLEX_PORT = 32400
-_EXPLOIT = re.compile(r"CompanionProxy/Subscribe.*unsupported protocol '.*searchOne|/player/timeline.*protocol=")
+_EXPLOIT = re.compile(r"unsupported protocol '")
 _STAMP = re.compile(r"^([A-Z][a-z]{2} +\d{1,2}, \d{4} \d{2}:\d{2}:\d{2})\.(\d{3})")
 _REQ = re.compile(r"\[(Req#[0-9a-fA-F]+)/")
 _CODEC_LOG = re.compile(r"CodecManager: obtaining (decoder|encoder) '([^']+)'")

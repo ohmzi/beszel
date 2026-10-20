@@ -39,11 +39,10 @@ def test_exploit_line_gives_one_plex_exploit_with_request_id_only():
     assert "searchOne" not in ev.detail and "PLACEHOLDER" not in ev.detail
 
 
-def test_timeline_line_is_matched_and_token_never_leaks():
-    (ev,) = exploit_attempts([TIMELINE])
-    assert ev.kind == "plex_exploit"
-    assert ev.detail == "Req#2b3c4d"
-    assert "SECRET-TOKEN-VALUE" not in ev.detail
+def test_a_legitimate_timeline_subscribe_is_not_an_exploit():
+    subscribe = ("Oct 17, 2026 15:18:00.001 [130939384544099] DEBUG - [Req#2b3c4d/Plex] GET "
+                 "/player/timeline/subscribe?protocol=http&token=SECRET-TOKEN-VALUE")
+    assert exploit_attempts([subscribe, TIMELINE]) == []
 
 
 def test_unrelated_lines_are_ignored():
