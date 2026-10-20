@@ -373,3 +373,21 @@ def test_paged_result_that_is_not_a_list_is_bad_response(tmp_path):
     with pytest.raises(CFUnavailable) as info:
         cf.list_access_rules("zone-a")
     assert str(info.value) == "bad-response"
+
+
+@pytest.mark.parametrize("errors", [{"message": "x"}, 5])
+def test_graphql_errors_that_are_not_a_list_are_bad_response(tmp_path, errors):
+    cf, _ = make(tmp_path, {"POST /client/v4/graphql": _json({"data": None, "errors": errors})})
+    with pytest.raises(CFUnavailable) as info:
+        cf.edge_requests("zone-a", _epoch(T0), _epoch(T1), CLASSES)
+    assert str(info.value) == "bad-response"
+
+
+def test_security_node_with_null_text_fields_becomes_empty_strings(tmp_path):
+    payload = json.loads((FIX / "cf_security.json").read_text())
+    node = payload["data"]["viewer"]["zones"][0]["firewallEventsAdaptive"][0]
+    node.update({"clientIP": None, "clientRequestHTTPHost": None, "action": None, "source": None})
+    cf, _ = make(tmp_path, {"POST /client/v4/graphql": _json(payload)})
+    event = cf.security_events("zone-a", _epoch(T0), _epoch(T1))[0]
+    assert event.src == "" and event.dst == "" and event.detail == "/"
+    assert "None" not in event.detail and event.src is not None

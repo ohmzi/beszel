@@ -146,9 +146,12 @@ class CF:
         }
         payload = self._request("POST", "/graphql", body)
         errors = payload.get("errors")
+        if errors is not None and not isinstance(errors, list):
+            raise CFUnavailable("bad-response")
         if errors:
-            first = errors[0]
-            message = first.get("message", "") if isinstance(first, dict) else str(first)
+            with _parsing():
+                first = errors[0]
+                message = first.get("message", "") if isinstance(first, dict) else str(first)
             raise CFUnavailable("graphql:" + self._scrub(str(message))[:80])
         data = payload.get("data")
         if not isinstance(data, dict):
@@ -235,9 +238,9 @@ class CF:
         with _parsing():
             return [
                 NetEvent(
-                    ts=_epoch(n["datetime"]), kind="cf_security", src=n["clientIP"],
-                    dst=n["clientRequestHTTPHost"], dport=_HTTPS_PORT,
-                    detail=f"{n['action']}/{n['source']}",
+                    ts=_epoch(n["datetime"]), kind="cf_security", src=n["clientIP"] or "",
+                    dst=n["clientRequestHTTPHost"] or "", dport=_HTTPS_PORT,
+                    detail=f"{n['action'] or ''}/{n['source'] or ''}",
                 )
                 for n in nodes
             ]
