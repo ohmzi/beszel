@@ -56,6 +56,8 @@ def _norm_ip(value) -> str | None:
         addr = ipaddress.ip_address(value.strip())
     except ValueError:
         return None
+    if getattr(addr, "scope_id", None):           # a scoped (zone-qualified) IPv6 address is not a firewall address
+        return None
     if addr.version == 6 and addr.ipv4_mapped is not None:
         addr = addr.ipv4_mapped
     return str(addr)
@@ -70,8 +72,8 @@ def _validate(req: dict) -> dict:
     if target not in TARGETS:
         raise _Refuse("bad-target")
     zone = req.get("zone", "")
-    if not isinstance(zone, str) or (target == "cloudflare" and not zone):
-        raise _Refuse("bad-zone")
+    if not isinstance(zone, str) or (target == "cloudflare" and not zone) or (target == "host" and zone):
+        raise _Refuse("bad-zone")          # a host block is keyed by its address alone
     days = req.get("days")
     if type(days) is not int or not 1 <= days <= MAX_DAYS:      # type() so that a bool is not an int here
         raise _Refuse("bad-days")
@@ -82,7 +84,7 @@ def _validate(req: dict) -> dict:
     if not isinstance(finding, str) or not _HEX16.fullmatch(finding):
         raise _Refuse("bad-finding")
     reason = req.get("override_reason", "")
-    if not isinstance(reason, str) or len(reason) > REASON_MAX:
+    if not isinstance(reason, str) or len(reason) > REASON_MAX or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in reason):
         raise _Refuse("bad-reason")
     return {"ip": ip, "target": target, "zone": zone, "days": days, "permanent": permanent, "reason": reason.strip()}
 
@@ -159,7 +161,8 @@ def _apply_block(req: dict, now: float, cf, sh, db) -> tuple[bool, str]:
     protection = protect.protection(ip, db, entities.load_topology(sh), now, cfg)
     if protection and protection[0] == "hard":
         raise _Refuse(f"hard:{protection[1]}")
-    if protection and protection[0] == "signin" and not reason:
+    signin = bool(protection and protection[0] == "signin")
+    if signin and not reason:
         raise _Refuse("signin-protected")
     until = None if r["permanent"] else now + r["days"] * DAY_S
     rule_id = None
@@ -181,7 +184,7 @@ def _apply_block(req: dict, now: float, cf, sh, db) -> tuple[bool, str]:
         (bid, ip, target, zone, now, until, int(r["permanent"]), reason, rule_id),
     )
     db.commit()
-    core.audit("netwatch", "block", ip, 0, f"ok:{target}" + (f" override:{reason}" if reason else ""))
+    core.audit("netwatch", "block", ip, 0, f"ok:{target}" + (f" override:{reason}" if reason and signin else ""))
     return True, "ok"
 
 
@@ -218,30 +221,40 @@ def _apply_unblock(req: dict, now: float, cf, sh, db) -> tuple[bool, str]:
         except CFUnavailable as exc:
             if exc.reason != "http-404":
                 raise _Refuse(f"cloudflare:{exc.reason}") from None
-    db.execute("UPDATE blocks SET removed = ? WHERE id = ?", (now, bid))
+    if target == "host":                  # one open row per address: close every one of them, not only this id
+        db.execute("UPDATE blocks SET removed = ? WHERE target = 'host' AND ip = ? AND removed IS NULL", (now, ip))
+    else:
+        db.execute("UPDATE blocks SET removed = ? WHERE id = ?", (now, bid))
     db.commit()
     core.audit("netwatch", "unblock", ip, 0, f"ok:{target}")
     return True, "ok"
 
 
 def restore(db, now: float, sh=core.sh) -> str:
-    """After a reboot the nft sets are empty: re-add every open, unexpired host block with its remaining time. Returns 'ok' or 'stale:nft'."""
+    """After a reboot the nft sets are empty: re-add every open, unexpired host block with its remaining time, unless the address
+    is protected now (a hard range): such a row is closed and audited instead. Returns 'ok' or 'stale:nft'."""
     try:
         ensure_table(sh)
     except Exception:  # noqa: BLE001
         return "stale:nft"
     status = "ok"
     rows = db.execute("SELECT id, ip, until, permanent FROM blocks WHERE target = 'host' AND removed IS NULL").fetchall()
+    topo, cfg = None, None
     for bid, ip, until, permanent in rows:
-        if permanent:
-            timeout = None
-        else:
-            left = int(until - now)
-            if left <= 0:
-                db.execute("UPDATE blocks SET removed = ? WHERE id = ?", (now, bid))
-                continue
-            timeout = f"{left}s"
+        left = None if permanent else int(until - now)
+        if left is not None and left <= 0:
+            db.execute("UPDATE blocks SET removed = ? WHERE id = ?", (now, bid))
+            continue
+        timeout = None if permanent else f"{left}s"
         try:
+            if topo is None:
+                topo = entities.load_topology(sh)
+                cfg = core.load_config().get("netwatch", {})
+            protection = protect.protection(ip, db, topo, now, cfg)
+            if protection and protection[0] == "hard":
+                db.execute("UPDATE blocks SET removed = ? WHERE id = ?", (now, bid))
+                core.audit("netwatch", "unblock", ip, 0, "unblock:now-protected")
+                continue
             _add_element(sh, ip, timeout)
         except Exception:  # noqa: BLE001
             status = "stale:nft"

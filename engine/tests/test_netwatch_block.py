@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import pytest
 
 from homelab_maint import acks, core
-from homelab_maint.netwatch import block, entities, store
+from homelab_maint.netwatch import block, entities, protect, store
 from homelab_maint.netwatch.cloudflare import CFUnavailable
 
 NOW = 1_800_000_000.0
@@ -117,7 +117,7 @@ def test_lan_address_is_refused_even_with_an_override_reason(db, audit):
     assert sh.calls == [] and db.execute("SELECT count(*) FROM blocks").fetchone()[0] == 0 and audit == []
 
 
-@pytest.mark.parametrize("override", ["", "   \t"])
+@pytest.mark.parametrize("override", ["", "   "])
 def test_signin_address_without_a_reason_is_refused(db, audit, override):
     _add_signin(db, "203.0.113.9")
     sh = FakeSh()
@@ -398,3 +398,62 @@ def test_netwatch_handlers_are_registered_with_the_inbox(monkeypatch):
     assert set(acks._HANDLERS) == {"net_block", "net_unblock"}
     assert acks._HANDLERS["net_block"][1] >= set(block.NET_BLOCK_KEYS)
     assert acks._HANDLERS["net_unblock"][1] >= set(block.NET_UNBLOCK_KEYS)
+
+
+# ---- fix round 1: one host row per address, restore re-checks protection, input hygiene ---------------------------------
+
+def test_host_request_with_a_zone_is_refused(db, audit):
+    sh = FakeSh()
+    for zone in ("example.test", " "):
+        assert block.apply_block(_req(zone=zone), NOW, sh=sh, db=db) == (False, "bad-zone")
+    assert sh.calls == [] and db.execute("SELECT count(*) FROM blocks").fetchone()[0] == 0 and audit == []
+
+
+def test_unblock_closes_every_open_row_for_the_address_and_restore_readds_nothing(db):
+    sh = FakeSh()
+    block.apply_block(_req(), NOW, sh=sh, db=db)
+    bid = block.block_id("203.0.113.9", "host", "")
+    db.execute(
+        "INSERT INTO blocks (id, ip, target, zone, created, until, permanent, reason, cf_rule_id, removed)"
+        " VALUES ('aaaaaaaaaaaaaaaa', '203.0.113.9', 'host', '', ?, ?, 0, '', NULL, NULL)",
+        (NOW, NOW + 30 * 86400),
+    )
+    db.commit()
+
+    assert block.apply_unblock({"block_id": bid}, NOW + 5, sh=FakeSh(), db=db) == (True, "ok")
+    assert db.execute("SELECT count(*) FROM blocks WHERE ip = '203.0.113.9' AND removed IS NULL").fetchone()[0] == 0
+    sh2 = FakeSh()
+    assert block.restore(db, NOW + 10, sh=sh2) == "ok"
+    assert sh2.element_adds() == []
+
+
+def test_restore_does_not_readd_an_address_that_is_now_hard(db, audit, monkeypatch):
+    block.apply_block(_req(), NOW, sh=FakeSh(), db=db)
+    bid = block.block_id("203.0.113.9", "host", "")
+    monkeypatch.setattr(protect, "protection", lambda ip, db, topo, now, cfg=None: ("hard", "203.0.113.0/24"))
+    audit.clear()
+    sh = FakeSh()
+
+    assert block.restore(db, NOW + 10, sh=sh) == "ok"
+    assert sh.element_adds() == []
+    assert _row(db, bid)[7] == NOW + 10
+    assert audit == [("netwatch", "unblock", "203.0.113.9", "unblock:now-protected")]
+
+
+def test_scoped_ipv6_address_is_refused(db, audit):
+    sh = FakeSh()
+    assert block.apply_block(_req(ip="2001:db8::1%eth0", target="host"), NOW, sh=sh, db=db) == (False, "bad-ip")
+    assert sh.calls == [] and audit == []
+
+
+@pytest.mark.parametrize("reason", ["a\x00b", "line\nbreak", "tab\there", "carriage\r", "del\x7fx"])
+def test_override_reason_with_control_characters_is_refused(db, audit, reason):
+    _add_signin(db, "203.0.113.9")
+    sh = FakeSh()
+    assert block.apply_block(_req(override_reason=reason), NOW, sh=sh, db=db) == (False, "bad-reason")
+    assert sh.calls == [] and audit == []
+
+
+def test_reason_is_audited_only_when_it_overrode_a_signin(db, audit):
+    assert block.apply_block(_req(override_reason="just a note"), NOW, sh=FakeSh(), db=db) == (True, "ok")
+    assert audit == [("netwatch", "block", "203.0.113.9", "ok:host")]
