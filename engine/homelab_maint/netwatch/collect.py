@@ -118,18 +118,23 @@ class Collector:
         return "ok"
 
     def _plex(self, now: float) -> str:
+        """Exploit lines follow the line-time cursor `plex:since`; codec scans follow their own cursor `plex:codec_since`,
+        so a codec file that is quiet in the log is reported once, not on every tick."""
         raw = store.meta_get(self._db, "plex:since")
         since = float(raw) if raw else now - PLEX_FIRST_S
+        raw = store.meta_get(self._db, "plex:codec_since")
+        codec_since = float(raw) if raw else now - PLEX_FIRST_S
         plex_dir = Path(self._cfg.get("plex_dir", plex.PLEX_DIR_DEFAULT))
         if not (plex_dir / "Logs" / PLEX_LOG).is_file():
-            return "stale:missing"            # nothing to read: not "ok", and the cursor stays where it was
+            return "stale:missing"            # nothing to read: not "ok", and neither cursor moves
         exploit_lines = plex.plex_log_lines(since, self._cfg, margin=0.0)
-        codec_lines = plex.plex_log_lines(since, self._cfg, margin=CODEC_WINDOW)
+        codec_lines = plex.plex_log_lines(codec_since, self._cfg, margin=CODEC_WINDOW)
         events = plex.exploit_attempts(exploit_lines)
-        events += plex.unexplained_codecs(plex_dir / "Codecs", codec_lines, since)
+        events += plex.unexplained_codecs(plex_dir / "Codecs", codec_lines, codec_since)
         store.add_events(self._db, events)
-        # The cursor moves to just past the newest line consumed, so the next read (lines stamped at or after it) never repeats one.
-        stamps = [ts for ts in map(plex.line_ts, exploit_lines + codec_lines) if ts is not None and ts >= since]
+        store.meta_set(self._db, "plex:codec_since", repr(now))
+        # The exploit cursor moves to just past the newest line consumed, so the next read never repeats one.
+        stamps = [ts for ts in map(plex.line_ts, exploit_lines) if ts is not None and ts >= since]
         if stamps:
             store.meta_set(self._db, "plex:since", repr(max(stamps) + PLEX_CURSOR_STEP))
         return "ok"

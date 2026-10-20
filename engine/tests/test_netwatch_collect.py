@@ -1,6 +1,7 @@
 """Tests for homelab_maint/netwatch/collect.py: the always-on collector, with fake shell, Cloudflare and clock. No loop is started."""
 import conftest  # noqa: F401  (points HOMELAB_MAINT_* at tmp dirs before homelab_maint.core is imported)
 
+import os
 import subprocess
 import time
 
@@ -242,3 +243,20 @@ def test_a_missing_plex_log_is_stale_and_leaves_the_cursor_alone(tmp_path):
     assert status["plex"] == "stale:missing"
     assert store.meta_get(db, "source:plex") == f"stale:missing|{NOW}"
     assert store.meta_get(db, "plex:since") == "123.0"
+
+
+def test_a_quiet_codec_file_is_reported_once_across_ticks(tmp_path):
+    # The codec was written after the last log line and no request explains it: one event, however many ticks follow.
+    _plex_log(tmp_path, NOW - 100)
+    codecs = tmp_path / "plex" / "Codecs"
+    codecs.mkdir(parents=True)
+    codec = codecs / "libexample_decoder.so"
+    codec.write_bytes(b"")
+    os.utime(codec, (NOW - 30, NOW - 30))
+    db, col = _collector(tmp_path, cf=None, sh=fake_sh())
+    col.tick(NOW)
+    col._due["plex"] = 0.0
+    col.tick(NOW + 60)
+    col._due["plex"] = 0.0
+    col.tick(NOW + 120)
+    assert _count(db, "events WHERE kind = 'codec_unexplained'") == 1
