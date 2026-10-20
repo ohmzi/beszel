@@ -42,7 +42,7 @@ func isAppRoute(urlPath, basePath string) bool {
 	}
 	urlPath = strings.TrimSuffix(urlPath, "/")
 	switch urlPath {
-	case "", "/alerts", "/incidents", "/reports", "/services", "/containers", "/smart", "/monitors", "/settings", "/forgot-password", "/request-otp",
+	case "", "/alerts", "/incidents", "/network", "/reports", "/services", "/containers", "/smart", "/monitors", "/settings", "/forgot-password", "/request-otp",
 		"/checks", "/registry", "/maintenance", "/capacity", "/slo", "/spikes", "/migration", "/health", "/ack":
 		return true
 	}
