@@ -303,3 +303,19 @@ def test_an_empty_store_is_not_stale_at_first_then_warns_and_names_the_missing_s
     for name in ("sockets", "kernel", "auth", "plex", "cloudflare", "tunnel", "signins"):
         assert name in res.summary
     assert res.metrics["stale_sources"] == 7
+
+
+def test_new_peers_share_one_issue_and_another_rule_changes_it(env):
+    _sources(env, NOW)
+    _flow(env, "out", "container:web", "203.0.113.9", 443)
+    first = _run()
+    assert [i["rule"] for i in first.items] == ["new_peer"]
+    env.execute("DELETE FROM flows")
+    _flow(env, "out", "container:blog", "203.0.113.10", 443)
+    second = _run()
+    assert [i["rule"] for i in second.items] == ["new_peer"] and second.items[0]["src"] == "container:blog"
+    assert first.issue_key == second.issue_key                         # a day of new peers is one issue
+    _seeded_exploit(env)
+    third = _run()
+    assert third.issue_key != second.issue_key                         # a different rule is a different issue
+    assert "plex_exploit:203.0.113.9" in third.issue_key

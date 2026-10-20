@@ -148,7 +148,10 @@ def _verdict(ctx: Ctx, db, cfg: dict, threat: ThreatIndex) -> Result:
 
     items = [{"rule": f.rule, "severity": f.severity, "src": f.src, "target": f.target, "why": f.why[:WHY_MAX],
               "count": f.count, "id": f.id} for f in ordered[:ITEMS_MAX]]
-    issue_key = ikey(rules=sorted(f"{f.rule}:{f.src}" for f in findings), stale=stale) if findings or stale else None
+    # A new peer is one alert for the whole day: its key names the rule alone, so every new peer shares the issue. Other rules
+    # keep rule:src, so a different attacker or another rule is a different issue.
+    keys = {"new_peer" if f.rule == "new_peer" else f"{f.rule}:{f.src}" for f in findings}
+    issue_key = ikey(rules=sorted(keys), stale=stale) if findings or stale else None
     link = f"/network?finding={ordered[0].id}" if ordered else ""
 
     core.write_json_atomic(core.STATE_DIR / "netwatch" / "findings.json",
