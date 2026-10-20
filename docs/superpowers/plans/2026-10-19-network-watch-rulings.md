@@ -63,3 +63,24 @@ Every ruling the build controller made on the owner's behalf, in order, with wha
 - export marks an aged 'skipped' source stale — the collector refreshes even skipped sources every tick, so an old epoch means the collector stopped — cost if wrong: none.
 - inherent to write-ahead ordering; exceptions roll back; sweep/unblock on the page clears it — cost if wrong: one stray block until unblocked.
 - install starts the collector (which creates the table) before the first publish; a raised handler exception is caught by process_inbox as handler_error — cost if wrong: one failed publish cycle.
+
+## Install findings (host, 2026-10-20, after the owner's OK)
+
+- **clientAsn is not available on this zone's plan.** The edge query failed whole with "does not have access to the field
+  'clientasn'", leaving the edge source stale forever. The query no longer asks for it; the parser still records it when a
+  zone provides it, else 0. Cost if wrong: the talkers table shows asn 0.
+- **`ss -tinHn state established` omits the State column on this host** (4 fields, not 5), so the sampler silently recorded
+  no flows while reporting "ok". The parser now reads the two address fields from the end. Cost if wrong: none.
+- **`[netwatch.path_classes]` is regex -> class, as the plan says;** the implementation read it reversed, so every path was
+  "other" and no edge sign-in could be recognised. Fixed to pattern -> class. Cost if wrong: none.
+- **The hub's SPA route allowlist needed `/network`.** The React route existed, but the server 404ed the page and every
+  email link to it until the allowlist was updated. Cost if wrong: fallback to the site root, no page.
+- **`[netwatch.signin] hosts` seeded conservatively** with the apps whose `auth_api` 2xx is known to require a session
+  (maintainer, ai, photos, drive, tday, notebook, kavita, audiobook, booklore, paperless). Real data then recorded sign-ins
+  from maintainer, drive and tday. The owner should add any other account app, and must not add an app whose API answers
+  2xx without credentials: every 2xx would protect that address from blocking for 30 days.
+- **Host IOC file** holds the four Plex2Shell addresses and the two proxystream domains from the 2026-10-19 incident report;
+  it is host-only, as planned.
+- **The pre-existing alert-transport queue** (2 critical pages undelivered for ~2.6 h, daily alert budget reached) is not
+  caused by Network Watch; the rules-registry emails and texts delivered normally during the install. It still needs the
+  owner's attention before attack emails can be trusted to arrive.
