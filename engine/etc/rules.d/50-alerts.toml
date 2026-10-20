@@ -116,26 +116,26 @@ since = "2026-10-03"
 
 [[rule]]
 id = "notify.task_routes"
-title = "Per-task route overrides (none shipped)"
+title = "Per-task route overrides (net_watch is email only)"
 kind = "alert"
 principle = "one umbrella"
 why = "One noisy check should be silenceable without disabling it. An explicit route is the owner's decision and is therefore final."
-does = "Empty today. An entry such as `docker_df = \"email\"` or `noisy_check = \"none\"` replaces the route of that task's alert and incident_open messages, is never escalated, and `none` drops them (route-none in the delivery log). The check itself keeps running and keeps its true colour in status.json."
+does = "Shipped: net_watch = \"email\", so a Network Watch alert is an email whatever its severity and is never texted or escalated (an attack is read, not paged by text). Any other entry, such as `docker_df = \"email\"` or `noisy_check = \"none\"`, replaces the route of that task's alert and incident_open messages, is never escalated, and `none` drops them (route-none in the delivery log). The check itself keeps running and keeps its true colour in status.json."
 file = "notify.toml"
 target = "task_routes"
-params = {}
+params = { net_watch = "email" }
 since = "2026-10-03"
 
 [[rule]]
 id = "notify.todo"
-title = "Fallback 'what to do' lines per task (none shipped)"
+title = "Fallback 'what to do' lines per task (net_watch shipped)"
 kind = "alert"
 principle = "one umbrella"
 why = "An alert email is only useful if it says what to check first. The lines normally come from the task's playbook; this table lets the owner override one task or set a default without editing the packaged playbooks."
-does = "Empty today. `[todo] my_task = [...]` replaces the 'What to do' lines of that task's alert email; the order is the caller's own details.todo, then this table for the task, then the playbook in etc/playbooks.toml, then `_default` of this table."
+does = "Shipped for net_watch only: the Network Watch email says where to click and that blocks are made on the Network page. `[todo] my_task = [...]` replaces the 'What to do' lines of that task's alert email; the order is the caller's own details.todo, then this table for the task, then the playbook in homelab_maint/data/playbooks.toml, then `_default` of this table."
 file = "notify.toml"
 target = "todo"
-params = {}
+params = { net_watch = ["Open the link in this email: the finding is selected on the Network page, with its evidence.", "Read the source: a known device or tunnel of yours, or a stranger. Blocks are made there by a logged-in user, never from the command line."] }
 since = "2026-10-03"
 
 [[rule]]

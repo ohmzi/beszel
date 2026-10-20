@@ -727,3 +727,33 @@ The relief is a command the owner runs on purpose: homelab-maint swap relieve is
 re-checks every precondition, runs swapoff, aborts it if available RAM or the memory stall turns \
 bad (the area then stays in service), and always runs swapon again. The relief_* options of this rule are the safety limits of EVERY relief: swap_audit's feasibility, the automatic relief (task.swap_auto_relief) and homelab-maint swap relieve all read them here."""
 since = "2026-10-03"
+
+[[rule]]
+id = "task.net_watch"
+title = "Network watch: who is talking to this host, and whether it is an attack"
+kind = "check"
+why = """\
+The homelab's own firewall and the edge logs say what reached the host, but nobody reads them. Network Watch joins them into \
+one verdict every 5 minutes: a Plex exploit attempt, a sign-in that stopped being the owner's, a service talking to a new \
+place, an address on a threat list that did more than scan. Scanning alone is normal on the internet and never pages; it is \
+only shown. A crit or warn here is an email to the owner, and the email links to the finding on the Network page."""
+does = """\
+Every 5 minutes it opens the Network Watch store (metadata only: who, when, port, connection counts, an edge request count and \
+a path class; never packet contents or request bodies) and runs every rule over the last 30 minutes. A finding is crit or \
+warn; the verdict is crit when any finding is crit, warn when any finding is warn or a collector source has been stale for \
+30 minutes or more (for example the Cloudflare edge data, which reads "edge data stale"), otherwise ok. It reports up to 12 \
+findings, the counts for the last 24 hours, the number of blocks in force, and the three busiest internet addresses by edge \
+requests. It writes the findings for the Network page's publisher. It never blocks anything: a block is made only by a \
+logged-in dashboard user, on the Network page. An unreadable store is an error, not an all-clear."""
+applies_to = ["net_watch"]
+file = "maint.toml"
+target = "tasks.net_watch"
+params = { schedule = "*/5 * * * *" }
+severity = "crit"
+destructive = false
+principle = "a finding is a fact about a window, and a block is a human decision"
+owner_notes = """\
+Runs every 5 minutes on its own schedule rather than with the 15-minute checks, because a plex exploit or a burst of failed \
+sign-ins is worth knowing about within minutes. Its email route is per task (notify.task_routes): email only, so an attack \
+is read and not texted. Read-only: the runner forces it to report mode."""
+since = "2026-10-20"

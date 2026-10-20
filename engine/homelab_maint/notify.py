@@ -161,8 +161,11 @@ DEFAULTS: dict[str, Any] = {
                "incident_open": {"crit": "both", "warn": "email", "info": "email"}, "incident_resolved": "both",
                "ack_expired": "email", "test": "mirror"},
     "significant": {"maintenance": "both"},
-    "task_routes": {},
-    "todo": {},
+    "task_routes": {"net_watch": "email"},
+    "todo": {"net_watch": [
+        "Open the link in this email: the finding is selected on the Network page, with its evidence.",
+        "Read the source: a known device or tunnel of yours, or a stranger. Blocks are made there by a logged-in user, never from the command line.",
+    ]},
     "escalation": {"warn_sms_after": 2, "recovery_sms_only_if_texted": True, "episode_ttl_h": 72},
     "dedupe": {"window_s": {"alert": 21600, "recovery": 3600, "maintenance": 3600, "digest_daily": 72000,
                             "report_weekly": 432000, "incident_open": 21600, "incident_resolved": 3600, "ack_expired": 604800,

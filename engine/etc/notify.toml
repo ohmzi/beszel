@@ -69,10 +69,16 @@ maintenance = "both"             # added to the maintenance route when facts.sig
 # Per-task override for alert/incident_open. An explicit route is final: it is never escalated and is the one
 # way to silence a noisy check without disabling it. Example:  docker_df = "email"   noisy_check = "none"
 [task_routes]
+net_watch = "email"             # the Network Watch alert is email only: an attack is read, never texted (rule notify.task_routes)
 
 # Fallback "what to do" lines for tasks that have no playbook. Normally the lines come from etc/playbooks.toml (the same
 # text as the Incidents tab); this table wins over it for the named task:   [todo]  my_task = ["First check ...", "..."]
 [todo]
+# rule: notify.todo
+net_watch = [
+  "Open the link in this email: the finding is selected on the Network page, with its evidence.",
+  "Read the source: a known device or tunnel of yours, or a stranger. Blocks are made there by a logged-in user, never from the command line.",
+]
 
 # ------------------------------------------------------------------------------------------------ policy
 [escalation]

@@ -139,6 +139,10 @@ keep_days = 30
 mount_point = "/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server/Media"
 expected_source_prefix = "/media/SandiskSSD/plex"
 
+# rule: task.net_watch
+[tasks.net_watch]                # the Network Watch verdict, every 5 minutes on its own schedule (the tick runs it)
+schedule = "*/5 * * * *"
+
 [tasks.config_drift]
 expect_journald_system_max_use = "1G"
 expect_tmp_age_days = 30      # systemd-tmpfiles default; the weekly `find /tmp -atime +7` cron is being retired
