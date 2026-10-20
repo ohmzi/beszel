@@ -5,6 +5,8 @@ import subprocess
 from ipaddress import ip_address, ip_network
 from pathlib import Path
 
+from dataclasses import replace
+
 from homelab_maint.netwatch.entities import ContainerInfo, Topology
 from homelab_maint.netwatch.model import Flow
 from homelab_maint.netwatch.sockets import sample
@@ -79,17 +81,41 @@ def make_sh(failing=(), host_ss=HOST_SS, host_rc=0):
 
 
 def test_flows_for_host_and_containers():
-    flows = sample(_topo(), CFG, NOW, sh=make_sh())
+    flows, status = sample(_topo(), CFG, NOW, sh=make_sh())
+    assert status == "ok"
     assert len(flows) == 5
     assert set(flows) == EXPECTED
 
 
 def test_vanished_container_skipped():
-    flows = sample(_topo(), CFG, NOW, sh=make_sh(failing=(4343,)))
+    flows, status = sample(_topo(), CFG, NOW, sh=make_sh(failing=(4343,)))
+    assert status == "ok"
     assert set(flows) == EXPECTED
 
 
-def test_failed_host_ss_gives_no_host_flows():
-    flows = sample(_topo(), CFG, NOW, sh=make_sh(host_rc=1))
-    assert not {f for f in flows if "host" in (f.src, f.dst)}
+def test_failed_host_ss_returns_container_flows_and_stale_status():
+    flows, status = sample(_topo(), CFG, NOW, sh=make_sh(host_rc=1))
+    assert status == "stale:host-ss"
+    assert set(flows) == {f for f in EXPECTED if "host" not in (f.src, f.dst)}
     assert {f for f in flows if f.src == "container:web" and f.dst == "198.51.100.20"}
+
+
+def test_stale_topology_reads_nothing():
+    def never(cmd, timeout=60, check=False, input_=None, env=None):
+        raise AssertionError(f"stale topology must not run {cmd}")
+    assert sample(replace(_topo(), stale=True), CFG, NOW, sh=never) == ([], "stale:topology")
+
+
+def test_host_loopback_on_a_non_tunnel_port_gives_no_flow():
+    host_ss = HOST_SS + "ESTAB 0 0 127.0.0.1:44445 127.0.0.1:8000\n\t cubic bytes_sent:5 bytes_received:5\n"
+    flows, status = sample(_topo(), CFG, NOW, sh=make_sh(host_ss=host_ss))
+    assert status == "ok"
+    assert set(flows) == EXPECTED
+
+
+def test_lan_outbound_from_host_is_counted_with_remote_port():
+    host_ss = HOST_SS + "ESTAB 0 0 192.168.40.20:50500 192.168.40.60:8443\n\t cubic bytes_sent:300 bytes_received:400\n"
+    flows, status = sample(_topo(), CFG, NOW, sh=make_sh(host_ss=host_ss))
+    assert status == "ok"
+    outbound = Flow(BUCKET, "lan", "host", "lan:192.168.40.60", 8443, "tcp", 1, 400, 300)
+    assert set(flows) == EXPECTED | {outbound}

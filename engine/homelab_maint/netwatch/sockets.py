@@ -7,9 +7,17 @@ how many sockets, how many bytes. Never packet contents.
 Direction, from the point of view of the namespace being read:
 - in:  the peer is on the internet and the local port is one this namespace listens on.
 - out: the peer is on the internet and the local port is not listening (an outbound connection).
-- lan: the peer is a LAN or Tailscale address. dport is the local port.
+- lan: the peer is a LAN or Tailscale address. If the local port is listening the flow is inbound: src is the
+  "lan:<ip>" / "ts:<ip>" peer, dst the local entity, dport the local port. Otherwise the local entity connected out:
+  src the local entity, dst "lan:<ip>" / "ts:<ip>", dport the remote port.
 - svc: the peer is a container or the host. Counted from the client end only: the server end is skipped, because the
   client's namespace already counts the same connection, and counting both would double it.
+
+Loopback sockets are skipped in every namespace: a process talking to itself is not network traffic. That covers
+cloudflared's legs to its local services (the tunnel ports in `cfg["tunnel_local_ports"]`), whose real peers come from
+Cloudflare (Task 5).
+
+Known limitation: a client socket whose ephemeral port collides with a listening port is counted as "in".
 """
 import re
 from dataclasses import dataclass
@@ -94,14 +102,10 @@ def _listening_ports(sh, pid: int) -> set[int] | None:
     return ports
 
 
-def _row(sock: _Sock, local: str, listening: set[int], topo: Topology, cfg: dict,
-         tunnel_ports: set[int], in_container: bool) -> tuple[str, str, str, int] | None:
+def _row(sock: _Sock, local: str, listening: set[int], topo: Topology, cfg: dict) -> tuple[str, str, str, int] | None:
     """(direction, src, dst, dport) for one socket, or None when it is not counted."""
-    loopback = ip_address(sock.laddr).is_loopback or ip_address(sock.paddr).is_loopback
-    if loopback and (sock.lport in tunnel_ports or sock.pport in tunnel_ports):
-        return None  # cloudflared's leg to a local service: its real peers come from Cloudflare
-    if in_container and ip_address(sock.paddr).is_loopback:
-        return None  # talks to itself inside the container, not network traffic
+    if ip_address(sock.laddr).is_loopback or ip_address(sock.paddr).is_loopback:
+        return None  # a process talking to itself, in any namespace
     listens = sock.lport in listening
     peer = classify(sock.paddr, topo, cfg)
     if peer.kind == "internet":
@@ -109,26 +113,32 @@ def _row(sock: _Sock, local: str, listening: set[int], topo: Topology, cfg: dict
             return ("in", sock.paddr, local, sock.lport)
         return ("out", local, sock.paddr, sock.pport)
     if peer.kind in ("lan", "tailscale"):
-        src = f"lan:{sock.paddr}" if peer.kind == "lan" else f"ts:{sock.paddr}"
-        return ("lan", src, local, sock.lport)
+        ext = f"lan:{sock.paddr}" if peer.kind == "lan" else f"ts:{sock.paddr}"
+        if listens:
+            return ("lan", ext, local, sock.lport)
+        return ("lan", local, ext, sock.pport)
     if listens:
         return None  # server end of a connection the client's namespace counts
     peer_entity = "host" if peer.kind == "host" else f"container:{peer.name}"
     return ("svc", local, peer_entity, sock.pport)
 
 
-def sample(topo: Topology, cfg: dict, now: float, sh=core.sh) -> list[Flow]:
+def sample(topo: Topology, cfg: dict, now: float, sh=core.sh) -> tuple[list[Flow], str]:
     """Hourly flows from every established socket on the host and in each container's namespace.
 
-    A container whose namespace can't be read is skipped. If the host's `ss` fails, no host flows are returned.
+    Returns (flows, status). status is "ok", or "stale:<why>" when the sample can't be trusted:
+    - "stale:topology": the topology is stale, so classification is unreliable. Nothing is read; returns ([], ...).
+    - "stale:host-ss": the host's `ss` failed. The container flows that were read are still returned.
+    A container whose namespace can't be read is skipped without making the status stale.
     """
+    if topo.stale:
+        return [], "stale:topology"
     bucket = int(now) - int(now) % 3600
-    tunnel_ports = {int(p) for p in cfg.get("tunnel_local_ports", [])}
     totals: dict[tuple[str, str, str, int], list[int]] = {}
 
-    def count(socks: list[_Sock], local: str, listening: set[int], in_container: bool) -> None:
+    def count(socks: list[_Sock], local: str, listening: set[int]) -> None:
         for sock in socks:
-            row = _row(sock, local, listening, topo, cfg, tunnel_ports, in_container)
+            row = _row(sock, local, listening, topo, cfg)
             if row is None:
                 continue
             t = totals.setdefault(row, [0, 0, 0])
@@ -136,9 +146,12 @@ def sample(topo: Topology, cfg: dict, now: float, sh=core.sh) -> list[Flow]:
             t[1] += sock.received
             t[2] += sock.sent
 
+    status = "ok"
     host = _established(sh, _SS_ESTABLISHED)
-    if host is not None:
-        count(host, "host", {port for proto, port in topo.listening if proto == "tcp"}, False)
+    if host is None:
+        status = "stale:host-ss"
+    else:
+        count(host, "host", {port for proto, port in topo.listening if proto == "tcp"})
     for info in topo.containers.values():
         listening = _listening_ports(sh, info.pid)
         if listening is None:
@@ -146,6 +159,7 @@ def sample(topo: Topology, cfg: dict, now: float, sh=core.sh) -> list[Flow]:
         socks = _established(sh, ["nsenter", "-t", str(info.pid), "-n", *_SS_ESTABLISHED])
         if socks is None:
             continue
-        count(socks, f"container:{info.name}", listening, True)
+        count(socks, f"container:{info.name}", listening)
 
-    return [Flow(bucket, d, s, t, p, "tcp", c, bi, bo) for (d, s, t, p), (c, bi, bo) in totals.items()]
+    flows = [Flow(bucket, d, s, t, p, "tcp", c, bi, bo) for (d, s, t, p), (c, bi, bo) in totals.items()]
+    return flows, status
