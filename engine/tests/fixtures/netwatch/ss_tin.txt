@@ -1,0 +1,8 @@
+ESTAB 0 0 192.168.40.20:32400 203.0.113.7:51234
+	 cubic wscale:7,7 rto:204 bytes_sent:1000 bytes_acked:1000 bytes_received:200 segs_out:5 segs_in:4
+ESTAB 0 0 192.168.40.20:32400 203.0.113.7:51235
+	 cubic wscale:7,7 rto:204 bytes_sent:500 bytes_acked:500 bytes_received:300 segs_out:3 segs_in:2
+ESTAB 0 0 192.168.40.20:22 192.168.40.50:50022
+	 cubic wscale:7,7 rto:204 bytes_sent:4000 bytes_acked:4000 bytes_received:800 segs_out:9 segs_in:8
+ESTAB 0 0 127.0.0.1:44444 127.0.0.1:9000
+	 cubic rto:204 bytes_sent:10 bytes_acked:10 bytes_received:10 segs_out:1 segs_in:1
