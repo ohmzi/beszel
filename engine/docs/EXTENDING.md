@@ -455,8 +455,9 @@ Then call it from `judge()` next to the others. Rules to keep in mind:
 
 * `_add` merges repeats of the same `(rule, src, target)`, so the finding id is stable across runs and the debounce works.
 * A finding is a fact about the window. `block` only offers the dashboard's button: `"host"`, `"cloudflare"` (with `zone`) or `None`.
-  Never set a block that would reach a hard range; `judge()` strips the block from hard ranges and from sign-ins itself, but a rule
-  that needs a classification must sit under the `if not topo.stale:` guard, because a stale topology cannot tell a peer apart.
+  `judge()` strips the block from a hard range (no block at all). For a sign-in protected source it keeps the block and sets
+  `stolen_account`; `block.py` then refuses the request unless it carries an `override_reason`. A rule that needs a classification
+  must sit under the `if not topo.stale:` guard, because a stale topology cannot tell a peer apart.
 * Read only the store. A rule never talks to the host, the firewall or Cloudflare.
 * Severity is `warn` or `crit`. Email needs no route change: the `net_watch` task already has its own route (`etc/notify.toml`,
   `net_watch = "email"`), so every new finding goes by e-mail only, never SMS.

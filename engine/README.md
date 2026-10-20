@@ -534,8 +534,8 @@ Sources, each on its own interval (the sampling doubles, up to 4 times, while th
   matching Plex request. Codec checks read with a short margin so a line is never missed at a window edge.
 * Cloudflare: edge requests per hour (with a `path_class` label, see below) and the firewall security events of each zone, every
   5 min over the last 15 min; the tunnel hostnames, hourly.
-* sign-ins: successful sign-ins to the apps listed in `[netwatch.signin]`, from the edge 2xx on the sign-in path classes and from
-  the Plex session list.
+* sign-ins: successful sign-ins to the hosts listed in `[netwatch.signin]`, learned from the edge 2xx on the `auth_api` path class
+  only (`auth_login` does not count), and from the Plex session list.
 
 The store is `/var/lib/homelab-maint/netwatch.db` (SQLite). It holds metadata only: who, when, which service or
 container, port, connection count, bytes, and for a request a `path_class` label such as `auth_login` or `auth_api`. It never
@@ -555,7 +555,8 @@ The rules (`homelab_maint/netwatch/judge.py`), over the last 30 minutes:
 | `line_not_meant` | a container is refused on a host port it has no pinhole for | warn | yes |
 | `new_peer` | a service talks somewhere new, or a device reaches a port it never used, after the learning period | warn | yes |
 
-Every finding emails, after the runner's usual two-run debounce; activity that produces no finding never emails. There is no digest. The alert goes to the owner by e-mail only (the Gmail route, never SMS), and
+Every finding emails, after the runner's usual two-run debounce. A source stale for 30 minutes or more also turns the check to
+warn, so it emails even with no finding. Activity that produces no finding and no stale source never emails. There is no digest. The alert goes to the owner by e-mail only (the Gmail route, never SMS), and
 its link opens `/network?finding=<id>` with the finding selected. The shipped `[netwatch]` settings are in the `netwatch.settings`
 rule of `etc/rules.d/70-monitoring.toml`.
 
@@ -574,15 +575,16 @@ re-added with their remaining time. Unblock removes the block from the Network p
 * addresses that signed in successfully in the last 30 days. Blocking one needs a non-empty `override_reason`, which is audited.
 * when the topology cannot be read, no block is offered, and the rules that need to classify a peer are skipped.
 
-To undo everything:
+To undo everything, in this order:
 
-```
-sudo nft delete table inet netwatch          # every host block at once
-sudo systemctl disable --now homelab-maint-netwatch
-```
+1. Unblock each block on the Network page. Or stop the collector first (step 2), then mark the open rows closed:
+   `sudo sqlite3 /var/lib/homelab-maint/netwatch.db "UPDATE blocks SET removed=strftime('%s','now') WHERE removed IS NULL"`.
+2. `sudo systemctl disable --now homelab-maint-netwatch`
+3. `sudo nft delete table inet netwatch`
+4. In the Cloudflare dashboard, delete the IP access rules whose note starts with `netwatch:`.
 
-Then delete, in the Cloudflare dashboard, the IP access rules whose note starts with `netwatch:`. Stopping the collector does not
-lift a block by itself; the two commands above do.
+The collector re-adds every open, unexpired host block when it starts (`block.restore`), so deleting the nft table alone does not
+stick: close the rows first, or the next start puts the blocks back. Stopping the collector does not lift a block by itself.
 
 Host-only settings, never committed (the shipped values are empty):
 
