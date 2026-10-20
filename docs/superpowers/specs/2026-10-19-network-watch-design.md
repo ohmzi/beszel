@@ -1,6 +1,6 @@
 # Network Watch: who talks to this server, and what it talks to
 
-Status: draft for owner approval, 2026-10-19.
+Status: approved by the owner, 2026-10-19.
 Lives in: `engine/` (the homelab-maint engine) for collection, judging, alerts and blocking,
 and `internal/site/` (the OhmzMaintainer dashboard) for the page.
 
@@ -151,3 +151,31 @@ page and see who has been talking to what, with anything unusual already flagged
   and OhmzMaintainer pages.
 - **How the Cloudflare API token is stored.** It must be kept out of process command lines;
   cloudflared's own token was moved out of `ExecStart` for that reason on 2026-09-14.
+
+## 6. Facts established on 2026-10-19 (after approval)
+
+- **Cloudflare plan and tunnel.**
+  - Both zones are on the Free plan.
+  - The one tunnel routes **45 public hostnames** to local ports across the two zones.
+  - The list isn't written here because this repository is public. Build the inventory at run
+    time from the tunnel's configuration using the token below.
+  - Plex is reachable both on its forwarded port 32400 and through the tunnel.
+- **Security events.**
+  - Cloudflare's security events (the `firewallEventsAdaptive` dataset) are readable on the
+    Free plan with at least 30 days of history. That matches the 30-day goal, so they are a
+    source for Internet → server traffic that Cloudflare already blocked or challenged.
+  - In the last 24 hours before this check, they showed managed-rule blocks, Bot Fight
+    challenges and Labyrinth injections.
+- **Access.**
+  - Zero Trust is configured with one-time-PIN login.
+  - The only Access application is the one created today for the Ollama hostname (owner email
+    only).
+  - Every other tunnelled hostname relies on the app's own login. Treat that as the current
+    state; changing it is out of scope.
+- **Token.**
+  - `homelab-maint network-watch` is stored at `/etc/homelab-maint/cloudflare.token`
+    (root:root, 0600) and expires 2027-10-19.
+  - Verified: it can read zones, IP access rules, security events and the tunnel, and edit
+    IP access rules. It can't read DNS, list API tokens or read billing. It can also list
+    Access applications, read-only.
+  - The engine must read it from that file only. Never pass it on a command line.
