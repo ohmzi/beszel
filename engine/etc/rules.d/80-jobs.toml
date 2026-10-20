@@ -1494,3 +1494,35 @@ file = "jobs.toml"
 target = "scheduler.pressure_max"
 params = { P0 = 5, P1 = 5, P2 = 1, P3 = 1 }
 since = "2026-10-03"
+
+[[rule]]
+id = "job.netwatch-threat-refresh"
+title = "Network Watch threat lists refresh, daily 06:10"
+kind = "job"
+severity = "warn"
+principle = "detect by evidence, never by guess; a stale list is reported, not trusted"
+why = "Network Watch flags a peer that sits on a published bad-address list. Those lists change daily, so a copy from install time would miss new hostile ranges. A list that cannot be downloaded or parsed must keep its last good copy and say so, never empty itself."
+does = "Runs python3 -m homelab_maint.netwatch.threat refresh as root daily at 06:10, class P3, catchup_hours 20, timeout 300 s. It downloads the Spamhaus DROP (IPv4 and IPv6) lists, the FireHOL level 1 netset and the abuse.ch Feodo blocklist into /var/lib/homelab-maint/netwatch/threat, one CIDR per line. Each list is written atomically and only after a parse with at least one entry; otherwise the old file stays and the list is reported as kept with its reason. It exits 0 even when some lists were kept. Blocks are never made from these lists alone: the collector only uses them to classify a peer. Ships mode = managed: there is no legacy driver to retire."
+proof = "A native job with no legacy driver: the tick runs it with the command given here, and nothing else on the host runs it."
+applies_to = ["netwatch-threat-refresh"]
+file = "jobs.toml"
+target = "job[]"
+merge = "append"
+since = "2026-10-20"
+order = 33
+
+[rule.params]
+name = "netwatch-threat-refresh"
+title = "Network Watch threat lists refresh"
+command = ["{python}", "-m", "homelab_maint.netwatch.threat", "refresh"]
+user = "root"
+schedule = "daily 06:10"
+source = "native"
+class = "P3"
+catchup_hours = 20
+timeout_s = 300
+mode = "managed"
+env = { PYTHONPATH = "/usr/local/lib/homelab-maint" }
+note = "Keeps the last good copy of any list that fails to download or parse. Exits 0 even when lists were kept; read the per-list status in the job output."
+success = { exit_codes = [0] }
+notify = { on_failure = "alert", title = "Network Watch threat lists" }

@@ -391,8 +391,8 @@ def test_the_shipped_config_applies_nothing_but_the_reclaim_rung(an):
     assert (pr["reclaim"], pr["throttle"], pr["restart"], pr["emergency"]) == ("apply", "report", "report", "report")
     modes = {j["name"]: j.get("mode") for j in docs["jobs.toml"]["job"]}
     assert set(modes.values()) <= {"observe", "managed", "retired"}, modes
-    # container-audit added 2026-10-04: a native job with no legacy driver, so it ships managed like the engines.
-    assert {n for n, m in modes.items() if m == "managed"} == {"probes-run", "routine-run", "container-audit"}
+    # container-audit (2026-10-04) and netwatch-threat-refresh (2026-10-20): native jobs with no legacy driver, so they ship managed like the engines.
+    assert {n for n, m in modes.items() if m == "managed"} == {"probes-run", "routine-run", "container-audit", "netwatch-threat-refresh"}
     assert {n for n, m in modes.items() if m == "retired"} == {"mem-guard"}
     assert modes["docker-prune"] == "observe"
 

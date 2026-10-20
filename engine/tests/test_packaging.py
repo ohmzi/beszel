@@ -733,14 +733,14 @@ def test_every_job_runs_a_real_command_and_installing_takes_nothing_over():
                     assert cmd[cmd.index("--task") + 1] in reg
         elif "-m" in cmd:
             mod = cmd[cmd.index("-m") + 1]
-            assert mod.startswith("homelab_maint.") and (REPO / "homelab_maint" / f"{mod.split('.')[1]}.py").is_file(), f"{j['name']}: {mod}"
+            assert mod.startswith("homelab_maint.") and (REPO / Path(*mod.split(".")).with_suffix(".py")).is_file(), f"{j['name']}: {mod}"
             assert j["env"]["PYTHONPATH"] == "/usr/local/lib/homelab-maint", j["name"]
         else:
             assert cmd[0].startswith("/"), f"{j['name']}: the program must be an absolute path"
-    # Shipped state: only the umbrella's own engines run from the first tick, plus container-audit (added 2026-10-04: a
-    # native job with no legacy driver); every legacy-driven job is observe (or retired).
+    # Shipped state: only the umbrella's own engines run from the first tick, plus the native jobs with no legacy driver
+    # (container-audit, added 2026-10-04; netwatch-threat-refresh, 2026-10-20); every legacy-driven job is observe (or retired).
     managed = sorted(j["name"] for j in jobs if j.get("mode") == "managed")
-    assert managed == ["container-audit", "probes-run", "routine-run"], managed
+    assert managed == ["container-audit", "netwatch-threat-refresh", "probes-run", "routine-run"], managed
     assert all(j.get("mode") in ("managed", "observe", "retired") for j in jobs)
     byname = {j["name"]: j for j in jobs}
     assert byname["routine-run"]["command"][-3:] == ["homelab_maint.routine", "run", "--apply"], "the routine is a job of the tick"

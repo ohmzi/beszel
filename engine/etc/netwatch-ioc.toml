@@ -1,0 +1,5 @@
+# Network Watch indicators: addresses and domains the owner knows are hostile. Read by homelab_maint/netwatch/threat.py.
+# ips takes single addresses or CIDRs (IPv4 or IPv6); domains takes host names. The shipped copy is empty because this
+# repository is public: the owner's live copy under /etc/homelab-maint/ holds the real indicators, and an install never overwrites it.
+ips = []
+domains = []

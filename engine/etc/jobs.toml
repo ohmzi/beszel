@@ -905,3 +905,23 @@ ok_values = ["ok"]
 finished_key = "finished"
 [job.notify]
 on_failure = "alert"
+
+# rule: job.netwatch-threat-refresh
+[[job]]
+name = "netwatch-threat-refresh"
+title = "Network Watch threat lists refresh"
+command = ["{python}", "-m", "homelab_maint.netwatch.threat", "refresh"]
+user = "root"
+schedule = "daily 06:10"
+source = "native"
+class = "P3"
+catchup_hours = 20
+timeout_s = 300
+mode = "managed"
+env = { PYTHONPATH = "/usr/local/lib/homelab-maint" }
+note = "Keeps the last good copy of any list that fails to download or parse. Exits 0 even when lists were kept; read the per-list status in the job output."
+[job.success]
+exit_codes = [0]
+[job.notify]
+on_failure = "alert"
+title = "Network Watch threat lists"

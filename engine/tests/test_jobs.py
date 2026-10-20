@@ -231,7 +231,7 @@ def shipped():
 
 def test_shipped_file_is_valid(shipped):
     assert shipped.errors == []
-    assert len(shipped.jobs) == 21      # + container-audit, added 2026-10-04 during the /home/ohmz migration
+    assert len(shipped.jobs) == 22      # + container-audit (2026-10-04, /home/ohmz migration), + netwatch-threat-refresh (2026-10-20)
 
 
 # What the real units / crontab say (verified read-only against this host on 2026-10-02). Name -> (command, user, cron schedule).
@@ -258,7 +258,7 @@ REAL = {
     "routine-run": (["/usr/bin/python3", "-B", "-m", "homelab_maint.routine", "run", "--apply"], "root", "7-52/15 * * * *"),
     "purge-public-guests": (["/usr/bin/python3", "/home/ohmz/StudioProjects/ai-stack/scripts/purge_public_guests.py", "--yes"], "ohmz", "20 5 * * *"),
 }
-NATIVE_NO_DRIVER = {"probes-run", "routine-run", "purge-public-guests", "container-audit"}
+NATIVE_NO_DRIVER = {"probes-run", "routine-run", "purge-public-guests", "container-audit", "netwatch-threat-refresh"}
 
 
 @pytest.mark.parametrize("name", sorted(REAL))
