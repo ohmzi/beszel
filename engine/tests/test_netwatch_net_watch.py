@@ -28,7 +28,7 @@ TOPO = entities.Topology(
     listening=set(),
     host_ips=frozenset({ipaddress.ip_address("192.168.40.2")}),
 )
-SOURCES = ("sockets", "kernel", "auth", "plex", "cloudflare", "tunnel")
+SOURCES = ("sockets", "kernel", "auth", "plex", "cloudflare", "tunnel", "signins")
 
 
 @pytest.fixture
@@ -91,7 +91,6 @@ def test_registered_as_a_c0_check_that_needs_root_with_a_timeout():
 
 
 def test_result_is_one_short_ascii_line_on_an_empty_store(env):
-    _sources(env, NOW)
     res = _run()
     assert isinstance(res, core.Result) and res.status in ("ok", "info", "warn", "crit", "skipped", "error")
     assert res.summary.isascii() and "\n" not in res.summary and len(res.summary) <= 140
@@ -269,3 +268,38 @@ def test_threat_lists_that_cannot_be_read_are_an_error(env, monkeypatch):
     monkeypatch.setattr(ThreatIndex, "load", unreadable)
     res = _run()
     assert res.status == "error" and res.summary == "Network: threat lists unreadable (ValueError)"
+
+
+def _age_threat_list(name, when):
+    os.utime(core.STATE_DIR / "netwatch" / "threat" / f"{name}.txt", (when, when))
+
+
+def test_a_threat_list_stale_then_fresh_then_stale_again_does_not_count_at_once(env):
+    _age_threat_list("feodo", NOW - 4 * 86400)                  # older than the 3-day list limit: stale
+    _sources(env, NOW)
+    assert _run(NOW).status == "ok"                             # first sight: marker set, not counted
+    assert store.meta_get(env, "stale_since:threat:feodo") == repr(NOW)
+    t1 = NOW + 31 * MIN
+    _age_threat_list("feodo", t1)                               # fresh again
+    _sources(env, t1)
+    res = _run(t1)
+    assert res.status == "ok" and res.metrics["stale_sources"] == 0
+    assert store.meta_get(env, "stale_since:threat:feodo") is None   # marker cleared on becoming fresh
+    t2 = t1 + MIN
+    _age_threat_list("feodo", NOW - 4 * 86400)                  # stale again
+    _sources(env, t2)
+    res = _run(t2)
+    assert res.status == "ok" and res.metrics["stale_sources"] == 0
+    assert store.meta_get(env, "stale_since:threat:feodo") == repr(t2)
+
+
+def test_an_empty_store_is_not_stale_at_first_then_warns_and_names_the_missing_sources(env):
+    res = _run(NOW)
+    assert res.status == "ok" and res.metrics["stale_sources"] == 0
+    later = NOW + 31 * MIN
+    res = _run(later)
+    assert res.status == "warn"
+    assert res.summary.startswith("Network: 7 sources stale: ")
+    for name in ("sockets", "kernel", "auth", "plex", "cloudflare", "tunnel", "signins"):
+        assert name in res.summary
+    assert res.metrics["stale_sources"] == 7

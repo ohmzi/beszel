@@ -21,6 +21,7 @@ WHY_MAX = 120
 TALKERS_MAX = 120
 SUMMARY_MAX = 140
 EDGE_SOURCE = "cloudflare"
+KNOWN_SOURCES = ("sockets", "kernel", "auth", "plex", "cloudflare", "tunnel", "signins")
 FLOW_DIRECTIONS = ("in", "out", "svc", "lan")
 
 
@@ -54,21 +55,28 @@ def _is_stale(status: str, epoch: float | None, now: float) -> bool:
 
 
 def _stale_sources(db, now: float, threat: ThreatIndex) -> list[str]:
-    """Sources stale for STALE_S or more, by name. Keeps meta stale_since:<name> (set on the first sight of staleness, removed once ok)."""
+    """Sources stale for STALE_S or more, by name. A source with no row at all (never started) is stale too, so a collector that
+    never ran is reported after the same grace as one that stopped. Keeps meta stale_since:<name>: set on the first sight of
+    staleness, removed as soon as the name is no longer stale (ok, skipped, or gone from the stale set)."""
     stale_now: dict[str, bool] = {}
     for key, value in db.execute("SELECT key, value FROM meta WHERE key LIKE 'source:%'").fetchall():
         status, epoch = _parse_source(value)
         stale_now[key[len("source:"):]] = _is_stale(status, epoch, now)
+    for name in KNOWN_SOURCES:
+        stale_now.setdefault(name, True)                       # no row: the collector never wrote it
     for name in threat.stale_lists(now):
         stale_now[f"threat:{name}"] = True
 
+    for (key,) in db.execute("SELECT key FROM meta WHERE key LIKE 'stale_since:%'").fetchall():
+        if not stale_now.get(key[len("stale_since:"):]):
+            with db:
+                db.execute("DELETE FROM meta WHERE key = ?", (key,))
+
     counted = []
     for name, stale in sorted(stale_now.items()):
-        marker = f"stale_since:{name}"
         if not stale:
-            with db:
-                db.execute("DELETE FROM meta WHERE key = ?", (marker,))
             continue
+        marker = f"stale_since:{name}"
         try:
             since = float(store.meta_get(db, marker))
         except (TypeError, ValueError):
