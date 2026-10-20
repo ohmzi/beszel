@@ -93,7 +93,8 @@ GENERATED_MARK = "# GENERATED from rules.d"
 MANAGED_FILES = ("maint.toml", "routine.toml", "jobs.toml", "probes.toml", "classes.toml", "notify.toml", "ack.toml", "protected.toml")
 CATEGORIES = {"checks": "Health checks", "spike": "Spike and load response", "cleanup": "Cleanup and retention",
               "protection": "Protections", "alerts": "Alerts and notifications", "schedule": "Schedule and routine",
-              "monitoring": "Monitoring probes", "jobs": "Jobs", "safety": "Safety limits", "ack": "Acknowledgements"}
+              "monitoring": "Monitoring probes", "jobs": "Jobs", "safety": "Safety limits", "ack": "Acknowledgements",
+              "netwatch": "Network Watch"}
 KINDS = ("check", "cleanup", "protection", "alert", "schedule", "probe", "job", "spike", "policy", "safety")
 SEVERITIES = ("warn", "crit", "none")
 MERGES = ("set", "append")
@@ -3441,13 +3442,15 @@ SPIKE_TASKS = frozenset({"spike_sampler", "stuck_detector", "orphan_report", "im
                          "bulkhead_check", "qos_classes"})
 OUT_FILES = {"checks": "10-checks.toml", "spike": "20-spike.toml", "cleanup": "30-cleanup.toml", "protection": "40-protection.toml",
              "alerts": "50-alerts.toml", "schedule": "60-schedule.toml", "monitoring": "70-monitoring.toml", "jobs": "80-jobs.toml",
-             "safety": "90-safety.toml", "ack": "95-ack.toml"}
+             "safety": "90-safety.toml", "ack": "95-ack.toml",
+             "netwatch": "65-netwatch.toml"}
 OUT_BLURB = {"checks": "What the script verifies and when it complains.", "spike": "How the script reacts to memory, IO, CPU and GPU pressure.",
              "cleanup": "What the script cleans or trims, under which limits (report-only until you say apply).",
              "protection": "Workloads and paths the script must never kill, restart or delete.",
              "alerts": "Who is told what, when and how often; acknowledgements.", "schedule": "When each maintenance step may run.",
              "monitoring": "Probes and the live monitor: what is watched and how.", "jobs": "Scheduled jobs and the timers the host runs.",
-             "safety": "Global limits and settings.", "ack": "Acknowledged known issues: how an error is recognised again."}
+             "safety": "Global limits and settings.", "ack": "Acknowledged known issues: how an error is recognised again.",
+             "netwatch": "Who talks to what: the Network Watch collector's cadence and retention."}
 DESTRUCTIVE_JOB = re.compile(r"prune|purge|delete|remove|clean|recycle|reclaim|restart|rm\b", re.I)
 
 
@@ -3604,7 +3607,7 @@ def _table_rule(c: _MCtx, file: str, path: tuple, own: dict, rid: str, title: st
 
 
 def _conv_maint(c: _MCtx, doc: dict, _raw: str) -> None:
-    for path, own in _tables(doc, r"global|caps|tasks\.[^.]+|live"):
+    for path, own in _tables(doc, r"global|caps|tasks\.[^.]+|live|netwatch"):
         if not path:
             _table_rule(c, "maint.toml", path, own, "config.root", "Global settings (root)", "policy", "safety")
         elif path[0] == "tasks" and len(path) == 2:
@@ -3631,6 +3634,8 @@ def _conv_maint(c: _MCtx, doc: dict, _raw: str) -> None:
                         mode_lift=True, applies=[name], destructive=klass in ("C1", "C2") and kind != "check", severity=sev, prefix=pre)
         elif path == ("live",):
             _table_rule(c, "maint.toml", path, own, "live.settings", "Live monitor settings", "probe", "monitoring", prefix="live.service")
+        elif path == ("netwatch",):
+            _table_rule(c, "maint.toml", path, own, "netwatch.settings", "Network Watch collector settings", "probe", "netwatch")
         else:
             _table_rule(c, "maint.toml", path, own, f"config.{'.'.join(path)}", f"Settings [{'.'.join(path)}]", "safety" if path[0] == "caps" else "policy", "safety",
                         applies=[])

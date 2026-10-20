@@ -43,7 +43,7 @@ TIER_SERVICES = ("check", "daily", "weekly")
 # One umbrella: the tick (with metrics) runs next to the tier timers; there is deliberately NO routine timer. The self-health refresher is
 # a timer of its own on purpose: it is the dead-man of the tick, so it must not run from it.
 ENABLED_TIMERS = {f"homelab-maint-{n}.timer" for n in (*TIER_SERVICES, "metrics", "tick", "selfhealth")}
-DAEMONS = {"homelab-maint-www.service", "homelab-maint-live.service"}
+DAEMONS = {"homelab-maint-www.service", "homelab-maint-live.service", "homelab-maint-netwatch.service"}
 # Triggered by their timers only: install.sh must never start, restart or enable these directly.
 TIMER_DRIVEN = {f"homelab-maint-{n}.service" for n in (*TIER_SERVICES, "metrics", "tick", "selfhealth")}
 ORIGINAL_IMMICH_UNIT = """\
@@ -325,6 +325,7 @@ EXPECTED_UNITS = {
     "homelab-maint-tick.service", "homelab-maint-tick.timer",           # the 1-minute scheduler tick (routine, probes, jobs)
     "homelab-maint-selfhealth.service", "homelab-maint-selfhealth.timer",   # the 1-minute pipeline self-check (public/self.json)
     "homelab-maint-live.service",                                       # the 5 s live monitor
+    "homelab-maint-netwatch.service",                                   # the Network Watch collector (netwatch/collect.py)
     "homelab-maint-www.service",
 }
 
@@ -1492,13 +1493,14 @@ STUB_DOCKER = """#!/bin/sh
 echo "$*" >> "$STUB_LOG_DOCKER"
 exit 0
 """
-FAKE_MODULES = ("live.py", "metrics_ring.py", "scheduler.py", "tasks/self_health.py")   # what NEEDS in install.sh looks for (server.py is in the fake project)
+FAKE_MODULES = ("live.py", "metrics_ring.py", "scheduler.py", "tasks/self_health.py", "netwatch/collect.py")   # what NEEDS in install.sh looks for (server.py is in the fake project)
 
 
 def _install_live_dry(env: Env, *args: str, retired_units: str = "", retired_paths: str = "", with_modules: bool = True):
     assert "--dry-run" in args, "the live-systemd branch may only ever be run as a dry run from a test"
     if with_modules:
         for m in FAKE_MODULES:
+            (env.proj / "homelab_maint" / m).parent.mkdir(parents=True, exist_ok=True)
             (env.proj / "homelab_maint" / m).write_text("VALUE = 1\n")
     bindir = env.tmp / "stubbin"
     bindir.mkdir(exist_ok=True)

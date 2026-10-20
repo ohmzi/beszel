@@ -120,9 +120,9 @@ Specifically:
   sync), every other file only if absent. It never runs `rules sync` by itself: it prints `sudo homelab-maint rules sync --adopt`,
   and runs it only with `--adopt-rules`.
 * It enables and starts `homelab-maint-check.timer`, `-daily.timer`, `-weekly.timer`, `-metrics.timer`, `-tick.timer`,
-  `-selfhealth.timer`, `homelab-maint-www.service` and `homelab-maint-live.service`, and nothing else (no legacy unit, no
+  `-selfhealth.timer`, `homelab-maint-www.service`, `homelab-maint-live.service` and `homelab-maint-netwatch.service`, and nothing else (no legacy unit, no
   `docker-prune.timer`). It never starts a tier, metrics, self-health or tick service itself; their timers do. `--no-start`
-  enables without starting. `--first-check` starts the check service once (the same run its timer does). The two daemons are
+  enables without starting. `--first-check` starts the check service once (the same run its timer does). The daemons are
   restarted when code or a unit changed.
 * It never touches a legacy unit. It also never puts back what `homelab-maint migrate cutover` retired: a timer or drop-in listed
   by `homelab-maint migrate retired` is skipped (`retired` in the output).
@@ -167,6 +167,7 @@ For tests and image builds, `HM_ROOT=/some/dir ./install.sh` stages everything u
 | `homelab-maint-metrics.timer` | every minute | a sampler: temperatures, fans, load into the 7-day ring `metrics-ring.json` (sandboxed) |
 | `homelab-maint-selfhealth.timer` | every minute | `homelab-maint-selfhealth.service` rewrites `public/self.json`: is the monitoring pipeline itself healthy (sandboxed). Its own timer, NOT a tick job: it is the dead-man of the tick |
 | `homelab-maint-live.service` | always on | the 5 s live monitor: writes `public/live.json` (sandboxed, 10 % CPU cap) |
+| `homelab-maint-netwatch.service` | always on | the Network Watch collector: sockets, journals, Plex log and Cloudflare into `netwatch.db` (metadata only, 10 % CPU cap) |
 | `homelab-maint-www.service` | always on | read-only JSON on `127.0.0.1:9111` for the Homarr widgets (dynamic user, sandboxed, loopback only) |
 
 `--apply` on the check, daily and weekly services only permits mutation. Whether a task actually mutates is decided per task by its

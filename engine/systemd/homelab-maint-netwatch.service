@@ -1,0 +1,51 @@
+[Unit]
+Description=homelab-maint Network Watch collector (sockets, journals, Plex log and Cloudflare -> netwatch.db)
+Documentation=file:///usr/local/lib/homelab-maint/homelab_maint/netwatch/collect.py
+# Ordering only (no Wants=): starting the collector must never start, or restart, anything it merely reads. Note: dockerd is
+# socket-activated here, and entities.load_topology calls `docker ps` without first checking docker.service is active (the live
+# monitor does that check); a connect to the socket while dockerd is stopped would start it. Flagged for review.
+After=network.target docker.service
+
+[Service]
+Type=simple
+# Config ([netwatch] in maint.toml) is read once at start: after editing it run `systemctl restart homelab-maint-netwatch`.
+# Metadata only: who, when, port, connection counts and bytes, in /var/lib/homelab-maint/netwatch.db. Root because nsenter needs to
+# enter each container's network namespace, and the journal and the Docker socket are root-only.
+User=root
+Environment=PYTHONPATH=/usr/local/lib/homelab-maint
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B -m homelab_maint.netwatch.collect
+# SIGTERM is handled: the current tick finishes, then the collector exits 0.
+KillSignal=SIGTERM
+TimeoutStopSec=15
+Restart=always
+RestartSec=5
+SyslogIdentifier=homelab-maint-netwatch
+
+# Best effort by design: it must never compete with the apps it watches.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=128M
+CPUQuota=10%
+TasksMax=48
+
+# Read-only everywhere except the state dir. Cloudflare is reached over HTTPS, so the address families stay open and there is no
+# IPAddressDeny. RestrictNamespaces is deliberately NOT set: nsenter switches into each container's network namespace (setns).
+ProtectSystem=strict
+ReadWritePaths=/var/lib/homelab-maint
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

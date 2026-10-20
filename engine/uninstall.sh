@@ -61,7 +61,7 @@ UNIT_NAMES=(
   homelab-maint-metrics.timer homelab-maint-tick.timer homelab-maint-selfhealth.timer
   homelab-maint-check.service homelab-maint-daily.service homelab-maint-weekly.service
   homelab-maint-metrics.service homelab-maint-tick.service homelab-maint-selfhealth.service
-  homelab-maint-live.service homelab-maint-www.service
+  homelab-maint-live.service homelab-maint-netwatch.service homelab-maint-www.service
 )
 # Drop-ins this project installed: <unit dir>/<file>. Only these exact files are removed.
 DROPINS=(immich-server-recycle.service.d/10-homelab-gate.conf)

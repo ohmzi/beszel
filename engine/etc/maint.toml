@@ -429,6 +429,24 @@ max_gib_per_run = 10
 # installations = ["system", "user:ohmz"]   # default: the system installation only; one entry per flatpak installation, each listed, checked and
 #                                          # removed on its own (apps of every other installation are cross-checked either way)
 
+# ------------------------------------------------------------------ Network Watch collector (homelab-maint-netwatch.service -> netwatch.db)
+# [netwatch] is read ONCE when the collector starts: after editing it run `systemctl restart homelab-maint-netwatch`.
+# rule: netwatch.settings
+[netwatch]
+lan_cidrs = ["192.168.40.0/24"]
+tailscale_cidrs = ["100.64.0.0/10"]
+tunnel_local_ports = []
+cf_account_id = ""
+cf_zones = []
+sockets_every_s = 30
+journal_every_s = 60
+plex_every_s = 60
+cloudflare_every_s = 300
+cloudflare_window_s = 900
+plex_dir = "/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server"
+keep_days = 30
+path_classes = {}
+
 # ------------------------------------------------------------------ live monitor (homelab-maint-live.service, 5 s heartbeat -> public/live.json)
 # Optional: with no [live] section the built-in defaults are identical (tests/test_live.py pins that). Listing it here makes the service
 # list editable.

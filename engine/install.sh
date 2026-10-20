@@ -85,8 +85,9 @@ TIMERS=(homelab-maint-check.timer homelab-maint-daily.timer homelab-maint-weekly
         homelab-maint-metrics.timer homelab-maint-tick.timer homelab-maint-selfhealth.timer)
 WWW=homelab-maint-www.service
 LIVE=homelab-maint-live.service
+NETWATCH=homelab-maint-netwatch.service
 # Unit -> the module that must exist in the source tree, else the unit would only fail every run.
-declare -A NEEDS=([$WWW]=server.py [$LIVE]=live.py [homelab-maint-metrics.timer]=metrics_ring.py [homelab-maint-tick.timer]=scheduler.py
+declare -A NEEDS=([$WWW]=server.py [$LIVE]=live.py [$NETWATCH]=netwatch/collect.py [homelab-maint-metrics.timer]=metrics_ring.py [homelab-maint-tick.timer]=scheduler.py
                   [homelab-maint-selfhealth.timer]=tasks/self_health.py)
 # Config that is release data rather than owner config: replaced on every install (the owner's own items live in legacy-retirement.d/).
 ALWAYS=(legacy-retirement.toml)
@@ -455,7 +456,7 @@ if [[ -n $ROOT ]]; then
 else
   # Reload when we changed a unit, or when an earlier interrupted run left one changed on disk.
   reload=$UNITS_CHANGED
-  for u in "${TIMERS[@]}" "$WWW" "$LIVE" immich-server-recycle.service; do
+  for u in "${TIMERS[@]}" "$WWW" "$LIVE" "$NETWATCH" immich-server-recycle.service; do
     if [[ $(systemctl show -p NeedDaemonReload --value "$u" 2>/dev/null || true) == yes ]]; then reload=1; fi
   done
   if ((reload)); then
@@ -482,6 +483,7 @@ else
   for u in "${TIMERS[@]}"; do eligible "$u" && to_enable+=("$u"); done
   eligible "$WWW" && to_enable+=("$WWW")
   eligible "$LIVE" && to_enable+=("$LIVE")
+  eligible "$NETWATCH" && to_enable+=("$NETWATCH")
 
   for u in "${to_enable[@]}"; do
     if [[ $(systemctl is-enabled "$u" 2>/dev/null || true) == enabled ]]; then
@@ -493,7 +495,7 @@ else
     fi
     ((START)) || continue
     if systemctl is-active --quiet "$u" 2>/dev/null; then
-      if [[ $u == "$WWW" || $u == "$LIVE" ]] && ((CODE_CHANGED || UNITS_CHANGED)); then
+      if [[ $u == "$WWW" || $u == "$LIVE" || $u == "$NETWATCH" ]] && ((CODE_CHANGED || UNITS_CHANGED)); then
         ctl restart "$u"            # a daemon: pick up new code or a new sandbox profile (the live monitor saves its history first)
         note "$(verb restart)" "$u (code or unit changed)"
         changed
