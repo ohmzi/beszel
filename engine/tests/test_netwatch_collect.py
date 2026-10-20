@@ -109,6 +109,7 @@ def test_one_tick_writes_flow_edge_and_event_rows(tmp_path):
 
     assert status == {
         "sockets": "ok", "kernel": "ok", "auth": "ok", "plex": "ok", "signins": "ok", "cloudflare": "ok", "tunnel": "ok",
+        "blocks": "ok",
     }
     assert _count(db, "flows") >= 1
     assert _count(db, "edge") == 1

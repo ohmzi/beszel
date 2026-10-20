@@ -1415,6 +1415,16 @@ def _auth_handlers() -> None:
         _event("auth-handlers", outcome=f"not registered: {type(exc).__name__}")
 
 
+def _netwatch_handlers() -> None:
+    """Network Watch's two request kinds (net_block, net_unblock) are answered by netwatch/block.py. Registered in the module that reads the
+    inbox, the same way as _auth_handlers. Any failure only leaves those kinds unanswered."""
+    try:
+        from .netwatch import block
+        block.register(sys.modules[__name__])
+    except Exception as exc:  # noqa: BLE001
+        _event("netwatch-handlers", outcome=f"not registered: {type(exc).__name__}")
+
+
 @dataclass
 class Report:
     applied: list[str] = field(default_factory=list)       # fingerprints acknowledged
@@ -1749,6 +1759,7 @@ def process_inbox(now: float | None = None, *, refresh: bool = False) -> Report:
         if not names:
             return rep                                           # the usual minute: nothing to do, no lock taken
         _auth_handlers()
+        _netwatch_handlers()
         if not lock.acquire():
             rep.skipped = True
             return rep

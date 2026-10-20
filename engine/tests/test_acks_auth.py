@@ -143,7 +143,7 @@ def test_process_inbox_registers_both_kinds_before_the_first_request_and_an_idle
     assert acks.process_inbox(NOW).note == "" and acks._HANDLERS == {}                                # an empty inbox: one listing, nothing imported or registered
     put(world, setup_req())
     rep = acks.process_inbox(NOW)
-    assert rep.handled == ["auth_setup"] and rep.rejected == [] and set(acks._HANDLERS) == {"auth_setup", "auth_change"}
+    assert rep.handled == ["auth_setup"] and rep.rejected == [] and set(acks._HANDLERS) >= {"auth_setup", "auth_change"}
     assert acks._HANDLERS["auth_setup"][1] >= {"rid", "pw", "totp", "recovery", "proof"} and acks._HANDLERS["auth_change"][1] >= {"rid", "op", "h"}
     assert acks._HANDLERS["auth_setup"][0]._acks_auth is True
 

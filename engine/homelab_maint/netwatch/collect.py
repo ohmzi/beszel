@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 
 from homelab_maint import core
-from homelab_maint.netwatch import entities, logs, plex, protect, sockets, store
+from homelab_maint.netwatch import block, entities, logs, plex, protect, sockets, store
 from homelab_maint.netwatch.cloudflare import CF, CFUnavailable
 from homelab_maint.netwatch.plex import CODEC_WINDOW
 
@@ -31,6 +31,7 @@ MAX_STRETCH = 4            # the load back-off never multiplies an interval by m
 PLEX_LOG = "Plex Media Server.log"
 PLEX_CURSOR_STEP = 0.001  # the cursor sits just past the newest consumed line, so that line is never read again
 PLEX_FIRST_S = 600         # the first Plex read looks back this far, like the journal's first read
+BLOCKS_S = 3600           # expired blocks are retired hourly
 _DEFAULTS = {
     "sockets_every_s": 30, "journal_every_s": 60, "plex_every_s": 60, "cloudflare_every_s": 300,
     "cloudflare_window_s": 900, "keep_days": 30,
@@ -51,6 +52,10 @@ class Collector:
         self._stretch = 1
         if store.meta_get(db, "first_run") is None:
             store.meta_set(db, "first_run", str(int(clock())))
+        try:                                    # a reboot empties the nft sets: put the open host blocks back
+            block.restore(db, clock(), sh)
+        except Exception:  # noqa: BLE001  (restore reports its own failures; the collector must start regardless)
+            pass
 
     # ---- scheduling ----------------------------------------------------------------------------------------------------
 
@@ -87,6 +92,7 @@ class Collector:
             ("cloudflare", cfg["cloudflare_every_s"], self._cloudflare, True),
             ("signins", SIGNINS_S, self._signins, True),
             ("tunnel", TUNNEL_S, self._tunnel, False),
+            ("blocks", BLOCKS_S, self._blocks, False),
         )
         ran: dict[str, str] = {}
         for name, every, fn, stretch in plan:
@@ -169,6 +175,9 @@ class Collector:
         hosts = sorted(self._cf.tunnel_hostnames())
         store.meta_set(self._db, "tunnel:hosts", json.dumps(hosts))
         return "ok"
+
+    def _blocks(self, now: float) -> str:
+        return block.sweep(self._db, now, self._cf)
 
     def _prune(self, now: float) -> str:
         store.prune(self._db, now, int(self._cfg["keep_days"]))
