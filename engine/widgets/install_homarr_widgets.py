@@ -48,9 +48,9 @@ HERE = Path(__file__).resolve().parent
 SCHEMA_TAG = "homarr-custom-widget-v2"
 DEF_TABLE = "custom_widget_v2_definition"
 LEGACY_TABLES = ("custom_widget_definition", "custom_widget_secret")          # read-only for us, always
-ORDER = ["ops-overview", "ops-disk", "ops-jobs", "ops-guard", "ops-reclaim", "ops-thermals", "ops-load"]
+ORDER = ["ops-overview", "ops-disk", "ops-jobs", "ops-guard", "ops-reclaim", "ops-thermals", "ops-load", "ops-net"]
 # Content-fit footprints in board tracks (WxH, spec 6.3: one track = 212 logical px) and item refresh seconds (spec 6.5).
-SIZES = {"ops-overview": (3, 2), "ops-disk": (3, 3), "ops-jobs": (3, 3), "ops-guard": (3, 3), "ops-reclaim": (3, 3),
+SIZES = {"ops-overview": (3, 2), "ops-disk": (3, 3), "ops-jobs": (3, 3), "ops-guard": (3, 3), "ops-reclaim": (3, 3), "ops-net": (3, 3),
          "ops-thermals": (3, 3), "ops-load": (3, 3)}
 REFRESH = {s: 30 for s in ORDER} | {"ops-thermals": 60, "ops-load": 60}
 LIVE_HINTS = [re.compile(p) for p in (r"^/data/compose/[^/]+/homarr/", r"/appdata/db/db\.sqlite$", r"^/volume1/docker/homarr/")]

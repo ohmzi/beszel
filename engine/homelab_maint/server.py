@@ -1,6 +1,6 @@
 """Tiny read-only JSON server for the Homarr widgets: 127.0.0.1:<www_port> (default 9111).
 
-Routes (GET only): /overview /disk /jobs /guard /reclaim /status  /thermal /load /metrics /heartbeat /pipeline
+Routes (GET only): /overview /disk /jobs /guard /reclaim /net /status  /thermal /load /metrics /heartbeat /pipeline
   * /thermal and /load are the 7-day sensor widgets (payloads_metrics, fed by the metrics ring); /metrics is the raw ring export;
     /heartbeat is the dead-man's switch for an external watcher (tasks.monitors.heartbeat_payload; HTTP 200 whatever "ok" says,
     so a Kuma keyword monitor can match '"ok":true'). None of them needs status.json;

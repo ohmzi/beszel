@@ -55,8 +55,10 @@ WIDGETS = {
                      "CPU/GPU/RAM temperature and CPU/case/GPU fan speed: now, 1 h / 24 h / 7 d averages and a 7-day hourly history.", (3, 3), 60),
     "ops-load": ("Ops Load 7d", "load",
                  "CPU, GPU and RAM utilisation: now, 1 h / 24 h / 7 d averages and a 7-day hourly history.", (3, 3), 60),
+    "ops-net": ("Ops Network", "net",
+                "Network Watch: connections per direction (24 h), the top internet talkers, and the open flags that need a look.", (3, 3), 30),
 }
-STATUS_STEMS = ["ops-overview", "ops-disk", "ops-jobs", "ops-guard", "ops-reclaim"]       # fed by status.json (homelab_maint.payloads)
+STATUS_STEMS = ["ops-overview", "ops-disk", "ops-jobs", "ops-guard", "ops-reclaim", "ops-net"]  # fed by status.json (homelab_maint.payloads)
 METRIC_STEMS = ["ops-thermals", "ops-load"]                                                # fed by the metrics ring (payloads_metrics)
 STATUS_CASES = ["ok", "warn", "crit", "stale", "stress", "no_tasks", "checks_only", "paused", "no_status_file"]
 METRIC_CASES = ["full_ring", "partial_ring", "stale", "all_none", "no_gpu", "hot", "no_ring_file"]
@@ -120,7 +122,8 @@ def payload_cases() -> dict[str, dict[str, dict]]:
         fixtures["paused"] = dict(ms.build("warn"), paused=True)       # the kill switch is on while checks still warn: the orange "paused" badge
         for case, st in fixtures.items():
             for stem in STATUS_STEMS:
-                cases[stem][case] = payloads.build(WIDGETS[stem][1], st, ms.NOW)
+                src = dict(st, tasks={**st.get("tasks", {}), "net_watch": ms.net_watch(case)}) if stem == "ops-net" else st
+                cases[stem][case] = payloads.build(WIDGETS[stem][1], src, ms.NOW)
         with tempfile.TemporaryDirectory() as td:    # the body the server sends before the first run / after a state-dir wipe
             missing = server.StatusSource(Path(td) / "status.json")
             for stem in STATUS_STEMS:

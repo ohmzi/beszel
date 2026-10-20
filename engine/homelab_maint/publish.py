@@ -33,6 +33,7 @@ Markdown scrubbed line by line with traceback blocks dropped):
   migration.json      legacy.export_public()         legacy items, replacement, retired or not
   reports/index.json  see below
   self.json           tasks.self_health.export()     health of the monitoring pipeline itself (SPEC6 S6): runner -> publish -> website, tick, live, registry
+  network.json        netwatch.export.build_network() Network Watch: directions, talkers, services, open findings, blocks, sign-ins (512 KB cap)
   rules.json          registry.write_public()        what the script does: every rule of the registry, last evaluated / triggered (SPEC6 S5; 700 KB cap of its own)
   rules-history.json  the `history` of rules.json    the registry's recent changes as a file of its own: {schema, generated_at, registry_hash, history: [newest first]}
   manifest.json       registry.write_public()        schema + generated_at of every public file, runner version, registry hash: written LAST
@@ -1433,6 +1434,14 @@ def build_reports(run: _Run):
     return WROTE, None
 
 
+def build_network_json(run: _Run):
+    """network.json (Network Watch, netwatch/export.py). Written here under its own 512 KB cap, not the 195 KB file cap, so it returns WROTE."""
+    from .netwatch import export
+    doc = export.build_network(run.status or {}, run.now)
+    _write_atomic(run.pub / "network.json", _dump(doc))
+    return WROTE, None
+
+
 BUILDERS: list[tuple[str, Callable]] = [
     ("overview.json", build_overview), ("checks.json", build_checks), ("actions.json", build_actions),
     ("storage.json", build_storage), ("metrics.json", build_metrics), ("schedule.json", build_schedule),
@@ -1440,6 +1449,7 @@ BUILDERS: list[tuple[str, Callable]] = [
     ("routine.json", build_routine), ("incidents.json", build_incidents), ("slo.json", build_slo),
     ("pressure.json", build_pressure), ("jobs.json", build_jobs), ("monitors.json", build_monitors),
     ("notifications.json", build_notifications), ("migration.json", build_migration), ("self.json", build_self),
+    ("network.json", build_network_json),
     ("reports/index.json", build_reports),
 ]
 

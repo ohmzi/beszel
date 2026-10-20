@@ -1,4 +1,4 @@
-"""JSON payloads behind the Homarr v2 custom widgets (ops-overview, ops-disk, ops-jobs, ops-guard, ops-reclaim).
+"""JSON payloads behind the Homarr v2 custom widgets (ops-overview, ops-disk, ops-jobs, ops-guard, ops-reclaim, ops-net).
 
 Everything here is a pure function of the status dict (STATE_DIR/status.json as written by cli.py) and `now`.
 Design rules, all driven by the Homarr v2 custom-widget runtime (widgets/CONVENTIONS.md):
@@ -518,8 +518,35 @@ def reclaim(status: dict, now: float | None = None) -> dict:
     return fit(p)
 
 
+# --------------------------------------------------------------------------- network
+NET_FLAGS = 5                                                                 # open flags shown in the widget
+
+
+def _count(v: Any) -> str:
+    n = _num(v)
+    return "--" if n is None else f"{int(n)}"
+
+
+def net(status: dict, now: float | None = None) -> dict:
+    """ops-net: the net_watch entry only (metrics in24/out24/svc24/lan24/edge24/blocked/stale_sources/top_talkers, items = open flags)."""
+    p, now = _base(status, now)
+    e = _tasks(status).get("net_watch")
+    m = _m(e)
+    p["dirs"] = [{"l": lbl, "v": _count(m.get(k))}
+                 for lbl, k in (("in", "in24"), ("out", "out24"), ("svc", "svc24"), ("lan", "lan24"))]
+    p["edge"], p["blocked"], p["stale_src"] = _count(m.get("edge24")), _count(m.get("blocked")), _count(m.get("stale_sources"))
+    p["tt"] = _t(m.get("top_talkers"), 120)
+    p["flags"] = [{"r": _t(x.get("rule"), 28), "s": _t(x.get("src"), 40), "t": _t(x.get("target"), 40), "n": _count(x.get("count")),
+                   "c": COLOR[_lv(x.get("severity"), "info")]}
+                  for x in _rows(e)[:NET_FLAGS]]
+    n = _num(m.get("flags"))
+    p["head"] = "no data" if e is None else "no flags" if not n else f"{int(n)} open"
+    p["hc"], p["hn"] = _col(e), _sum(e, 110)
+    return fit(p)
+
+
 # --------------------------------------------------------------------------- dispatch / raw status
-ROUTES = {"overview": overview, "disk": disk, "jobs": jobs, "guard": guard, "reclaim": reclaim}
+ROUTES = {"overview": overview, "disk": disk, "jobs": jobs, "guard": guard, "reclaim": reclaim, "net": net}
 
 
 def build(route: str, status: dict, now: float | None = None) -> dict:

@@ -91,7 +91,8 @@ def test_squash_strips_indentation_blank_lines_and_comment_lines():
 def test_metadata_matches_the_spec_geometry_and_refresh():
     """docs/HOMARR_V2_WIDGETS.md 6.3 / 6.5: 3x2 tracks for the overview, 3x3 for the rest; 30 s status, 60 s metrics."""
     assert {s: m[3] for s, m in bv.WIDGETS.items()} == {"ops-overview": (3, 2), "ops-disk": (3, 3), "ops-jobs": (3, 3), "ops-guard": (3, 3),
-                                                       "ops-reclaim": (3, 3), "ops-thermals": (3, 3), "ops-load": (3, 3)}
+                                                       "ops-reclaim": (3, 3), "ops-net": (3, 3), "ops-thermals": (3, 3),
+                                                       "ops-load": (3, 3)}
     assert {s: m[4] for s, m in bv.WIDGETS.items()} == {**{s: 30 for s in bv.STATUS_STEMS}, "ops-thermals": 60, "ops-load": 60}
 
 
@@ -194,7 +195,7 @@ def test_fixtures_are_what_the_payload_builders_produce(cases):
         assert set(per_case) == set(bv.STATUS_CASES if stem in bv.STATUS_STEMS else bv.METRIC_CASES)
         for case, payload in per_case.items():
             assert bv.fixture_path(stem, case).read_text() == bv.fixture_text(payload), f"fixtures/{stem}/{case}.json is stale: run widgets/build_v2.py"
-    assert len(list(bv.FIXTURES.glob("*/*.json"))) == 5 * 9 + 2 * 7                  # no orphan fixture files
+    assert len(list(bv.FIXTURES.glob("*/*.json"))) == 6 * 9 + 2 * 7                  # no orphan fixture files
 
 
 def test_fixtures_cover_ok_warn_crit_stale_all_none_and_a_partial_ring(cases):
@@ -242,9 +243,9 @@ def test_metrics_fixtures_carry_pixel_geometry(cases):
 
 def test_harness_job_matrix_shape():
     plain = bv.harness_jobs()
-    assert len(plain) == 5 * (9 + 4) + 2 * (7 + 4) and len({j["id"] for j in plain}) == len(plain)
+    assert len(plain) == 6 * (9 + 4) + 2 * (7 + 4) and len({j["id"] for j in plain}) == len(plain)
     shots = [j for j in bv.harness_jobs(Path("/x")) if "shot" in j]
-    assert len(shots) == 7 * (3 * 2 + 2) + 2 * 2 and {j["scheme"] for j in shots} == {"dark", "light"} and all(j["noDom"] for j in shots)    # + the paused badge, 2 widgets x 2 schemes
+    assert len(shots) == 8 * (3 * 2 + 2) + 2 * 2 and {j["scheme"] for j in shots} == {"dark", "light"} and all(j["noDom"] for j in shots)    # + the paused badge, 2 widgets x 2 schemes
     assert {j["id"] for j in shots if "/paused/" in j["id"]} == {f"{s}/paused/{w}x{h}/{sc}" for s in bv.PAUSED_STEMS for (w, h) in [bv.WIDGETS[s][3]] for sc in ("dark", "light")}
 
 

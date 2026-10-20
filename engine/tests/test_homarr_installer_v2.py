@@ -37,7 +37,7 @@ FANCTL = "oeoh2bjwtpstoygwa225mxdf"
 # name, Base bottom, Mobile bottom, items: the four real boards (docs/HOMARR_V2_WIDGETS.md 6.4)
 BOARDS = [("Local-Big-Screen", 44, 76, 40), ("Local-Mobile", 177, 215, 37), ("Remote-Big-Screen", 19, 44, 40), ("Remote-Mobile", 144, 188, 37)]
 NAMES = {"ops-overview": ("Ops Overview", "overview"), "ops-disk": ("Ops Disk", "disk"), "ops-jobs": ("Ops Jobs", "jobs"),
-         "ops-guard": ("Ops Guard", "guard"), "ops-reclaim": ("Ops Reclaimed", "reclaim"), "ops-thermals": ("Ops Thermals 7d", "thermal"),
+         "ops-guard": ("Ops Guard", "guard"), "ops-reclaim": ("Ops Reclaimed", "reclaim"), "ops-net": ("Ops Network", "net"), "ops-thermals": ("Ops Thermals 7d", "thermal"),
          "ops-load": ("Ops Load 7d", "load")}
 WRITTEN = ("custom_widget_v2_definition", "item", "item_layout")
 LIVE = Path(os.environ.get("HOMARR_LIVE_DB", "/data/compose/5/homarr/appdata/db/db.sqlite").split(":")[0])
@@ -219,8 +219,8 @@ def test_dry_run_writes_nothing(env, capsys):
     assert env.run("--dry-run") == 0
     out = capsys.readouterr().out
     assert fhash(env.db) == before and tree(env.tmp) == files and snapshot(env.db) == snap       # no bytes, no backup, no manifest, no journal
-    assert "DRY RUN" in out and out.count("INSERT INTO custom_widget_v2_definition") == 7
-    assert out.count("INSERT INTO item (") == 28 and out.count("INSERT INTO item_layout") == 56
+    assert "DRY RUN" in out and out.count("INSERT INTO custom_widget_v2_definition") == 8
+    assert out.count("INSERT INTO item (") == 32 and out.count("INSERT INTO item_layout") == 64
     assert "BEGIN IMMEDIATE;" in out and out.count("COMMIT;") == 2
     # the rollback SQL is printed, children first
     rb = out[out.index("-- rollback"):]
@@ -252,8 +252,8 @@ def test_install_inserts_exactly_the_expected_rows(env, capsys):
     post = snapshot(env.db)
     # nothing but the three written tables changed; legacy tables and everything else are byte-identical row sets
     assert {t for t in post if post[t] != pre[t]} == set(WRITTEN)
-    assert len(post["custom_widget_v2_definition"]) == len(pre["custom_widget_v2_definition"]) + 7
-    assert len(post["item"]) == len(pre["item"]) + 28 and len(post["item_layout"]) == len(pre["item_layout"]) + 56
+    assert len(post["custom_widget_v2_definition"]) == len(pre["custom_widget_v2_definition"]) + 8
+    assert len(post["item"]) == len(pre["item"]) + 32 and len(post["item_layout"]) == len(pre["item_layout"]) + 64
     assert all(r in post["item"] for r in pre["item"]) and all(r in post["item_layout"] for r in pre["item_layout"])    # no old row touched
     defs, items = installed(env.db)
     assert set(defs) == {n for n, _ in NAMES.values()}
@@ -267,7 +267,7 @@ def test_install_inserts_exactly_the_expected_rows(env, capsys):
                                                                 "trigger": "load", "auth": "inherit", "cacheSeconds": 5, "permission": "view"}}}
         assert json.loads(r["options"]) == {"json": {}} and r["icon_url"] is None
         assert r["template"] == json.loads((env.defs / f"{stem}.json").read_text())["template"]
-    assert len(items) == 28
+    assert len(items) == 32
     for it in items:
         assert it["advanced_options"] == '{"json":{"title":null,"customCssClasses":[],"borderColor":""}}' and re.fullmatch(r"[a-z][a-z0-9]{23}", it["id"])
         o = json.loads(it["options"])["json"]
@@ -336,14 +336,14 @@ def test_new_items_never_overlap_existing_ones_even_with_containers_and_odd_layo
         cont = [r for r in c.execute("SELECT x_offset,y_offset,width,height FROM section_layout WHERE layout_id=? AND parent_section_id=?", (lay, sec))]
         if not new:
             continue
-        assert len(new) == 7
+        assert len(new) == 8
         bottom = max([r[1] + r[3] for r in old] + [r[1] + r[3] for r in cont] + [0])
         for n in new:
             assert n[1] >= bottom and n[0] + n[2] <= cols                                       # appended below everything, inside the lane
             assert not any(overlaps(n, o) for o in old + cont)
         assert not any(overlaps(a, b) for i, a in enumerate(new) for b in new[i + 1:])
     # the 12-column custom layout got a row for every new item too (one item_layout row per layout)
-    assert c.execute("SELECT count(*) FROM item_layout WHERE layout_id='customlayout0000000000001'").fetchone()[0] == 1 + 7
+    assert c.execute("SELECT count(*) FROM item_layout WHERE layout_id='customlayout0000000000001'").fetchone()[0] == 1 + 8
 
 
 def test_gutters_reduce_the_main_lane_and_mobile_ignores_them(env):
@@ -354,9 +354,9 @@ def test_gutters_reduce_the_main_lane_and_mobile_ignores_them(env):
     c.close()
     assert env.run("--boards", "Local-Mobile", "--size", "4x2") == 0                            # 10-3 = 7 usable: one 4-wide tile per row
     _defs, items = installed(env.db)
-    base = rows(env.db, "SELECT il.* FROM item_layout il JOIN layout l ON l.id=il.layout_id WHERE l.role='base' AND il.item_id IN (%s) ORDER BY y_offset, x_offset" % ",".join("?" * 7), *[i["id"] for i in items])
-    assert [(r["x_offset"], r["y_offset"] - 177) for r in base] == [(0, 2 * k) for k in range(7)]
-    mob = rows(env.db, "SELECT il.* FROM item_layout il JOIN layout l ON l.id=il.layout_id WHERE l.role='mobile' AND il.item_id IN (%s)" % ",".join("?" * 7), *[i["id"] for i in items])
+    base = rows(env.db, "SELECT il.* FROM item_layout il JOIN layout l ON l.id=il.layout_id WHERE l.role='base' AND il.item_id IN (%s) ORDER BY y_offset, x_offset" % ",".join("?" * 8), *[i["id"] for i in items])
+    assert [(r["x_offset"], r["y_offset"] - 177) for r in base] == [(0, 2 * k) for k in range(8)]
+    mob = rows(env.db, "SELECT il.* FROM item_layout il JOIN layout l ON l.id=il.layout_id WHERE l.role='mobile' AND il.item_id IN (%s)" % ",".join("?" * 8), *[i["id"] for i in items])
     assert {r["width"] for r in mob} == {3}                                                       # capped to the 3 mobile columns
 
 
@@ -406,9 +406,9 @@ def test_idempotent_by_existing_items_for_the_same_definition(env, capsys):
 def test_definition_present_but_never_placed_gets_items_without_a_second_definition(env):
     assert env.run("--boards", "none") == 0
     defs = installed(env.db)[0]
-    assert len(defs) == 7 and not installed(env.db)[1]
+    assert len(defs) == 8 and not installed(env.db)[1]
     assert env.run() == 0
-    assert installed(env.db)[0] == defs and len(installed(env.db)[1]) == 28
+    assert installed(env.db)[0] == defs and len(installed(env.db)[1]) == 32
 
 
 def test_update_existing_is_opt_in_bumps_updated_at_and_keeps_id_and_items(env, capsys):
@@ -481,7 +481,7 @@ def test_accept_existing_places_tiles_on_the_foreign_definition_and_leaves_it_al
     assert c.execute("SELECT count(*) FROM item WHERE json_extract(options,'$.json.definitionId')='foreigndisk000000000000a'").fetchone()[0] == 4
     assert c.execute("SELECT count(*) FROM custom_widget_v2_definition WHERE name='Ops Disk'").fetchone()[0] == 1          # no second definition
     c.close()
-    assert len(installed(env.db)[0]) == 7
+    assert len(installed(env.db)[0]) == 8
 
 
 def test_update_existing_replaces_the_foreign_definition_so_the_tiles_show_our_template(env):
@@ -544,7 +544,7 @@ def test_install_writes_a_manifest_next_to_the_backup_and_the_backup_is_the_pre_
     assert snapshot(bk / "copy.sqlite") == pre                                                    # restorable pre-change state
     m = json.loads((bk / "ops-widgets-manifest.json").read_text())
     assert m["format"] == inst.MANIFEST_FORMAT and m["status"] == "committed" and m["backup"] == str(bk / "copy.sqlite")
-    assert len(m["definitions"]) == 7 and len(m["items"]) == 28 and len(m["item_layouts"]) == 56
+    assert len(m["definitions"]) == 8 and len(m["items"]) == 32 and len(m["item_layouts"]) == 64
     assert {i["id"] for i in m["items"]} == {i["id"] for i in installed(env.db)[1]}
 
 
@@ -560,7 +560,7 @@ def test_rollback_removes_exactly_the_recorded_rows_and_restores_every_table(env
     assert snapshot(env.db) == pre                                                                # every table, every row, identical to before
     assert json.loads(manifest.read_text())["status"] == "rolled_back"
     assert env.run("--rollback", str(manifest)) == 0 and "nothing to roll back" in capsys.readouterr().out
-    assert env.run() == 0 and len(installed(env.db)[0]) == 7                                       # and it can be installed again
+    assert env.run() == 0 and len(installed(env.db)[0]) == 8                                       # and it can be installed again
 
 
 def test_rollback_keeps_rows_users_added_and_definitions_they_depend_on(env, capsys):
@@ -621,7 +621,7 @@ def test_rollback_on_live_target_needs_live_flag_and_a_new_backup_dir(env, tmp_p
     assert inst.main(["--live", str(env.db), "--rollback", m, "--no-docker-check"]) == 2                       # --live without --backup-dir
     b2 = tmp_path / "backup-rollback"
     assert inst.main(["--live", str(env.db), "--rollback", m, "--backup-dir", str(b2), "--no-docker-check"]) == 0
-    assert installed(env.db) == ({}, []) and sqlite3.connect(b2 / "copy.sqlite").execute("SELECT count(*) FROM custom_widget_v2_definition WHERE name LIKE 'Ops %'").fetchone() == (7,)
+    assert installed(env.db) == ({}, []) and sqlite3.connect(b2 / "copy.sqlite").execute("SELECT count(*) FROM custom_widget_v2_definition WHERE name LIKE 'Ops %'").fetchone() == (8,)
     assert json.loads((b2 / "ops-widgets-rollback.json").read_text())["manifest"] == m
 
 
@@ -971,7 +971,7 @@ def test_a_short_lived_writer_is_waited_for(env):
     ev.wait(5)
     assert env.run("--busy-timeout-ms", "10000") == 0
     t.join()
-    assert len(installed(env.db)[1]) == 28
+    assert len(installed(env.db)[1]) == 32
 
 
 def test_plan_is_recomputed_under_the_write_lock_from_the_rows_as_they_are_then(env, monkeypatch):
@@ -1121,7 +1121,7 @@ def test_the_repos_own_widget_files_are_installable(env, capsys):
     snap = snapshot(env.db)
     assert inst.main([str(env.db), "--widgets-dir", str(ROOT / "widgets"), "--no-docker-check", "--no-harness"]) == 0
     defs, items = installed(env.db)
-    assert len(defs) == 7 and len(items) == 28 and {d["template"] for d in defs.values()} == {w.d["template"] for w in widgets}
+    assert len(defs) == 8 and len(items) == 32 and {d["template"] for d in defs.values()} == {w.d["template"] for w in widgets}
     assert inst.main([str(env.db), "--rollback", str(next(env.tmp.glob("copy.sqlite.ops-widgets-manifest-*.json"))), "--no-docker-check"]) == 0
     assert snapshot(env.db) == snap
 
@@ -1295,18 +1295,18 @@ def test_rehearsal_on_a_fresh_copy_of_the_real_live_database(tmp_path, capsys):
     assert inst.main([str(copy), "--backup-dir", str(bk), *argv, "--boards", ",".join(["Local-Big-Screen", "Local-Mobile", "Remote-Big-Screen"])]) == 0
     post = snapshot(copy)
     assert {t for t in post if post[t] != pre[t]} == set(WRITTEN)
-    assert len(post["custom_widget_v2_definition"]) == len(pre["custom_widget_v2_definition"]) + 7
-    assert len(post["item"]) == len(pre["item"]) + 21 and len(post["item_layout"]) == len(pre["item_layout"]) + 42
+    assert len(post["custom_widget_v2_definition"]) == len(pre["custom_widget_v2_definition"]) + 8
+    assert len(post["item"]) == len(pre["item"]) + 24 and len(post["item_layout"]) == len(pre["item_layout"]) + 48
     assert all(r in post["item_layout"] for r in pre["item_layout"]) and all(r in post["item"] for r in pre["item"])
     assert {t: post[t] for t in post if t not in WRITTEN} == {t: pre[t] for t in pre if t not in WRITTEN}          # incl. legacy tables and secrets
     c = sqlite3.connect(copy)
     assert {tuple(r) for r in c.execute("PRAGMA foreign_key_check")} == fk0 and c.execute("PRAGMA quick_check").fetchone() == ("ok",)
-    new_defs = {r[0]: r for r in c.execute("SELECT id, name, creator_id, sources, requests, template, enabled FROM custom_widget_v2_definition WHERE name IN (%s)" % ",".join("?" * 7), expected)}
-    assert len(new_defs) == 7 and all(r[6] == 1 and not r[0].startswith("seed-") for r in new_defs.values())
+    new_defs = {r[0]: r for r in c.execute("SELECT id, name, creator_id, sources, requests, template, enabled FROM custom_widget_v2_definition WHERE name IN (%s)" % ",".join("?" * 8), expected)}
+    assert len(new_defs) == 8 and all(r[6] == 1 and not r[0].startswith("seed-") for r in new_defs.values())
     if thermals_creator:
         assert {r[2] for r in new_defs.values()} == {thermals_creator[0]}
-    new_items = c.execute("SELECT id, board_id, json_extract(options,'$.json.definitionId') FROM item WHERE json_extract(options,'$.json.definitionId') IN (%s)" % ",".join("?" * 7), list(new_defs)).fetchall()
-    assert len(new_items) == 21 and legacy_ids_in_use >= 8
+    new_items = c.execute("SELECT id, board_id, json_extract(options,'$.json.definitionId') FROM item WHERE json_extract(options,'$.json.definitionId') IN (%s)" % ",".join("?" * 8), list(new_defs)).fetchall()
+    assert len(new_items) == 24 and legacy_ids_in_use >= 8
     for iid, bid, did in new_items:
         lays = c.execute("SELECT il.layout_id, il.section_id, il.x_offset, il.y_offset, il.width, il.height, l.column_count FROM item_layout il JOIN layout l ON l.id=il.layout_id WHERE il.item_id=?", (iid,)).fetchall()
         assert len(lays) == 2 == c.execute("SELECT count(*) FROM layout WHERE board_id=?", (bid,)).fetchone()[0]

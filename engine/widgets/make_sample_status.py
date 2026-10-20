@@ -226,6 +226,28 @@ def stress(now: int = NOW) -> dict:
     return st
 
 
+NET_ITEMS = [
+    {"rule": "plex_exploit", "severity": "crit", "src": "203.0.113.7", "target": "plex", "why": "request to the Plex API from a listed address",
+     "count": 4, "id": "3f2a9c01d4e5b678"},
+    {"rule": "ssh_burst", "severity": "warn", "src": "198.51.100.23", "target": "host", "why": "5 failed sign-ins in 10 minutes",
+     "count": 5, "id": "9b7e10c2a6d4f381"},
+    {"rule": "new_peer", "severity": "warn", "src": "container:shop", "target": "203.0.113.40", "why": "a new destination for this service",
+     "count": 1, "id": "51c0d8e7b2a94f06"},
+]
+
+
+def net_watch(case: str = "warn", now: int = NOW) -> dict:
+    """The net_watch task entry for the ops-net fixtures; `case` is a fixture name (crit, warn, stress, ... anything else is ok)."""
+    items = {"crit": NET_ITEMS, "warn": NET_ITEMS[1:], "paused": NET_ITEMS[1:], "stale": NET_ITEMS[1:]}.get(case, [])
+    if case == "stress":                                    # more flags than the widget shows, long text
+        items = [dict(NET_ITEMS[i % 3], id=f"{i:016x}", why="w" * 120, target="t" * 60) for i in range(12)]
+    status = "crit" if case == "crit" else "warn" if items else "ok"
+    metrics = {"in24": 412, "out24": 1893, "svc24": 96, "lan24": 40, "edge24": 1204, "flags": len(items), "blocked": 2, "stale_sources": 0,
+               "top_talkers": "203.0.113.7 DE 812; 198.51.100.23 US 310; 203.0.113.40 NL 64"}
+    summary = f"{status}: Network: {len(items)} findings" if items else "ok: Network: no findings"
+    return _t("Network watch", "C0", "check", status, summary, now - 180, metrics, items)
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         print(json.dumps(build(sys.argv[1]), indent=1, sort_keys=True))

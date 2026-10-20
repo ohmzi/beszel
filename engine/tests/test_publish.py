@@ -36,7 +36,8 @@ FILES = ["overview.json", "checks.json", "actions.json", "storage.json", "metric
 NEW_FILES = ["routine.json", "incidents.json", "slo.json", "pressure.json", "jobs.json", "monitors.json", "notifications.json",
              "migration.json"]
 SELF_FILES = ["self.json"]                            # SPEC6 S6: the pipeline's own health (tasks.self_health.export), after migration.json
-ALL_FILES = FILES + NEW_FILES + SELF_FILES            # what publish() returns when no report has been generated yet (the `env` fixture has no registry)
+NETWORK_FILES = ["network.json"]                      # Network Watch (netwatch/export.py), after self.json: written even without the store (available: false)
+ALL_FILES = FILES + NEW_FILES + SELF_FILES + NETWORK_FILES            # what publish() returns when no report has been generated yet (the `env` fixture has no registry)
 REGISTRY_FILES = ["rules.json", "rules-history.json", "manifest.json"]      # SPEC6 S5: written LAST, by _publish_registry (the `env` fixture stubs it)
 OPTIONAL_FILES = ["jobs.json", "monitors.json", "notifications.json", "migration.json", "self.json"]     # their module may be absent
 
@@ -1520,7 +1521,7 @@ def test_publish_does_not_break_the_rest_when_every_new_source_fails(env, monkey
     for n in NEW_FILES:
         set_source(monkeypatch, n, boom)
     written = env.run()
-    assert written == FILES + SELF_FILES                                     # the SPEC2 files (and the pipeline's self.json) are unaffected
+    assert written == FILES + SELF_FILES + NETWORK_FILES                     # the SPEC2 files (and the pipeline's self.json) are unaffected
     assert env.load("overview.json")["export_errors"] == sorted(NEW_FILES)
     assert not [n for n in NEW_FILES if (env.out / n).exists()]
 
