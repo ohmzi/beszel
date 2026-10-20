@@ -71,9 +71,11 @@ def _zone_query(selection: str) -> str:
 
 
 EDGE_SELECTION = (
+    # clientAsn is deliberately not requested: some plans reject it ("does not have access to the field"), and one rejected
+    # field fails the whole query. The parser still reads it when a zone provides it; otherwise the row's asn is 0.
     "httpRequestsAdaptiveGroups(filter: {datetime_geq: $s, datetime_leq: $e}, limit: 5000, orderBy: [count_DESC]) "
     "{ count sum { edgeResponseBytes } dimensions { clientIP clientRequestHTTPHost clientRequestPath "
-    "edgeResponseStatus clientCountryName clientAsn datetimeHour } }"
+    "edgeResponseStatus clientCountryName datetimeHour } }"
 )
 SECURITY_SELECTION = (
     "firewallEventsAdaptive(filter: {datetime_geq: $s, datetime_leq: $e}, limit: 1000, orderBy: [datetime_DESC]) "

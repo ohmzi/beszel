@@ -202,6 +202,8 @@ def test_edge_requests_posts_query_and_variables(tmp_path):
     assert set(body) == {"query", "variables"}
     assert "httpRequestsAdaptiveGroups" in body["query"]
     assert "edgeResponseBytes" in body["query"]
+    assert "clientIP" in body["query"] and "clientCountryName" in body["query"]
+    assert "clientAsn" not in body["query"], "not every plan grants clientAsn; a denied field fails the whole query (2026-10-20)"
     assert body["variables"] == {"z": "zone-a", "s": T0, "e": T1}
 
 
