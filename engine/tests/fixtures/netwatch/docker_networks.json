@@ -1,0 +1,24 @@
+[
+  {
+    "Name": "bridge",
+    "Id": "aa11bb22cc33",
+    "Driver": "bridge",
+    "IPAM": {"Driver": "default", "Config": [{"Subnet": "172.17.0.0/16", "Gateway": "172.17.0.1"}]},
+    "Containers": {}
+  },
+  {
+    "Name": "stack_default",
+    "Id": "dd44ee55ff66",
+    "Driver": "bridge",
+    "IPAM": {
+      "Driver": "default",
+      "Config": [
+        {"Subnet": "172.28.0.0/16", "Gateway": "172.28.0.1"},
+        {"Subnet": "fd00::/64", "Gateway": "fd00::fe"}
+      ]
+    },
+    "Containers": {
+      "1f2e3d4c5b6a": {"Name": "web", "IPv4Address": "172.28.0.5/16", "IPv6Address": "fd00::1/64"}
+    }
+  }
+]
