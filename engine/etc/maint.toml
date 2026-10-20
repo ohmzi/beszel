@@ -438,7 +438,7 @@ max_gib_per_run = 10
 # rule: netwatch.settings
 [netwatch]
 lan_cidrs = ["192.168.40.0/24"]
-tailscale_cidrs = ["100.64.0.0/10"]
+tailscale_cidrs = ["100.64.0.0/10", "fd7a:115c:a1e0::/48"]
 tunnel_local_ports = []
 cf_account_id = ""
 cf_zones = []

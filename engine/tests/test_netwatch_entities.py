@@ -195,3 +195,11 @@ def test_docker_is_asked_once_docker_service_is_active():
     topo = load_topology(rec)
     assert topo.stale is False
     assert ["docker", "ps", "-q"] in calls
+
+
+def test_tailscale_ipv6_is_tailscale_and_never_blockable():
+    from ipaddress import ip_address
+    addr = ip_address("fd7a:115c:a1e0::53")
+    assert classify("fd7a:115c:a1e0::53", _topo(), {}).kind == "tailscale"
+    assert any(addr in net for net in HARD_RANGES(_topo()))
+    assert any(addr in net for net in HARD_RANGES(_topo(), {"tailscale_cidrs": ["100.100.0.0/16"]}))

@@ -14,9 +14,9 @@ from homelab_maint import core
 
 COMPOSE_LABEL = "com.docker.compose.project"
 DEFAULT_LAN = ["192.168.40.0/24"]
-DEFAULT_TAILSCALE = ["100.64.0.0/10"]
+DEFAULT_TAILSCALE = ["100.64.0.0/10", "fd7a:115c:a1e0::/48"]
 # Never overridable: these are the owner's hard ranges, whatever [netwatch] says about LAN and Tailscale.
-_FIXED_HARD = ["192.168.40.0/24", "100.64.0.0/10", "127.0.0.0/8", "::1/128", "169.254.0.0/16", "fe80::/10"]
+_FIXED_HARD = ["192.168.40.0/24", "100.64.0.0/10", "fd7a:115c:a1e0::/48", "127.0.0.0/8", "::1/128", "169.254.0.0/16", "fe80::/10"]
 # With a stale topology the Docker subnets are unknown, so every private range is treated as hard until docker is readable again.
 _STALE_FALLBACK = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8"]
 
