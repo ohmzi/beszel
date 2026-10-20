@@ -26,6 +26,7 @@ Nothing else on the host should schedule maintenance, watch a service or send a 
 | runner | the tier runs (`check` every 15 min, `daily`, `weekly`) and the routine's steps | `homelab-maint-{check,daily,weekly}.timer`, `etc/routine.toml` |
 | state | `status.json`, `history.jsonl`, the audit log, the change log | `/var/lib/homelab-maint`, `/var/log/homelab-maint` |
 | monitoring plane | every service, container, endpoint and status file, debounced | `etc/probes.toml` |
+| network watch | who talks to the host and its containers, what the firewall refused, sign-ins, Plex and the Cloudflare edge: metadata only, judged into findings | `homelab-maint-netwatch.service`, `/var/lib/homelab-maint/netwatch.db`, `netwatch.settings` in `etc/rules.d/70-monitoring.toml` |
 | notification path | alerts, recoveries, digests, reports, through the existing Hermes SMS and Gmail transports | `etc/notify.toml`, `notify.py` |
 | dashboard | the OhmzMaintainer beszel hub: read-only view fed by the public export; its only write is a signed acknowledge request | `supplemental/systemd/`, `/var/lib/homelab-maint/public/`, `ack/inbox` |
 | rules registry | the one place that defines what the script does (checks, thresholds, cleanup rules, protections, routes, schedules, probes, jobs, limits) | `/etc/homelab-maint/rules.d/`, `homelab-maint rules` |
@@ -517,6 +518,81 @@ with the `maintenance-web` container**: the hub that serves the site now (`besze
 `../supplemental/systemd/README.md`), and no site reads `bootstrap.secret` or `auth.json` any more. The e-mail acknowledge link itself
 still needs no login — its one-time token is the capability — and the signed request path through `ack/inbox` is unchanged (see
 "Acknowledging a known issue"). Put Cloudflare Access in front of the site as well.
+
+## Network watch
+
+`homelab-maint-netwatch.service` is always on and capped at 10 % CPU. It records who talks to this host, its containers and its
+tunnelled sites, and what the firewall, sshd, Plex and Cloudflare saw. It judges that into findings and emails the owner about
+the ones that matter. It changes nothing by itself: a block is only ever made by a logged-in dashboard user, from the Network page.
+
+Sources, each on its own interval (the sampling doubles, up to 4 times, while the 1-minute load is at or above the CPU count):
+
+* sockets: established TCP and UDP flows of the host, and of every container (read with `nsenter` into its network namespace), every 30 s.
+* kernel and sshd: the firewall lines in the kernel journal (ufw's `BLOCK` lines), and the sshd journal's failed and successful
+  sign-ins, every 60 s.
+* Plex: the Plex Media Server log, for exploit-shaped requests on the Plex port, and for codec libraries that change with no
+  matching Plex request. Codec checks read with a short margin so a line is never missed at a window edge.
+* Cloudflare: edge requests per hour (with a `path_class` label, see below) and the firewall security events of each zone, every
+  5 min over the last 15 min; the tunnel hostnames, hourly.
+* sign-ins: successful sign-ins to the apps listed in `[netwatch.signin]`, from the edge 2xx on the sign-in path classes and from
+  the Plex session list.
+
+The store is `/var/lib/homelab-maint/netwatch.db` (SQLite). It holds metadata only: who, when, which service or
+container, port, connection count, bytes, and for a request a `path_class` label such as `auth_login` or `auth_api`. It never
+holds packet contents, request bodies or a raw request path. Rows are pruned hourly and kept for 30 days (`keep_days`).
+
+Learning: the first start of the collector begins a 7-day learning period, recorded in the database, so a reinstall or a restart
+never starts it again. During it the `new_peer` rule stays silent while the collector learns what each service normally talks to.
+
+The rules (`homelab_maint/netwatch/judge.py`), over the last 30 minutes:
+
+| Rule | Fires when | Severity | Emails |
+|------|------------|----------|--------|
+| `plex_exploit` | an exploit-shaped request reaches the Plex port; the attacker is named when exactly one internet peer used that port that hour | crit | yes |
+| `codec_unexplained` | a Plex codec library changed with no matching Plex request | crit | yes |
+| `threat_active` | an address on a listed threat list did more than scan: over 20 edge requests, a 2xx on an app path, or a connection in | warn | yes, for more than scanning |
+| `auth_burst` | 5 failed sshd sign-ins from one address in 10 minutes, or 10 refused (401/403) sign-ins on an `auth_*` path from one address | warn | yes |
+| `line_not_meant` | a container is refused on a host port it has no pinhole for | warn | no, shown on the page only |
+| `new_peer` | a service talks somewhere new, or a device reaches a port it never used, after the learning period | warn | yes |
+
+Scanning alone never emails. There is no digest. The alert goes to the owner by e-mail only (the Gmail route, never SMS), and
+its link opens `/network?finding=<id>` with the finding selected. The shipped `[netwatch]` settings are in the `netwatch.settings`
+rule of `etc/rules.d/70-monitoring.toml`.
+
+Blocks are never automatic. A finding offers a block; a logged-in user confirms it on the Network page, and the dashboard writes a
+signed request into `ack/inbox`, which the agent applies. Two targets:
+
+* host: the address goes into a timeout set of the dedicated `inet netwatch` nftables table (`block4` and `block6`, with a drop
+  rule in each input and forward chain). ufw's own rules are never edited.
+* Cloudflare: an IP access rule in mode `block` on the zone that owns the hostname. Its note starts with `netwatch:`.
+
+A block lasts 1 to 365 days, or is permanent. Host blocks expire on their nftables timeout, and after a reboot the open ones are
+re-added with their remaining time. Unblock removes the block from the Network page. The owner's never-block set:
+
+* hard ranges, never overridable: the owner's LAN and Tailscale ranges (`lan_cidrs`, `tailscale_cidrs`), every Docker network
+  subnet, loopback and link-local. Those findings carry no block.
+* addresses that signed in successfully in the last 30 days. Blocking one needs a non-empty `override_reason`, which is audited.
+* when the topology cannot be read, no block is offered, and the rules that need to classify a peer are skipped.
+
+To undo everything:
+
+```
+sudo nft delete table inet netwatch          # every host block at once
+sudo systemctl disable --now homelab-maint-netwatch
+```
+
+Then delete, in the Cloudflare dashboard, the IP access rules whose note starts with `netwatch:`. Stopping the collector does not
+lift a block by itself; the two commands above do.
+
+Host-only settings, never committed (the shipped values are empty):
+
+* the Cloudflare token: `/etc/homelab-maint/cloudflare.token`, root, mode 0600. It is read from that file only, never logged, never
+  on a command line and never in an exception message.
+* `[netwatch.signin] hosts` in `/etc/homelab-maint/maint.toml`: the hosts whose 2xx on an `auth_api` path proves a sign-in.
+* `cf_account_id` in `[netwatch]` of `/etc/homelab-maint/maint.toml`: the Cloudflare account, when it is not read from the token.
+* `/etc/homelab-maint/netwatch-ioc.toml`: the owner's indicators (`ips` and `domains`), added to the threat lists.
+
+`[netwatch]` is read once when the collector starts: `sudo systemctl restart homelab-maint-netwatch` after editing it.
 
 ## Adding a task
 

@@ -24,6 +24,8 @@ That form works in a checkout too: `cd /home/ohmz/homelab-maint && python3 -m ho
 | decide what gets sacrificed first under memory pressure     | a service class                           | `classes.toml`                          | the spike manager                     |
 | show it on the Homarr board or the website                  | a payload and a widget / a public file    | `payloads.py`, `widgets/`, `publish.py` | the publisher after every check run   |
 | retire something this replaces                              | an item                                   | `legacy-retirement.toml`                | you, with `homelab-maint migrate`     |
+| flag a new kind of network finding                          | a Network Watch rule                      | `homelab_maint/netwatch/judge.py`       | the net_watch task, every 5 min       |
+| tell the Network Watch which requests are sign-ins or logins | a path class                             | `[netwatch.path_classes]` in `maint.toml` | the edge reader, every 5 min        |
 
 Rule of thumb: if it is a command that already exists and works, make it a **job**. If it answers "is it up", make it a **probe**.
 If you need judgement over numbers (thresholds, trends, history), write a **task**.
@@ -414,3 +416,56 @@ The inventory of every legacy scheduled thing, hook and notifier is `etc/legacy-
 the file (it refuses, for example, to ever disable the umbrella's own services). Never delete the old thing: a cutover disables the unit,
 moves the script into `/usr/local/lib/homelab-maint/legacy/NAME/` with a README, comments the cron line with a tag, and remembers the exact prior
 state so `homelab-maint migrate rollback NAME --apply` puts it back.
+
+## 17. Network Watch: a rule or a path class
+
+The Network Watch collector (`homelab-maint-netwatch.service`) stores metadata; the `net_watch` check (C0, every 5 minutes) judges the
+last 30 minutes of it. Two things are worth adding without touching the collector: a rule, and a path class.
+
+**A path class** names a request path without storing it. `[netwatch.path_classes]` maps a regex on the request path to a label; the
+first regex that matches wins (TOML keeps the order), and a path that matches none is `other`. Only the label is stored. Labels that
+start with `auth_` count toward the `auth_burst` rule, and `auth_api` is the label whose 2xx proves a sign-in on the hosts listed in
+`[netwatch.signin]`. Add the table to `[netwatch]` in `/etc/homelab-maint/maint.toml` on the host, or to `netwatch.settings` in
+`etc/rules.d/70-monitoring.toml` for the shipped default, and keep the two in step. Put only generic patterns in the shipped copy: no
+hostnames.
+
+```toml
+[netwatch.path_classes]
+"^/api/auth/(login|sign-in)" = "auth_login"
+"^/api/"                    = "auth_api"
+```
+
+Then `sudo systemctl restart homelab-maint-netwatch`: `[netwatch]` is read once at start. Check the result with
+`sudo sqlite3 /var/lib/homelab-maint/netwatch.db "select host,path_class,status,count(*) from edge group by 1,2,3"`.
+
+**A rule** is one function in `homelab_maint/netwatch/judge.py`. Each `_rule(db, ..., lo, now, found)` reads the store and records
+findings with `_add`:
+
+```python
+def _burst_of_something(db, lo: float, now: float, found: dict) -> None:
+    for src, n, first, last in db.execute(
+        "SELECT src, COUNT(*), MIN(ts), MAX(ts) FROM events WHERE kind = 'fw_block' AND ts >= ? GROUP BY src HAVING COUNT(*) >= 50",
+        (lo,),
+    ).fetchall():
+        _add(found, "burst_of_something", "warn", src, "host",
+             f"{n} refused connections from {src} in 30 minutes", first, last, n, block="host")
+```
+
+Then call it from `judge()` next to the others. Rules to keep in mind:
+
+* `_add` merges repeats of the same `(rule, src, target)`, so the finding id is stable across runs and the debounce works.
+* A finding is a fact about the window. `block` only offers the dashboard's button: `"host"`, `"cloudflare"` (with `zone`) or `None`.
+  Never set a block that would reach a hard range; `judge()` strips the block from hard ranges and from sign-ins itself, but a rule
+  that needs a classification must sit under the `if not topo.stale:` guard, because a stale topology cannot tell a peer apart.
+* Read only the store. A rule never talks to the host, the firewall or Cloudflare.
+* Severity is `warn` or `crit`. Email needs no route change: the `net_watch` task already has its own route (`etc/notify.toml`,
+  `net_watch = "email"`), so every new finding goes by e-mail only, never SMS.
+* Scanning must stay quiet. A rule that fires on every probe of the internet will email the owner every few minutes; count
+  repeats (as `threat_active` does with `THREAT_EDGE_MIN`) before raising a finding.
+
+Test it with a fixture database and no real addresses (use `203.0.113.0/24`, `198.51.100.0/24` or `2001:db8::/32`). Import
+`conftest` first, as in `tests/test_netwatch_judge.py`, which already builds a store in a temporary directory and calls `judge.judge`:
+
+```sh
+cd engine && python3 -m pytest tests/test_netwatch_judge.py -q
+```
