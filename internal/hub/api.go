@@ -218,6 +218,8 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	// Ohmz fork: forward an acknowledge / un-acknowledge request to the agent, which writes a
 	// signed request into the maintenance engine's inbox.
 	apiAuth.POST("/maintenance/ack", h.maintenanceAck).BindFunc(excludeReadOnlyRole)
+	// Network Watch: a signed block / unblock request, forwarded to the agent the same way as an ack.
+	apiAuth.POST("/maintenance/netblock", h.maintenanceNetBlock).BindFunc(excludeReadOnlyRole)
 	// Ohmz fork: ack tokens for e-mail links are minted and applied by the hub (the new site). Mint is
 	// authenticated with the engine's ack/web.key (HMAC over the body); peek/commit need a valid token.
 	apiNoAuth.POST("/maintenance/ack/mint", h.maintenanceAckMint)
@@ -590,6 +592,52 @@ func (h *Hub) maintenanceAck(e *core.RequestEvent) error {
 		Severity: body.Severity,
 		Note:     body.Note,
 		Days:     body.Days,
+	})
+	if err != nil {
+		return e.InternalServerError("", err)
+	}
+	if !result.OK {
+		return e.BadRequestError(result.Error, nil)
+	}
+	return e.JSON(http.StatusOK, map[string]any{"ok": true})
+}
+
+// maintenanceNetBlock handles POST /api/beszel/maintenance/netblock (Network Watch).
+// It forwards a block / unblock request to the agent, which writes a signed request into the
+// maintenance engine's inbox. The engine validates it again and applies it; nothing is blocked here.
+func (h *Hub) maintenanceNetBlock(e *core.RequestEvent) error {
+	systemID := e.Request.URL.Query().Get("system")
+	if systemID == "" {
+		return e.BadRequestError("Invalid system parameter", nil)
+	}
+	system, err := h.sm.GetSystem(systemID)
+	if err != nil || !system.HasUser(e.App, e.Auth) {
+		return e.NotFoundError("", nil)
+	}
+	var body struct {
+		Kind           string `json:"kind"`
+		Finding        string `json:"finding"`
+		IP             string `json:"ip"`
+		Target         string `json:"target"`
+		Zone           string `json:"zone"`
+		Days           int    `json:"days"`
+		Permanent      bool   `json:"permanent"`
+		OverrideReason string `json:"override_reason"`
+		BlockID        string `json:"block_id"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return e.BadRequestError("Invalid request body", nil)
+	}
+	result, err := system.MaintenanceNetBlockFromAgent(common.MaintenanceNetBlockRequest{
+		Kind:           body.Kind,
+		Finding:        body.Finding,
+		IP:             body.IP,
+		Target:         body.Target,
+		Zone:           body.Zone,
+		Days:           body.Days,
+		Permanent:      body.Permanent,
+		OverrideReason: body.OverrideReason,
+		BlockID:        body.BlockID,
 	})
 	if err != nil {
 		return e.InternalServerError("", err)

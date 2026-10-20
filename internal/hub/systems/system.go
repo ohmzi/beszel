@@ -883,6 +883,16 @@ func (sys *System) MaintenanceAckFromAgent(req common.MaintenanceAckRequest) (co
 	return result, err
 }
 
+// MaintenanceNetBlockFromAgent asks the agent to enqueue a signed net_block / net_unblock request into
+// the maintenance engine's inbox (Network Watch).
+func (sys *System) MaintenanceNetBlockFromAgent(req common.MaintenanceNetBlockRequest) (common.MaintenanceAckResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var result common.MaintenanceAckResult
+	err := sys.request(ctx, common.MaintenanceNetBlock, req, &result)
+	return result, err
+}
+
 // FetchZfsDataFromAgent fetches ZFS detail data from the agent.
 func (sys *System) FetchZfsDataFromAgent(force bool) (*zfs.ZfsData, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

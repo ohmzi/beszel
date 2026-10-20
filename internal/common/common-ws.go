@@ -32,6 +32,8 @@ const (
 	GetSystemdLogs
 	// Enqueue an acknowledge / un-acknowledge request into the maintenance engine's inbox (Ohmz fork).
 	MaintenanceAck
+	// Enqueue a Network Watch block / unblock request into the maintenance engine's inbox (Ohmz fork).
+	MaintenanceNetBlock
 	// Add new actions here...
 )
 
@@ -103,6 +105,21 @@ type MaintenanceAckRequest struct {
 	Severity string `cbor:"2,keyasint,omitempty"` // warn | crit (ack only)
 	Note     string `cbor:"3,keyasint,omitempty"` // ack only
 	Days     int    `cbor:"4,keyasint,omitempty"` // ack only
+}
+
+// MaintenanceNetBlockRequest asks the agent to write a signed net_block or net_unblock request into the
+// maintenance engine's inbox (Network Watch). Kind is net_block | net_unblock; the fields that apply
+// to each kind are the only ones the agent reads. The agent builds and signs the request itself.
+type MaintenanceNetBlockRequest struct {
+	Kind           string `cbor:"0,keyasint" json:"kind"`                        // net_block | net_unblock
+	Finding        string `cbor:"1,keyasint,omitempty" json:"finding,omitempty"` // net_block only
+	IP             string `cbor:"2,keyasint,omitempty" json:"ip,omitempty"`      // net_block only
+	Target         string `cbor:"3,keyasint,omitempty" json:"target,omitempty"`  // host | cloudflare
+	Zone           string `cbor:"4,keyasint,omitempty" json:"zone,omitempty"`    // cloudflare only
+	Days           int    `cbor:"5,keyasint,omitempty" json:"days,omitempty"`    // 1-365
+	Permanent      bool   `cbor:"6,keyasint,omitempty" json:"permanent,omitempty"`
+	OverrideReason string `cbor:"7,keyasint,omitempty" json:"override_reason,omitempty"` // printable ASCII, at most 200
+	BlockID        string `cbor:"8,keyasint,omitempty" json:"block_id,omitempty"`        // net_unblock only
 }
 
 // MaintenanceAckResult is the agent's answer: whether the request was queued.

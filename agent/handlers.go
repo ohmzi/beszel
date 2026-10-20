@@ -61,6 +61,7 @@ func NewHandlerRegistry() *HandlerRegistry {
 	registry.Register(common.GetZfsData, &GetZfsDataHandler{})
 	registry.Register(common.GetPackageUpdates, &GetPackageUpdatesHandler{})
 	registry.Register(common.MaintenanceAck, &MaintenanceAckHandler{})
+	registry.Register(common.MaintenanceNetBlock, &MaintenanceNetBlockHandler{})
 
 	return registry
 }
@@ -221,6 +222,21 @@ func (h *GetPackageUpdatesHandler) Handle(hctx *HandlerContext) error {
 		return hctx.SendResponse(system.PackageUpdates{}, hctx.RequestID)
 	}
 	return hctx.SendResponse(hctx.Agent.packageUpdates.list(), hctx.RequestID)
+}
+
+// MaintenanceNetBlockHandler writes a signed net_block / net_unblock request into the maintenance
+// engine's inbox (Network Watch). It builds and signs the request itself.
+type MaintenanceNetBlockHandler struct{}
+
+func (h *MaintenanceNetBlockHandler) Handle(hctx *HandlerContext) error {
+	var req common.MaintenanceNetBlockRequest
+	if err := cbor.Unmarshal(hctx.Request.Data, &req); err != nil {
+		return err
+	}
+	if err := enqueueNetBlockRequest(req); err != nil {
+		return hctx.SendResponse(common.MaintenanceAckResult{OK: false, Error: err.Error()}, hctx.RequestID)
+	}
+	return hctx.SendResponse(common.MaintenanceAckResult{OK: true}, hctx.RequestID)
 }
 
 ////////////////////////////////////////////////////////////////////////////
