@@ -15,7 +15,7 @@ import ipaddress
 from collections import defaultdict
 from dataclasses import dataclass, replace
 
-from homelab_maint.netwatch import entities, plex, protect, store
+from homelab_maint.netwatch import plex, protect, store
 from homelab_maint.netwatch.entities import Topology, classify
 from homelab_maint.netwatch.threat import ThreatIndex
 
@@ -191,7 +191,10 @@ def _auth(db, lo: float, now: float, found: dict) -> None:
     ):
         if not path_class.startswith("auth_"):
             continue
-        acc = grouped[(client_ip, zone, host)]
+        ip = _ip(client_ip)
+        if ip is None:
+            continue
+        acc = grouped[(ip, zone, host)]
         acc[0] += count
         acc[1] = bucket if acc[1] is None else min(acc[1], bucket)
         acc[2] = bucket if acc[2] is None else max(acc[2], bucket)
@@ -238,8 +241,9 @@ def _new_peer(db, topo: Topology, cfg: dict, lo: float, now: float, found: dict)
         if not (src.startswith("container:") and dst.startswith("container:")):
             continue            # the host is involved: never expected to flag
         a, b = topo.compose.get(src[len("container:"):]), topo.compose.get(dst[len("container:"):])
-        if a is None or b is None or a == b:
+        if a is None or b is None or (a == b and a != ""):
             continue            # not a known container, or the same compose project: always expected
+                                # (unlabelled containers have project "" and are judged against the baseline)
         observed[(src, f"svc:{dst}:{dport}")] = f"{src} talks to {dst} on port {dport}, across compose projects"
     for src, dst, dport in db.execute(
         "SELECT src, dst, dport FROM flows WHERE direction = 'lan' AND bucket >= ?", (since,)

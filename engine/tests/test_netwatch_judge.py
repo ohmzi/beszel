@@ -311,3 +311,22 @@ def test_stale_topology_has_no_blocks(db, threat):
     assert _rule(findings, "line_not_meant") == []
     assert _rule(findings, "new_peer") == []
     assert db.execute("SELECT COUNT(*) FROM baseline").fetchone()[0] == 0
+
+
+def test_unlabelled_containers_are_judged_against_the_baseline(db, threat):
+    _learned(db)
+    topo = entities.Topology(containers={}, subnets=[], compose={"x": "", "y": ""}, listening=set())
+    _flow(db, "svc", "container:x", "container:y", 6379)
+    [f] = _rule(_judge(db, threat, topo=topo), "new_peer")
+    assert f.src == "container:x"
+    assert f.target == "svc:container:y:6379"
+
+
+def test_edge_auth_burst_counts_one_client_once_in_either_form(db, threat):
+    _edge(db, status=401, path_class="auth_login", count=5, client_ip="203.0.113.50")
+    _edge(db, status=401, path_class="auth_login", count=5, client_ip="::ffff:203.0.113.50")
+    _edge(db, status=401, path_class="auth_login", count=20, client_ip="not-an-ip")
+    [f] = _rule(_judge(db, threat), "auth_burst")
+    assert f.src == "203.0.113.50"
+    assert f.count == 10
+    assert f.block == "cloudflare"
