@@ -3,7 +3,9 @@ import conftest  # noqa: F401  (points HOMELAB_MAINT_* at tmp dirs before homela
 
 import subprocess
 
-from homelab_maint.netwatch import store
+import pytest
+
+from homelab_maint.netwatch import entities, store
 from homelab_maint.netwatch.cloudflare import CFUnavailable
 from homelab_maint.netwatch.collect import Collector
 from homelab_maint.netwatch.model import EdgeRow, NetEvent
@@ -26,12 +28,19 @@ def _cp(stdout="", rc=0):
     return subprocess.CompletedProcess([], rc, stdout, "")
 
 
+@pytest.fixture(autouse=True)
+def dockerd_up(monkeypatch):
+    monkeypatch.setattr(entities, "dockerd_running", lambda: True)
+
+
 def fake_sh(calls=None, journal_k="", journal_ssh=""):
     """Host with no containers, one listening port and one established inbound socket; journalctl answers per unit."""
     def sh(cmd, timeout=60, check=False, input_=None, env=None):
         if calls is not None:
             calls.append(list(cmd))
         head = cmd[0]
+        if head == "systemctl":
+            return _cp("active\n")
         if head == "docker":
             return _cp("")
         if head == "hostname":

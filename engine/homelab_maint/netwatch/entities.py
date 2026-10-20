@@ -8,6 +8,7 @@ Callers must treat `stale` as "refuse block decisions that depend on classificat
 import json
 from dataclasses import dataclass, field
 from ipaddress import ip_address, ip_network
+from pathlib import Path
 
 from homelab_maint import core
 
@@ -75,9 +76,48 @@ def _listening(sh) -> tuple[set[tuple[str, int]], bool]:
     return found, ok
 
 
-def load_topology(sh=core.sh) -> Topology:
-    """Read containers, networks, host addresses and listening ports. Any failure returns an empty stale Topology."""
+PROC = Path("/proc")
+CGROUP = Path("/sys/fs/cgroup")
+DOCKER_PIDFILE = Path("/run/docker.pid")    # dockerd's own pidfile; read only
+DOCKER_UNIT = "docker.service"
+
+
+def _read(p: Path) -> str | None:
     try:
+        return p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def _is_dockerd(pid: int) -> bool:
+    return (_read(PROC / str(pid) / "comm") or "").strip() == "dockerd"
+
+
+def dockerd_running() -> bool:
+    """A live dockerd process, found without forking and without touching the socket: the pidfile first (the process must be
+    named `dockerd`, so a stale file proves nothing), then docker.service's cgroup. Same test as live.dockerd_process_alive."""
+    txt = (_read(DOCKER_PIDFILE) or "").strip()
+    if txt.isdigit() and len(txt) <= 10 and int(txt) > 0 and _is_dockerd(int(txt)):
+        return True
+    procs = (_read(CGROUP / "system.slice" / DOCKER_UNIT / "cgroup.procs") or "").split()
+    return any(p.isdigit() and len(p) <= 10 and _is_dockerd(int(p)) for p in procs[:64])
+
+
+def docker_ready(sh=core.sh) -> bool:
+    """True only when a connect to the docker socket is safe. Docker is socket-activated: a connect while docker.service is
+    stopped, or still stopping, starts dockerd and every restart=always container. So both must hold, as in live.dockerd_ready:
+    a live dockerd process, and `systemctl is-active docker.service` printing "active". Anything else fails closed."""
+    if not dockerd_running():
+        return False
+    return sh(["systemctl", "is-active", DOCKER_UNIT], timeout=3).stdout.strip() == "active"
+
+
+def load_topology(sh=core.sh) -> Topology:
+    """Read containers, networks, host addresses and listening ports. Any failure returns an empty stale Topology.
+    docker is never called while dockerd is down (see docker_ready): the view is stale instead."""
+    try:
+        if not docker_ready(sh):
+            return Topology.empty_stale()
         ps = sh(["docker", "ps", "-q"])
         if not _cp_ok(ps):
             return Topology.empty_stale()

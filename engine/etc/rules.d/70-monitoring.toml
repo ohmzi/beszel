@@ -52,6 +52,33 @@ cpu_fans = [1, 4]
 case_fans = [2, 3, 5]
 
 [[rule]]
+id = "netwatch.settings"
+title = "Network Watch collector: sampling cadence, retention and address ranges"
+kind = "probe"
+principle = "detect by saturation, not size"
+why = "Network Watch answers who talks to this host and its services, and from where, without reading any content. The collector must stay cheap enough to run all the time on a busy host, so each source has its own cadence and backs off under load."
+does = "homelab-maint-netwatch samples established sockets every 30 s (sockets_every_s), reads the kernel and sshd journals and the Plex log every 60 s, and reads Cloudflare edge counts and firewall events every 300 s over the last 900 s (cloudflare_window_s). Tunnel hostnames are refreshed hourly and old rows are pruned hourly, keeping 30 days (keep_days). Only metadata is stored in its own database under /var/lib/homelab-maint: who, when, port, connection counts and bytes, and a path class label, never a raw path or a request body. While the 1-minute load is at or above the CPU count the sampling intervals double, up to 4 times. The address ranges that are the owner's LAN and Tailscale (lan_cidrs, tailscale_cidrs) classify peers; nothing outside its own database is written. Read once at start: restart homelab-maint-netwatch after editing."
+file = "maint.toml"
+target = "netwatch"
+since = "2026-10-20"
+owner_notes = "The Cloudflare zones are read from the token unless cf_zones lists zone ids. The token is never in this file."
+
+[rule.params]
+lan_cidrs = ["192.168.40.0/24"]
+tailscale_cidrs = ["100.64.0.0/10"]
+tunnel_local_ports = []
+cf_account_id = ""
+cf_zones = []
+sockets_every_s = 30
+journal_every_s = 60
+plex_every_s = 60
+cloudflare_every_s = 300
+cloudflare_window_s = 900
+plex_dir = "/var/snap/plexmediaserver/common/Library/Application Support/Plex Media Server"
+keep_days = 30
+path_classes = {}
+
+[[rule]]
 id = "live.service.plex"
 title = "Live tab tile: Plex"
 kind = "probe"
