@@ -176,7 +176,8 @@ def _apply_block(req: dict, now: float, cf, sh, db) -> tuple[bool, str]:
     r = _validate(req)
     ip, target, zone, reason = r["ip"], r["target"], r["zone"], r["reason"]
     bid = block_id(ip, target, zone)
-    if db.execute("SELECT 1 FROM blocks WHERE id = ? AND removed IS NULL", (bid,)).fetchone():
+    # An expired row is not a block in force: the same request after its expiry applies again.
+    if db.execute("SELECT 1 FROM blocks WHERE id = ? AND removed IS NULL AND (until IS NULL OR until > ?)", (bid, now)).fetchone():
         return True, "already-blocked"
     cfg = core.load_config().get("netwatch", {})
     protection = protect.protection(ip, db, entities.load_topology(sh), now, cfg)
@@ -186,25 +187,33 @@ def _apply_block(req: dict, now: float, cf, sh, db) -> tuple[bool, str]:
     if signin and not reason:
         raise _Refuse("signin-protected")
     until = None if r["permanent"] else now + r["days"] * DAY_S
-    rule_id = None
-    if target == "host":
-        try:
-            ensure_table(sh)
-            _add_element(sh, ip, None if r["permanent"] else f"{r['days']}d")
-        except NftError:
-            raise _Refuse("nft:add") from None
-    else:
-        when = "permanent" if r["permanent"] else f"until {_date(until)}"
-        try:
-            rule_id = _cf(cf, cfg).create_access_rule(zone, ip, f"netwatch:{bid} {when}")
-        except CFUnavailable as exc:
-            raise _Refuse(f"cloudflare:{exc.reason}") from None
+    # The row goes first, so a block that reaches the firewall is always on the books; if the firewall or Cloudflare refuses,
+    # the row is deleted again, which leaves nothing behind.
     db.execute(
         "INSERT OR REPLACE INTO blocks (id, ip, target, zone, created, until, permanent, reason, cf_rule_id, removed)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
-        (bid, ip, target, zone, now, until, int(r["permanent"]), reason, rule_id),
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
+        (bid, ip, target, zone, now, until, int(r["permanent"]), reason),
     )
     db.commit()
+    try:
+        if target == "host":
+            try:
+                ensure_table(sh)
+                _add_element(sh, ip, None if r["permanent"] else f"{r['days']}d")
+            except NftError:
+                raise _Refuse("nft:add") from None
+        else:
+            when = "permanent" if r["permanent"] else f"until {_date(until)}"
+            try:
+                rule_id = _cf(cf, cfg).create_access_rule(zone, ip, f"netwatch:{bid} {when}")
+            except CFUnavailable as exc:
+                raise _Refuse(f"cloudflare:{exc.reason}") from None
+            db.execute("UPDATE blocks SET cf_rule_id = ? WHERE id = ?", (rule_id, bid))
+            db.commit()
+    except BaseException:
+        db.execute("DELETE FROM blocks WHERE id = ?", (bid,))
+        db.commit()
+        raise
     core.audit("netwatch", "block", ip, 0, f"ok:{target}" + (f" override:{reason}" if reason and signin else ""))
     return True, "ok"
 

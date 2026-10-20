@@ -457,3 +457,63 @@ def test_override_reason_with_control_characters_is_refused(db, audit, reason):
 def test_reason_is_audited_only_when_it_overrode_a_signin(db, audit):
     assert block.apply_block(_req(override_reason="just a note"), NOW, sh=FakeSh(), db=db) == (True, "ok")
     assert audit == [("netwatch", "block", "203.0.113.9", "ok:host")]
+
+
+# ---- the row goes first; an expired row is not already blocked ------------------------------------------------------------
+
+def test_the_block_row_exists_while_the_firewall_is_being_changed(db, audit):
+    seen = []
+
+    class Watching(FakeSh):
+        def __call__(self, cmd, **kw):
+            if cmd[:3] == ["nft", "add", "element"]:
+                seen.append(db.execute("SELECT count(*) FROM blocks WHERE id = ? AND removed IS NULL", (bid,)).fetchone()[0])
+            return super().__call__(cmd, **kw)
+
+    bid = block.block_id("203.0.113.9", "host", "")
+    assert block.apply_block(_req(), NOW, sh=Watching(), db=db) == (True, "ok")
+    assert seen == [1]
+
+
+def test_a_cloudflare_block_row_exists_before_the_rule_and_keeps_its_rule_id(db, audit):
+    cf = FakeCF()
+    bid = block.block_id("203.0.113.9", "cloudflare", ZONE)
+    rows_during = []
+    original = cf.create_access_rule
+
+    def watched(zone, ip, note):
+        rows_during.append(db.execute("SELECT count(*) FROM blocks WHERE id = ?", (bid,)).fetchone()[0])
+        return original(zone, ip, note)
+
+    cf.create_access_rule = watched
+    assert block.apply_block(_req(target="cloudflare", zone=ZONE), NOW, cf=cf, sh=FakeSh(), db=db) == (True, "ok")
+    assert rows_during == [1]
+    assert _row(db, bid)[6] == "rule-1"
+
+
+def test_a_failed_host_apply_leaves_no_row_even_when_nothing_else_is_refused(db, audit):
+    class Broken(FakeSh):
+        def __call__(self, cmd, **kw):
+            if cmd[:3] == ["nft", "add", "element"]:
+                raise OSError("nft vanished")                 # not an NftError: an unexpected failure, still no row
+            return super().__call__(cmd, **kw)
+
+    assert block.apply_block(_req(), NOW, sh=Broken(), db=db) == (False, "error")
+    assert db.execute("SELECT count(*) FROM blocks").fetchone()[0] == 0
+
+
+def test_a_block_whose_earlier_row_has_expired_applies_again(db, audit):
+    sh = FakeSh()
+    bid = block.block_id("203.0.113.9", "host", "")
+    assert block.apply_block(_req(days=1), NOW, sh=sh, db=db) == (True, "ok")
+    later = NOW + 2 * 86400                                       # the one-day block has run out
+    assert block.apply_block(_req(days=2), later, sh=sh, db=db) == (True, "ok")
+    assert len(sh.element_adds()) == 2
+    assert _row(db, bid)[3] == later + 2 * 86400
+
+
+def test_an_unexpired_block_is_still_already_blocked(db, audit):
+    sh = FakeSh()
+    assert block.apply_block(_req(days=2), NOW, sh=sh, db=db) == (True, "ok")
+    assert block.apply_block(_req(days=2), NOW + 86400, sh=sh, db=db) == (True, "already-blocked")
+    assert len(sh.element_adds()) == 1

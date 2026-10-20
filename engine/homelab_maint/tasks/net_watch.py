@@ -1,5 +1,6 @@
-"""net_watch: the Network Watch verdict, every 5 minutes. Read-only: it reads the netwatch store, judges the last day's window and
-reports. The runner debounces and emails; a finding is a fact about the window, never a block (blocks are the dashboard's, by hand).
+"""net_watch: the Network Watch verdict, every 5 minutes. It reads the netwatch store, judges the last day's window and reports; it
+writes only its own bookkeeping there (new-peer baseline rows and stale markers). The runner debounces and emails; a finding is a
+fact about the window, never a block (blocks are the dashboard's, by hand).
 
 It also writes netwatch/findings.json for the publisher. A source that cannot be read is reported stale, never "all fine".
 """
