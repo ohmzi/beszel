@@ -550,12 +550,12 @@ The rules (`homelab_maint/netwatch/judge.py`), over the last 30 minutes:
 |------|------------|----------|--------|
 | `plex_exploit` | an exploit-shaped request reaches the Plex port; the attacker is named when exactly one internet peer used that port that hour | crit | yes |
 | `codec_unexplained` | a Plex codec library changed with no matching Plex request | crit | yes |
-| `threat_active` | an address on a listed threat list did more than scan: over 20 edge requests, a 2xx on an app path, or a connection in | warn | yes, for more than scanning |
+| `threat_active` | an address on a listed threat list did more than scan: over 20 edge requests, a 2xx on an app path, or a connection in | warn | yes |
 | `auth_burst` | 5 failed sshd sign-ins from one address in 10 minutes, or 10 refused (401/403) sign-ins on an `auth_*` path from one address | warn | yes |
-| `line_not_meant` | a container is refused on a host port it has no pinhole for | warn | no, shown on the page only |
+| `line_not_meant` | a container is refused on a host port it has no pinhole for | warn | yes |
 | `new_peer` | a service talks somewhere new, or a device reaches a port it never used, after the learning period | warn | yes |
 
-Scanning alone never emails. There is no digest. The alert goes to the owner by e-mail only (the Gmail route, never SMS), and
+Every finding emails, after the runner's usual two-run debounce; activity that produces no finding never emails. There is no digest. The alert goes to the owner by e-mail only (the Gmail route, never SMS), and
 its link opens `/network?finding=<id>` with the finding selected. The shipped `[netwatch]` settings are in the `netwatch.settings`
 rule of `etc/rules.d/70-monitoring.toml`.
 
