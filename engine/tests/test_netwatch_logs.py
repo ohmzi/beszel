@@ -89,8 +89,9 @@ def _db(tmp_path):
 def test_read_journal_first_run_uses_since_and_stores_cursor(tmp_path):
     db = _db(tmp_path)
     sh = _FakeSh(stdout=f"{UFW_V4}\n-- cursor: s=abc;i=1\n")
-    lines = read_journal("-k", "cursor_kernel", db, sh=sh)
+    lines, status = read_journal("-k", "cursor_kernel", db, sh=sh)
     assert lines == [UFW_V4]
+    assert status == "ok"
     assert sh.calls == [["journalctl", "-o", "short-iso", "--no-pager", "--show-cursor", "-k", "--since", "-10min"]]
     assert meta_get(db, "cursor_kernel") == "s=abc;i=1"
 
@@ -99,7 +100,7 @@ def test_read_journal_with_unit_and_saved_cursor_uses_after_cursor(tmp_path):
     db = _db(tmp_path)
     meta_set(db, "cursor_ssh", "s=old;i=9")
     sh = _FakeSh(stdout="-- cursor: s=new;i=10\n")
-    assert read_journal("ssh.service", "cursor_ssh", db, sh=sh) == []
+    assert read_journal("ssh.service", "cursor_ssh", db, sh=sh) == ([], "ok")
     assert sh.calls == [[
         "journalctl", "-o", "short-iso", "--no-pager", "--show-cursor",
         "-u", "ssh.service", "--after-cursor", "s=old;i=9",
@@ -110,13 +111,13 @@ def test_read_journal_with_unit_and_saved_cursor_uses_after_cursor(tmp_path):
 def test_read_journal_failure_returns_nothing_and_keeps_cursor(tmp_path):
     db = _db(tmp_path)
     meta_set(db, "cursor_kernel", "s=keep;i=5")
-    assert read_journal("-k", "cursor_kernel", db, sh=_FakeSh(rc=1, stdout="")) == []
+    assert read_journal("-k", "cursor_kernel", db, sh=_FakeSh(rc=1, stdout="")) == ([], "stale:journalctl")
     assert meta_get(db, "cursor_kernel") == "s=keep;i=5"
 
 
 def test_read_journal_without_cursor_line_keeps_cursor(tmp_path):
     db = _db(tmp_path)
     meta_set(db, "cursor_kernel", "s=keep;i=5")
-    assert read_journal("-k", "cursor_kernel", db, sh=_FakeSh(stdout="-- No entries --\n")) == []
+    assert read_journal("-k", "cursor_kernel", db, sh=_FakeSh(stdout="-- No entries --\n")) == ([], "ok")
     assert meta_get(db, "cursor_kernel") == "s=keep;i=5"
 

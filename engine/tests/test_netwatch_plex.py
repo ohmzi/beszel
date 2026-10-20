@@ -4,7 +4,7 @@ import conftest  # noqa: F401  (points HOMELAB_MAINT_* at tmp dirs before homela
 import os
 import time
 
-from homelab_maint.netwatch.plex import exploit_attempts, plex_log_lines, unexplained_codecs
+from homelab_maint.netwatch.plex import CODEC_WINDOW, exploit_attempts, plex_log_lines, unexplained_codecs
 
 EXPLOIT = (
     "Oct 17, 2026 15:17:04.668 [130939384544056] WARN - [Req#176eb82/CompanionProxy/Subscribe/poc_23919] "
@@ -110,3 +110,32 @@ def test_plex_log_lines_keeps_lines_at_or_after_since(tmp_path):
 
 def test_plex_log_missing_file_returns_nothing(tmp_path):
     assert plex_log_lines(0.0, cfg={"plex_dir": str(tmp_path / "nope")}) == []
+
+
+def test_codec_explained_by_request_just_before_since_when_read_with_margin(tmp_path):
+    """The poll boundary: the request is logged 2 s before `since`, the codec lands 1 s after it. Only a margin reads the request."""
+    codec_dir = tmp_path / "codecs"
+    (codec_dir / "1.2.3").mkdir(parents=True)
+    so = codec_dir / "1.2.3" / "libaac_latm_decoder.so"
+    so.write_bytes(b"x")
+    since = 1798761600.0
+    logged = since - 2.0
+    os.utime(so, (since + 1.0, since + 1.0))
+    plex_dir = tmp_path / "Plex Media Server"
+    (plex_dir / "Logs").mkdir(parents=True)
+    (plex_dir / "Logs" / "Plex Media Server.log").write_text(_codec_line(logged, "aac_latm") + "\n")
+    cfg = {"plex_dir": str(plex_dir)}
+    # Without the margin the request is outside the window and the codec is (wrongly) reported.
+    assert len(unexplained_codecs(codec_dir, plex_log_lines(since, cfg), since=since)) == 1
+    lines = plex_log_lines(since, cfg, margin=CODEC_WINDOW)
+    assert unexplained_codecs(codec_dir, lines, since=since) == []
+
+
+def test_padded_day_of_month_is_parsed():
+    """Plex pads single-digit days with a space: `Oct  5, 2026`. All three forms must give the same epoch."""
+    tail = " [1] WARN - [Req#abc/CompanionProxy/Subscribe/x] unsupported protocol 'x searchOne'"
+    (a,) = exploit_attempts(["Oct  5, 2026 15:17:04.668" + tail])
+    (b,) = exploit_attempts(["Oct 5, 2026 15:17:04.668" + tail])
+    (c,) = exploit_attempts(["Oct 05, 2026 15:17:04.668" + tail])
+    assert a.ts == b.ts == c.ts
+    assert a.detail == "Req#abc"

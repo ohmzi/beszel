@@ -7,7 +7,6 @@ syslog lines (`Oct 19 08:12:01 ...`, which carry no year, so the current year is
 Metadata only: addresses, ports, protocol and interface. Never packet contents, never the rest of a log line.
 """
 import re
-import subprocess
 import time
 from datetime import datetime
 from typing import Iterable
@@ -42,7 +41,10 @@ def _line_ts(line: str) -> float | None:
         except ValueError:
             return None
         if ts - time.time() > 86400:   # a December line read in January belongs to last year
-            ts = time.mktime(time.strptime(f"{year - 1} {m.group(1)} {m.group(2)} {m.group(3)}", "%Y %b %d %H:%M:%S"))
+            try:
+                ts = time.mktime(time.strptime(f"{year - 1} {m.group(1)} {m.group(2)} {m.group(3)}", "%Y %b %d %H:%M:%S"))
+            except ValueError:
+                return None
         return ts
     return None
 
@@ -82,11 +84,11 @@ def parse_auth(lines: Iterable[str]) -> list[NetEvent]:
     return events
 
 
-def read_journal(unit_or_k: str, cursor_key: str, db, sh=core.sh) -> list[str]:
+def read_journal(unit_or_k: str, cursor_key: str, db, sh=core.sh) -> tuple[list[str], str]:
     """New journal lines since the cursor stored under `cursor_key` (or the last 10 minutes on the first run).
 
-    `unit_or_k` is "-k" for the kernel ring, otherwise a unit name. The cursor journalctl prints last is saved in meta; a
-    failed journalctl returns no lines and leaves the saved cursor where it was.
+    `unit_or_k` is "-k" for the kernel ring, otherwise a unit name. Returns (lines, status): status is "ok", or
+    "stale:journalctl" when journalctl fails, in which case no lines are returned and the saved cursor is left where it was.
     """
     argv = ["journalctl", "-o", "short-iso", "--no-pager", "--show-cursor"]
     argv += ["-k"] if unit_or_k == "-k" else ["-u", unit_or_k]
@@ -94,11 +96,11 @@ def read_journal(unit_or_k: str, cursor_key: str, db, sh=core.sh) -> list[str]:
     argv += ["--after-cursor", cursor] if cursor else ["--since", "-10min"]
     res = sh(argv)
     if res.returncode != 0:
-        return []
+        return [], "stale:journalctl"
     lines = [ln for ln in res.stdout.splitlines() if ln.strip()]
     new_cursor = None
     if lines and lines[-1].startswith("-- cursor: "):
         new_cursor = lines.pop()[len("-- cursor: "):].strip()
     if new_cursor:
         meta_set(db, cursor_key, new_cursor)
-    return [ln for ln in lines if not ln.startswith("-- ")]
+    return [ln for ln in lines if not ln.startswith("-- ")], "ok"
