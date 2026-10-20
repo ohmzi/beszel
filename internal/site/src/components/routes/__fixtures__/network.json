@@ -1,0 +1,24 @@
+{
+  "generated": 1792454400,
+  "learning_until": 1792800000,
+  "sources": {"conntrack": "ok", "threat": "stale"},
+  "directions": {"24h": {"in": 12, "out": 340, "svc": 0, "lan": 80}, "30d": {"in": 300, "out": 9000, "svc": 0, "lan": 2100}},
+  "talkers": [
+    {"ip": "203.0.113.10", "country": "NL", "asn": 64500, "hosts": ["app.example.test"], "requests": 412, "threat": ["scanners"], "protection": null},
+    {"ip": "198.51.100.7", "country": "US", "asn": 64501, "hosts": ["mail.example.test"], "requests": 33, "threat": [], "protection": "signin"},
+    {"ip": "192.0.2.44", "country": "DE", "asn": 64502, "hosts": ["git.example.test"], "requests": 5, "threat": null, "protection": "hard"}
+  ],
+  "services": [{"name": "git", "in": 3, "out": 1}, {"name": "mail", "in": 2, "out": 4}],
+  "findings": [
+    {"id": "0123456789abcdef", "rule": "scan-burst", "severity": "crit", "src": "203.0.113.10", "target": "app.example.test", "why": "Port scan across 40 ports", "first": 1792450000, "last": 1792453000, "count": 3, "block": "host", "zone": null, "stolen_account": null},
+    {"id": "fedcba9876543210", "rule": "failed-signins", "severity": "warn", "src": "198.51.100.7", "target": "mail.example.test", "why": "Burst of failed sign-ins", "first": 1792440000, "last": 1792449000, "count": 12, "block": "cloudflare", "zone": "example.test", "stolen_account": "user@example.test"},
+    {"id": "1111222233334444", "rule": "unknown-peer", "severity": "warn", "src": "192.0.2.44", "target": "git.example.test", "why": "New service peer", "first": 1792400000, "last": 1792430000, "count": 1, "block": null, "zone": null, "stolen_account": null}
+  ],
+  "blocks": [
+    {"id": "aaaabbbbccccdddd", "ip": "203.0.113.99", "target": "host", "zone": "", "until": 1794000000, "permanent": false, "reason": "Scanner from a documentation range"}
+  ],
+  "protected": {
+    "signins": [{"ip": "198.51.100.7", "source": "mail", "last_seen": 1792449000}],
+    "hard_ranges": ["192.168.40.0/24", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16"]
+  }
+}
