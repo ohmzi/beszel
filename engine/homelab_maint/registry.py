@@ -3604,7 +3604,7 @@ def _table_rule(c: _MCtx, file: str, path: tuple, own: dict, rid: str, title: st
 
 
 def _conv_maint(c: _MCtx, doc: dict, _raw: str) -> None:
-    for path, own in _tables(doc, r"global|caps|tasks\.[^.]+|live"):
+    for path, own in _tables(doc, r"global|caps|tasks\.[^.]+|live|netwatch"):
         if not path:
             _table_rule(c, "maint.toml", path, own, "config.root", "Global settings (root)", "policy", "safety")
         elif path[0] == "tasks" and len(path) == 2:
@@ -3631,6 +3631,8 @@ def _conv_maint(c: _MCtx, doc: dict, _raw: str) -> None:
                         mode_lift=True, applies=[name], destructive=klass in ("C1", "C2") and kind != "check", severity=sev, prefix=pre)
         elif path == ("live",):
             _table_rule(c, "maint.toml", path, own, "live.settings", "Live monitor settings", "probe", "monitoring", prefix="live.service")
+        elif path == ("netwatch",):
+            _table_rule(c, "maint.toml", path, own, "netwatch.settings", "Network watch settings", "probe", "monitoring", prefix="netwatch")
         else:
             _table_rule(c, "maint.toml", path, own, f"config.{'.'.join(path)}", f"Settings [{'.'.join(path)}]", "safety" if path[0] == "caps" else "policy", "safety",
                         applies=[])
