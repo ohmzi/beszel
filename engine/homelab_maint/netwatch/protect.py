@@ -63,8 +63,9 @@ def _signin_rows(db, now: float, cfg: dict, since: float, plex_sessions) -> list
     rows: list[tuple[str, str, float]] = []
     hosts = set((cfg.get("signin") or {}).get("hosts") or [])
     if hosts:
+        # An hour bucket keeps accumulating after it was first read, so re-read the bucket the mark falls in.
         for bucket, host, client_ip, status, path_class in db.execute(
-            "SELECT bucket, host, client_ip, status, path_class FROM edge WHERE bucket >= ?", (since,)
+            "SELECT bucket, host, client_ip, status, path_class FROM edge WHERE bucket >= ?", (since - EDGE_BUCKET_S,)
         ):
             if host in hosts and path_class == AUTH_CLASS and 200 <= status < 300:
                 rows.append((client_ip, f"edge:{host}", min(bucket + EDGE_BUCKET_S, now)))
@@ -88,9 +89,10 @@ def _signin_rows(db, now: float, cfg: dict, since: float, plex_sessions) -> list
 
 
 def record_signins(db, now: float, cfg: dict, plex_sessions=None) -> int:
-    """Write the sign-ins seen since the last call (see the module docstring). Returns the number of rows written.
+    """Write the sign-ins seen since the last call (see the module docstring). Returns the number of rows given to the upsert.
 
-    A row upserts on (ip, source) and keeps the larger last_seen. The `signins:since` mark moves to `now`.
+    A row upserts on (ip, source) and keeps the larger last_seen, so re-reading an edge hour is harmless. The `signins:since`
+    mark moves to `now`.
     """
     raw = store.meta_get(db, "signins:since")
     since = float(raw) if raw else now - SINCE_DEFAULT_S
@@ -110,7 +112,10 @@ def protection(ip: str, db, topo, now: float, cfg: dict | None = None) -> tuple[
 
     The hard ranges win. Otherwise the most recent sign-in within 30 days of `now` protects the address.
     """
-    addr = _norm(ip)
+    try:
+        addr = _norm(ip)
+    except ValueError:      # fail closed: an address we cannot parse is never blockable
+        return ("hard", "invalid-address")
     for net in entities.HARD_RANGES(topo, cfg):
         if addr in net:
             return ("hard", str(net))

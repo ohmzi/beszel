@@ -62,6 +62,11 @@ def test_a_hard_range_wins_over_a_sign_in(db):
     assert protect.protection("192.168.40.7", db, TOPO, NOW, CFG) == ("hard", "192.168.40.0/24")
 
 
+@pytest.mark.parametrize("ip", ["not-an-ip", "", "198.51.100.300", "192.168.40.7/24"])
+def test_an_unparseable_address_is_hard_and_never_raises(db, ip):
+    assert protect.protection(ip, db, TOPO, NOW, CFG) == ("hard", "invalid-address")
+
+
 def test_an_unknown_public_address_is_not_protected(db):
     assert protect.protection("198.51.100.77", db, TOPO, NOW, CFG) is None
 
@@ -87,6 +92,16 @@ def test_an_edge_200_on_another_host_or_path_class_is_no_sign_in(db):
     protect.record_signins(db, NOW, CFG)
     assert protect.protection("198.51.100.20", db, TOPO, NOW, CFG) is None
     assert protect.protection("198.51.100.21", db, TOPO, NOW, CFG) is None
+
+
+def test_a_2xx_landing_in_an_already_read_hour_is_recorded_on_the_next_run(db):
+    # The mark is set mid-hour (NOW is 20 minutes into BUCKET's hour). A later 2xx in that same hour must still be seen.
+    _edge(db, _edge_row(status=401, client_ip="198.51.100.30"))
+    protect.record_signins(db, NOW, CFG)
+    assert protect.protection("198.51.100.20", db, TOPO, NOW, CFG) is None
+    _edge(db, _edge_row(status=200, client_ip="198.51.100.20"))
+    assert protect.record_signins(db, NOW + 60, CFG) == 1
+    assert protect.protection("198.51.100.20", db, TOPO, NOW + 60, CFG) == ("signin", "edge:app.example.test 2027-01-01")
 
 
 def test_no_listed_hosts_means_no_edge_sign_ins(db):
