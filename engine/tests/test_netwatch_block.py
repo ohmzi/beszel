@@ -74,7 +74,7 @@ class FakeCF:
 @pytest.fixture
 def audit(monkeypatch):
     rows = []
-    monkeypatch.setattr(core, "audit", lambda task, what, target, size, outcome, n=1: rows.append((task, what, target, outcome)))
+    monkeypatch.setattr(core, "audit", lambda task, what, target, size, outcome, n=1, **k: rows.append((task, what, target, outcome)))
     return rows
 
 

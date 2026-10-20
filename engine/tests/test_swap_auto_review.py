@@ -684,7 +684,7 @@ def test_the_breaker_summary_keeps_the_holders_inside_the_140_character_cap(worl
 
 def test_a_launch_is_audited_as_launched_and_only_a_confirmed_relief_as_done(world, monkeypatch):
     rows = []
-    rec = lambda task, what, target, size, outcome, n=1: rows.append((what, outcome))         # noqa: E731
+    rec = lambda task, what, target, size, outcome, n=1, **k: rows.append((what, outcome))         # noqa: E731
     monkeypatch.setattr(core, "audit", rec)
     monkeypatch.setattr(swap_auto, "audit", rec)                                              # the task imported it by name
     from homelab_maint import routine
@@ -708,7 +708,7 @@ def inspect_done(routine):
 
 def test_ctx_act_labels_a_success_with_the_outcome_the_caller_chose(monkeypatch):
     rows = []
-    monkeypatch.setattr(core, "audit", lambda task, what, target, size, outcome, n=1: rows.append((what, outcome)))
+    monkeypatch.setattr(core, "audit", lambda task, what, target, size, outcome, n=1, **k: rows.append((what, outcome)))
     cfg = {"tasks": {"x": {"mode": "apply"}}}
     ctx = core.Ctx(cfg, "x", True, 1e9)
     assert ctx.act("start", "t:1", 0, lambda: None, outcome="launched") and ctx.act("go", "t:2", 0, lambda: None)

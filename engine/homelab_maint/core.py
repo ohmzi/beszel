@@ -218,32 +218,32 @@ class Ctx:
         protected, or `target` is empty. Every attempt is written to audit.jsonl.
         """
         if not target or not str(target).strip():
-            audit(self.name, what, target, size, "refused-empty-selector")
+            audit(self.name, what, target, size, "refused-empty-selector", ts=self.now)
             return False
         if self.is_protected(target, *protect_names):
-            audit(self.name, what, target, size, "refused-protected")
+            audit(self.name, what, target, size, "refused-protected", ts=self.now)
             return False
         if not self.apply:
             self._would(what, target, size)
             return False
         if paused(self.name):            # a PAUSE dropped in while a long task is running
-            audit(self.name, what, target, size, "refused-paused")
+            audit(self.name, what, target, size, "refused-paused", ts=self.now)
             self.apply = False
             return False
         if self._actions + 1 > self.cap_items or self._deleted_bytes + max(size, 0) > self.cap_bytes:
-            audit(self.name, what, target, size, "refused-cap")
+            audit(self.name, what, target, size, "refused-cap", ts=self.now)
             raise CapExceeded(f"{self.name}: per-run cap reached "
                               f"({human(self._deleted_bytes)} / {self.cap_items} items)")
         try:
             ret = fn()
         except Exception as exc:  # noqa: BLE001
-            audit(self.name, what, target, size, f"failed: {exc}")
+            audit(self.name, what, target, size, f"failed: {exc}", ts=self.now)
             raise
         if isinstance(ret, int) and not isinstance(ret, bool) and ret >= 0:
             size = ret                   # exact bytes freed reported by the action itself
         self._actions += 1
         self._deleted_bytes += max(size, 0)
-        audit(self.name, what, target, size, outcome)
+        audit(self.name, what, target, size, outcome, ts=self.now)
         return True
 
     def _would(self, what: str, target: str, size: int) -> None:
@@ -253,7 +253,7 @@ class Ctx:
         d[0] += 1
         d[1] += max(size, 0)
         if d[0] <= self.dry_sample:
-            audit(self.name, what, target, size, "dry-run")
+            audit(self.name, what, target, size, "dry-run", ts=self.now)
         else:
             d[2] += 1
             d[3] += max(size, 0)
@@ -262,7 +262,7 @@ class Ctx:
         """One aggregate row per action whose would-do rows were not all listed (run_task calls it when the task ends)."""
         for what, d in self._dry.items():
             if d[2]:
-                audit(self.name, what, f"(+{d[2]} more, not listed)", d[3], "dry-run", n=d[2])
+                audit(self.name, what, f"(+{d[2]} more, not listed)", d[3], "dry-run", n=d[2], ts=self.now)
         self._dry.clear()
 
     @property
@@ -292,9 +292,10 @@ def _int_or(v: Any, default: int) -> int:
     return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else default
 
 
-def audit(task_name: str, what: str, target: str, size: int, outcome: str, n: int = 1) -> None:
+def audit(task_name: str, what: str, target: str, size: int, outcome: str, n: int = 1, ts: float | None = None) -> None:
     """One row of audit.jsonl. `n` > 1: the row stands for n would-do decisions (an aggregate, see Ctx.flush_dry)."""
-    rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "task": task_name, "action": what,
+    rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z") if ts is None else time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(ts)),
+           "task": task_name, "action": what,
            "target": str(target), "bytes": size, "outcome": outcome, **({"n": n} if n > 1 else {})}
     try:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -370,9 +371,9 @@ def _alarm(_sig, _frm):
     raise _Timeout()
 
 
-def run_task(t: Task, cfg: dict, apply: bool) -> tuple[Result, float]:
+def run_task(t: Task, cfg: dict, apply: bool, now: float | None = None) -> tuple[Result, float]:
     global _syslog
-    ctx = Ctx(cfg, t.name, apply)
+    ctx = Ctx(cfg, t.name, apply, now)
     started = time.time()
     old = signal.signal(signal.SIGALRM, _alarm)
     signal.alarm(t.timeout)
