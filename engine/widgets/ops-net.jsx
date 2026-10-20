@@ -1,4 +1,4 @@
-// ops-net: GET /net (request "state", trigger load) -> data.state.*; footprint 3x2 board tracks (212 px each).
+// ops-net: GET /net (request "state", trigger load) -> data.state.*; footprint 3x3 board tracks (212 px each).
 // Lines starting with // are build-time comments and are stripped. Rules: widgets/CONVENTIONS.md.
 <Stack gap={7} p={2} style={{opacity:data.state.stale?0.55:1}}>
 <Group justify="space-between" align="center" wrap="nowrap" gap={8}>

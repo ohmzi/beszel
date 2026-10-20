@@ -123,6 +123,25 @@ def test_unavailable_without_a_database_and_the_file_is_not_created(env):
     assert not (env / "netwatch.db").exists()
 
 
+def test_the_build_never_writes_the_store(env):
+    import hashlib
+    import os
+    import stat
+    conn = store.open_db()
+    _seed_edges(conn, 300)
+    store.upsert_flows(conn, [Flow(HOUR, "in", "203.0.113.9", "container:shop", 443, "tcp", 4, 1, 1)])
+    store.meta_set(conn, "first_run", str(HOUR))
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    conn.close()
+    path = env / "netwatch.db"
+    before = (hashlib.sha256(path.read_bytes()).hexdigest(), stat.S_IMODE(os.stat(path).st_mode), os.stat(path).st_mtime_ns)
+    doc = export.build_network({}, NOW)                   # the path form: the store is opened by the export itself
+    assert len(doc["talkers"]) == 50
+    after = (hashlib.sha256(path.read_bytes()).hexdigest(), stat.S_IMODE(os.stat(path).st_mode), os.stat(path).st_mtime_ns)
+    assert after == before
+    assert not (env / "netwatch.db-wal").exists() or (env / "netwatch.db-wal").stat().st_size == 0
+
+
 def test_findings_are_read_from_the_file_and_missing_is_empty(db, env):
     assert _build(db)["findings"] == []
     path = env / "netwatch" / "findings.json"

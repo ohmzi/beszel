@@ -539,8 +539,8 @@ def net(status: dict, now: float | None = None) -> dict:
     p["flags"] = [{"r": _t(x.get("rule"), 28), "s": _t(x.get("src"), 40), "t": _t(x.get("target"), 40), "n": _count(x.get("count")),
                    "c": COLOR[_lv(x.get("severity"), "info")]}
                   for x in _rows(e)[:NET_FLAGS]]
-    n = _num(m.get("flags"))
-    p["head"] = "no data" if e is None else "no flags" if not n else f"{int(n)} open"
+    n = _num(m.get("flags"))                              # a missing count is unknown ("--"), never "no flags"
+    p["head"] = "no data" if e is None else "--" if n is None else "no flags" if not n else f"{int(n)} open"
     p["hc"], p["hn"] = _col(e), _sum(e, 110)
     return fit(p)
 

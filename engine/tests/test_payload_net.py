@@ -65,6 +65,12 @@ def test_missing_net_watch_entry_gives_every_key_with_no_data():
     assert p["edge"] == "--" and p["blocked"] == "--"
 
 
+def test_a_missing_flag_count_is_unknown_not_no_flags():
+    st = _status([], metrics={"in24": 1})                 # no "flags" metric at all
+    p = payloads.build("net", st, NOW)
+    assert p["head"] == "--"
+
+
 def test_no_status_at_all_is_a_stale_payload_with_the_same_keys():
     p = payloads.build("net", {}, NOW)
     assert p["stale"] is True and "dirs" in p and "flags" in p

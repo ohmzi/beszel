@@ -205,8 +205,8 @@ def build_network(status: dict, now: float, db=None, findings_path: Path | None 
         path = _store_path()
         if not path.exists():
             return {"available": False, "generated": now}
-        try:
-            own = db = store.open_db(path)
+        try:                                              # read-only: no DDL, no WAL switch, no chmod, the collector keeps writing
+            own = db = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
         except (OSError, sqlite3.Error):
             return {"available": False, "generated": now}
     try:
