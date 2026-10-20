@@ -3,6 +3,7 @@
 Everything here reads state; nothing changes docker, the firewall or the network. `sh` is core.sh by default and is
 passed as a parameter so tests can fake it. When a source can't be read the topology comes back `stale=True` and empty
 rather than raising: the caller must not treat a stale view as "nothing here".
+Callers must treat `stale` as "refuse block decisions that depend on classification".
 """
 import json
 from dataclasses import dataclass, field
@@ -15,6 +16,8 @@ DEFAULT_LAN = ["192.168.40.0/24"]
 DEFAULT_TAILSCALE = ["100.64.0.0/10"]
 # Never overridable: these are the owner's hard ranges, whatever [netwatch] says about LAN and Tailscale.
 _FIXED_HARD = ["192.168.40.0/24", "100.64.0.0/10", "127.0.0.0/8", "::1/128", "169.254.0.0/16", "fe80::/10"]
+# With a stale topology the Docker subnets are unknown, so every private range is treated as hard until docker is readable again.
+_STALE_FALLBACK = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8"]
 
 
 @dataclass
@@ -149,6 +152,16 @@ def classify(ip: str, topo: Topology, cfg: dict) -> Peer:
     return Peer("internet", ip)
 
 
-def HARD_RANGES(topo: Topology) -> list:
-    """Addresses the owner must never block: LAN, Tailscale, every Docker subnet, loopback and link-local, both families."""
-    return [ip_network(c) for c in _FIXED_HARD] + list(topo.subnets)
+def HARD_RANGES(topo: Topology, cfg: dict | None = None) -> list:
+    """Addresses the owner must never block, both families.
+
+    Fixed ranges, the configured LAN and Tailscale ranges (defaults when unset), and every Docker subnet. When the
+    topology is stale the Docker subnets are unknown, so the conservative private fallback ranges are added too.
+    """
+    cfg = cfg or {}
+    ranges = [ip_network(c) for c in _FIXED_HARD]
+    ranges += _networks(cfg, "lan_cidrs", DEFAULT_LAN) + _networks(cfg, "tailscale_cidrs", DEFAULT_TAILSCALE)
+    ranges += list(topo.subnets)
+    if topo.stale:
+        ranges += [ip_network(c) for c in _STALE_FALLBACK]
+    return ranges

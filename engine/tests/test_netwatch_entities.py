@@ -48,8 +48,8 @@ def _topo():
 
 
 def test_container_ip_is_container():
-    assert classify("172.28.0.5", _topo(), {}).kind == "container"
-    assert classify("172.28.0.5", _topo(), {}).name == "web"
+    p = classify("172.28.0.5", _topo(), {})
+    assert (p.kind, p.name) == ("container", "web")
 
 
 def test_ipv6_on_docker_subnet_is_container():
@@ -123,3 +123,19 @@ def test_docker_missing_binary_does_not_raise():
         return _cp("", 127)
     topo = load_topology(boom)
     assert topo.stale is True
+
+
+def test_hard_ranges_fail_closed_when_topology_is_stale():
+    ranges = HARD_RANGES(Topology.empty_stale())
+    assert ip_network("172.16.0.0/12") in ranges
+    assert ip_network("fd00::/8") in ranges
+    assert ip_network("10.0.0.0/8") in ranges
+    assert ip_network("192.168.0.0/16") in ranges
+
+
+def test_hard_ranges_include_configured_lan_and_tailscale():
+    ranges = HARD_RANGES(_topo(), {"lan_cidrs": ["10.9.0.0/24"]})
+    assert ip_network("10.9.0.0/24") in ranges
+    assert ip_network("192.168.40.0/24") in ranges
+    assert ip_network("100.64.0.0/10") in ranges
+    assert ip_network("10.0.0.0/8") not in ranges
