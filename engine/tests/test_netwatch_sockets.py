@@ -80,6 +80,14 @@ def make_sh(failing=(), host_ss=HOST_SS, host_rc=0):
     return fake
 
 
+def test_state_column_omitted_when_ss_is_filtered_by_state():
+    # `ss -tinHn state established` omits the State column (4 fields per socket); the parser must not require it.
+    host_ss = "\n".join(line if not line or line[0].isspace() else " ".join(line.split()[1:]) for line in HOST_SS.splitlines())
+    flows, status = sample(_topo(), CFG, NOW, sh=make_sh(host_ss=host_ss))
+    assert status == "ok"
+    assert set(flows) == EXPECTED
+
+
 def test_flows_for_host_and_containers():
     flows, status = sample(_topo(), CFG, NOW, sh=make_sh())
     assert status == "ok"

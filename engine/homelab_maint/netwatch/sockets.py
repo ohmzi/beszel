@@ -67,11 +67,13 @@ def _parse(stdout: str) -> list[_Sock]:
             continue
         cur = None
         parts = line.split()
-        if len(parts) < 5:
+        if len(parts) < 4:
             continue
         try:
-            laddr, lport = _addr(parts[3])
-            paddr, pport = _addr(parts[4])
+            # The state column is present (`ESTAB 0 0 local peer`) but is omitted when ss is filtered by state
+            # (`ss -tinHn state established` gives `0 0 local peer`), so read the two address fields from the end.
+            laddr, lport = _addr(parts[-2])
+            paddr, pport = _addr(parts[-1])
         except ValueError:
             continue
         cur = _Sock(laddr, lport, paddr, pport)
@@ -96,7 +98,7 @@ def _listening_ports(sh, pid: int) -> set[int] | None:
         if len(parts) < 4:
             continue
         try:
-            ports.add(int(parts[3].rsplit(":", 1)[-1]))
+            ports.add(int(parts[-2].rsplit(":", 1)[-1]))
         except ValueError:
             continue
     return ports
