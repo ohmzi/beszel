@@ -2315,7 +2315,8 @@ class HermesNotifier(core.Notifier):
         try:
             # An alert carries the exact fingerprint of the task's Result (it knows issue_key): the summary alone cannot say it.
             fp, mode = ("", "") if recovery else _result_ack(name, res, level, self._nc)
-            facts = {"ack_fp": fp, **({"ack_mode": mode} if mode else {})} if fp else None
+            link = "" if recovery else str(getattr(res, "link", "") or "")         # the result's review page (site_url checks it)
+            facts = {**({"ack_fp": fp, **({"ack_mode": mode} if mode else {})} if fp else {}), **({"link": link} if link else {})} or None
             if self.defer:
                 return enqueue(_core_event(name, title, "crit" if level >= 2 else "warn", summary, recovery=recovery, was=was, facts=facts),
                                self.cfg, now)

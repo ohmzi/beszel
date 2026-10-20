@@ -289,12 +289,19 @@ def norm_severity(sev, status=None, kind: str = "") -> str:
     return "ok" if kind in ("recovery", "incident_resolved") else "info"
 
 
+# A dashboard page with at most one query parameter, e.g. "/network?finding=<16 hex>". site_url takes it only where the fragment rules refuse.
+_SITE_PATH_RE = re.compile(r"/[A-Za-z0-9/_-]{1,40}(?:\?[A-Za-z_]{1,16}=[A-Za-z0-9]{1,32})?")
+
+
 def site_url(base: str, fragment) -> str:
-    """Dashboard link: http(s) base from config + an optional tight fragment ("#/incidents"). Else ""."""
+    """Dashboard link: http(s) base from config + an optional tight fragment ("#/incidents"), or a dashboard path with at most one
+    query parameter ("/network?finding=<id>"). Else ""."""
     base = str(base or "").strip()
     if not re.fullmatch(r"https?://[A-Za-z0-9.-]+(?::\d{1,5})?(?:/[A-Za-z0-9._~/-]*)?", base):
         return ""
     frag = str(fragment or "").strip()
+    if frag and _SITE_PATH_RE.fullmatch(frag) and not re.fullmatch(r"#?/?[A-Za-z0-9][A-Za-z0-9/_.-]{0,60}", frag):
+        return base.rstrip("/") + frag
     if frag and not re.fullmatch(r"#?/?[A-Za-z0-9][A-Za-z0-9/_.-]{0,60}", frag):
         frag = ""
     if frag and ".." in frag:

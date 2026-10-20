@@ -46,6 +46,7 @@ class Result:
     plan: dict[str, Any] | None = None    # C2: what *would* be done, hashed for approval
     alert: bool = True                    # False: show in dashboard but never page
     issue_key: str | None = None          # SPEC5: stable identity of THIS error for acknowledgements; None = derive it from the summary (etc/ack.toml)
+    link: str = ""                        # optional dashboard page for the alert email, e.g. "/network?finding=<id>" (notify_templates.site_url checks it)
 
 
 def ikey(**sets: Any) -> str | None:
