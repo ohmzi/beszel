@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pb } from "@/lib/api"
+import { blockMode } from "@/lib/netwatch-mode"
 import { useMaintenanceFile, when } from "@/lib/maintenance"
 import { $systems } from "@/lib/stores"
 
@@ -85,6 +86,9 @@ export default memo(() => {
 	const findings = net?.findings ?? []
 	const blocks = net?.blocks ?? []
 	const host = systems.find((s) => s.info?.mt)
+	const stale = Object.entries(net?.sources ?? {})
+		.filter(([, state]) => state !== "ok" && state !== "skipped")
+		.map(([name]) => name)
 
 	const [tab, setTab] = useState("flags")
 	const [dialog, setDialog] = useState<Finding | null>(null)
@@ -96,10 +100,14 @@ export default memo(() => {
 		document.title = "OhmzMaintainer"
 	}, [t])
 
-	// The e-mail link: select the Flags tab and open the block dialog for that finding (once per finding).
+	// The e-mail link selects the Flags tab. Keyed on the finding only, so a 30 s refresh does not snap the tab back.
+	useEffect(() => {
+		if (finding) setTab("flags")
+	}, [finding])
+
+	// The e-mail link opens the block dialog for that finding, once per finding.
 	useEffect(() => {
 		if (!finding) return
-		setTab("flags")
 		const f = findings.find((x) => x.id === finding)
 		if (f && opened.current !== finding) {
 			opened.current = finding
@@ -112,8 +120,6 @@ export default memo(() => {
 		if (!finding || tab !== "flags" || !hasRow) return
 		document.getElementById(`finding-${finding}`)?.scrollIntoView({ block: "center" })
 	}, [finding, tab, hasRow])
-
-	const protectionOf = (ip?: string) => talkers.find((x) => x.ip === ip)?.protection ?? null
 
 	// Sends a signed request to the agent; resolves to null on success or the server's error text.
 	async function send(key: string, body: Record<string, unknown>): Promise<string | null> {
@@ -154,315 +160,128 @@ export default memo(() => {
 					<Trans>The network watch has no data yet.</Trans>
 				</div>
 			) : (
-				<Tabs value={tab} onValueChange={setTab}>
-					<TabsList>
-						<TabsTrigger value="flags">
-							<Trans>Flags</Trans>
-						</TabsTrigger>
-						<TabsTrigger value="talkers">
-							<Trans>Talkers</Trans>
-						</TabsTrigger>
-						<TabsTrigger value="services">
-							<Trans>Services</Trans>
-						</TabsTrigger>
-						<TabsTrigger value="blocks">
-							<Trans>Blocks</Trans>
-						</TabsTrigger>
-						<TabsTrigger value="never">
-							<Trans>Never-block</Trans>
-						</TabsTrigger>
-					</TabsList>
+				<>
+					{stale.length > 0 ? (
+						<div className="mb-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 px-4 py-3 text-sm">
+							{t`Some sources are stale: ${stale.join(", ")} — data may be incomplete`}
+						</div>
+					) : null}
+					<Tabs value={tab} onValueChange={setTab}>
+						<TabsList>
+							<TabsTrigger value="flags">
+								<Trans>Flags</Trans>
+							</TabsTrigger>
+							<TabsTrigger value="talkers">
+								<Trans>Talkers</Trans>
+							</TabsTrigger>
+							<TabsTrigger value="services">
+								<Trans>Services</Trans>
+							</TabsTrigger>
+							<TabsTrigger value="blocks">
+								<Trans>Blocks</Trans>
+							</TabsTrigger>
+							<TabsTrigger value="never">
+								<Trans>Never-block</Trans>
+							</TabsTrigger>
+						</TabsList>
 
-					<TabsContent value="flags">
-						{findings.length === 0 ? (
-							<Empty>
-								<Trans>No open findings.</Trans>
-							</Empty>
-						) : (
-							<Table>
-								<TableHeader className="sticky top-0 z-10 bg-table-header">
-									<TableRow>
-										<TableHead className="w-28">
-											<Trans>Severity</Trans>
-										</TableHead>
-										<TableHead className="w-44">
-											<Trans>Rule</Trans>
-										</TableHead>
-										<TableHead>
-											<Trans>Source → target</Trans>
-										</TableHead>
-										<TableHead>
-											<Trans>Why</Trans>
-										</TableHead>
-										<TableHead className="w-44">
-											<Trans>Seen</Trans>
-										</TableHead>
-										<TableHead className="w-36 text-right">
-											<Trans>Action</Trans>
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{findings.map((f) => (
-										<TableRow
-											key={f.id}
-											id={`finding-${f.id}`}
-											className={f.id === finding ? "bg-accent/40" : undefined}
-										>
-											<TableCell>
-												<span className="flex items-center gap-1.5">
-													<span
-														className={`block size-2 rounded-full ${SEV_DOT[f.severity ?? ""] ?? "bg-foreground/40"}`}
-													/>
-													<span className="text-muted-foreground">
-														{f.severity === "crit" ? t`critical` : t`warning`}
-													</span>
-												</span>
-											</TableCell>
-											<TableCell className="font-medium">{f.rule ?? ""}</TableCell>
-											<TableCell className="tabular-nums">
-												{f.src ?? ""} <span className="text-muted-foreground">→</span> {f.target ?? ""}
-											</TableCell>
-											<TableCell>
-												<span className="block text-sm">{f.why ?? ""}</span>
-												{f.stolen_account ? (
-													<span className="block text-xs text-red-500 mt-1">
-														<Trans>Possible stolen account:</Trans> {f.stolen_account}
-													</span>
-												) : null}
-												{note && note.key === f.id ? (
-													<span className={`block text-xs mt-1 ${note.ok ? "text-green-500" : "text-red-500"}`}>
-														{note.text}
-													</span>
-												) : null}
-											</TableCell>
-											<TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-												<span className="block">
-													<Trans>first</Trans> {when(f.first)}
-												</span>
-												<span className="block">
-													<Trans>last</Trans> {when(f.last)}
-												</span>
-											</TableCell>
-											<TableCell className="text-right">
-												{f.block ? (
-													<button
-														type="button"
-														className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-accent disabled:opacity-60"
-														onClick={() => setDialog(f)}
-													>
-														<Trans>Block</Trans>
-													</button>
-												) : null}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						)}
-					</TabsContent>
-
-					<TabsContent value="talkers">
-						{talkers.length === 0 ? (
-							<Empty>
-								<Trans>No talkers in the last day.</Trans>
-							</Empty>
-						) : (
-							<Table>
-								<TableHeader className="sticky top-0 z-10 bg-table-header">
-									<TableRow>
-										<TableHead>
-											<Trans>Address</Trans>
-										</TableHead>
-										<TableHead className="w-20">
-											<Trans>Country</Trans>
-										</TableHead>
-										<TableHead className="w-24">
-											<Trans>ASN</Trans>
-										</TableHead>
-										<TableHead>
-											<Trans>Hosts</Trans>
-										</TableHead>
-										<TableHead className="w-28 text-right">
-											<Trans>Requests</Trans>
-										</TableHead>
-										<TableHead className="w-32">
-											<Trans>Threat</Trans>
-										</TableHead>
-										<TableHead className="w-32">
-											<Trans>Protection</Trans>
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{talkers.map((r) => (
-										<TableRow key={r.ip}>
-											<TableCell className="font-mono text-xs">{r.ip}</TableCell>
-											<TableCell className="text-muted-foreground">{r.country || "-"}</TableCell>
-											<TableCell className="tabular-nums text-muted-foreground">{r.asn || "-"}</TableCell>
-											<TableCell className="text-xs text-muted-foreground">{(r.hosts ?? []).join(", ")}</TableCell>
-											<TableCell className="text-right tabular-nums">{r.requests ?? 0}</TableCell>
-											<TableCell>
-												{r.threat === null || r.threat === undefined ? (
-													<span className="text-xs text-muted-foreground">
-														<Trans>unknown</Trans>
-													</span>
-												) : r.threat.length === 0 ? (
-													<span className="text-xs text-muted-foreground">
-														<Trans>none</Trans>
-													</span>
-												) : (
-													<Badge variant="danger">{r.threat.join(", ")}</Badge>
-												)}
-											</TableCell>
-											<TableCell>
-												{r.protection === "hard" ? (
-													<Badge variant="secondary">
-														<Trans>never block</Trans>
-													</Badge>
-												) : r.protection === "signin" ? (
-													<Badge variant="warning">
-														<Trans>signed in</Trans>
-													</Badge>
-												) : (
-													<span className="text-xs text-muted-foreground">-</span>
-												)}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						)}
-					</TabsContent>
-
-					<TabsContent value="services">
-						{(net?.services ?? []).length === 0 ? (
-							<Empty>
-								<Trans>No services talked to a peer in the last day.</Trans>
-							</Empty>
-						) : (
-							<Table>
-								<TableHeader className="sticky top-0 z-10 bg-table-header">
-									<TableRow>
-										<TableHead>
-											<Trans>Entity</Trans>
-										</TableHead>
-										<TableHead className="w-32 text-right">
-											<Trans>Peers in</Trans>
-										</TableHead>
-										<TableHead className="w-32 text-right">
-											<Trans>Peers out</Trans>
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{(net?.services ?? []).map((s) => (
-										<TableRow key={s.name}>
-											<TableCell className="font-medium">{s.name}</TableCell>
-											<TableCell className="text-right tabular-nums">{s.in}</TableCell>
-											<TableCell className="text-right tabular-nums">{s.out}</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						)}
-					</TabsContent>
-
-					<TabsContent value="blocks">
-						{blocks.length === 0 ? (
-							<Empty>
-								<Trans>No active blocks.</Trans>
-							</Empty>
-						) : (
-							<Table>
-								<TableHeader className="sticky top-0 z-10 bg-table-header">
-									<TableRow>
-										<TableHead>
-											<Trans>Address</Trans>
-										</TableHead>
-										<TableHead className="w-28">
-											<Trans>Target</Trans>
-										</TableHead>
-										<TableHead className="w-36">
-											<Trans>Zone</Trans>
-										</TableHead>
-										<TableHead className="w-32">
-											<Trans>Until</Trans>
-										</TableHead>
-										<TableHead>
-											<Trans>Reason</Trans>
-										</TableHead>
-										<TableHead className="w-32 text-right">
-											<Trans>Action</Trans>
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{blocks.map((b) => (
-										<TableRow key={b.id}>
-											<TableCell className="font-mono text-xs">{b.ip}</TableCell>
-											<TableCell className="text-muted-foreground">{b.target}</TableCell>
-											<TableCell className="text-muted-foreground">{b.zone || "-"}</TableCell>
-											<TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">
-												{b.permanent ? t`permanent` : when(b.until)}
-											</TableCell>
-											<TableCell className="text-sm">
-												{b.reason}
-												{note && note.key === b.id ? (
-													<span className={`block text-xs mt-1 ${note.ok ? "text-green-500" : "text-red-500"}`}>
-														{note.text}
-													</span>
-												) : null}
-											</TableCell>
-											<TableCell className="text-right">
-												<button
-													type="button"
-													className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-accent disabled:opacity-60"
-													disabled={busy !== ""}
-													onClick={async () => ack(b.id, await send(b.id, { kind: "net_unblock", block_id: b.id }))}
-												>
-													{busy === b.id ? t`Sending…` : t`Unblock`}
-												</button>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						)}
-					</TabsContent>
-
-					<TabsContent value="never" className="space-y-6">
-						<section>
-							<h2 className="text-sm font-semibold mb-1">
-								<Trans>Hard ranges</Trans>
-							</h2>
-							<p className="text-xs text-muted-foreground mb-2">
-								<Trans>Never blocked, whatever the reason.</Trans>
-							</p>
-							{(net?.protected?.hard_ranges ?? []).length === 0 ? (
+						<TabsContent value="flags">
+							{findings.length === 0 ? (
 								<Empty>
-									<Trans>No hard ranges.</Trans>
+									{stale.length > 0 ? (
+										<Trans>No open findings in the data available</Trans>
+									) : (
+										<Trans>No open findings.</Trans>
+									)}
 								</Empty>
 							) : (
-								<ul className="flex flex-wrap gap-2">
-									{(net?.protected?.hard_ranges ?? []).map((r) => (
-										<li key={r} className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs">
-											{r}
-										</li>
-									))}
-								</ul>
+								<Table>
+									<TableHeader className="sticky top-0 z-10 bg-table-header">
+										<TableRow>
+											<TableHead className="w-28">
+												<Trans>Severity</Trans>
+											</TableHead>
+											<TableHead className="w-44">
+												<Trans>Rule</Trans>
+											</TableHead>
+											<TableHead>
+												<Trans>Source → target</Trans>
+											</TableHead>
+											<TableHead>
+												<Trans>Why</Trans>
+											</TableHead>
+											<TableHead className="w-44">
+												<Trans>Seen</Trans>
+											</TableHead>
+											<TableHead className="w-36 text-right">
+												<Trans>Action</Trans>
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{findings.map((f) => (
+											<TableRow
+												key={f.id}
+												id={`finding-${f.id}`}
+												className={f.id === finding ? "bg-accent/40" : undefined}
+											>
+												<TableCell>
+													<span className="flex items-center gap-1.5">
+														<span
+															className={`block size-2 rounded-full ${SEV_DOT[f.severity ?? ""] ?? "bg-foreground/40"}`}
+														/>
+														<span className="text-muted-foreground">
+															{f.severity === "crit" ? t`critical` : t`warning`}
+														</span>
+													</span>
+												</TableCell>
+												<TableCell className="font-medium">{f.rule ?? ""}</TableCell>
+												<TableCell className="tabular-nums">
+													{f.src ?? ""} <span className="text-muted-foreground">→</span> {f.target ?? ""}
+												</TableCell>
+												<TableCell>
+													<span className="block text-sm">{f.why ?? ""}</span>
+													{f.stolen_account ? (
+														<span className="block text-xs text-red-500 mt-1">
+															<Trans>Possible stolen account:</Trans> {f.stolen_account}
+														</span>
+													) : null}
+													{note && note.key === f.id ? (
+														<span className={`block text-xs mt-1 ${note.ok ? "text-green-500" : "text-red-500"}`}>
+															{note.text}
+														</span>
+													) : null}
+												</TableCell>
+												<TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+													<span className="block">
+														<Trans>first</Trans> {when(f.first)}
+													</span>
+													<span className="block">
+														<Trans>last</Trans> {when(f.last)}
+													</span>
+												</TableCell>
+												<TableCell className="text-right">
+													{f.block ? (
+														<button
+															type="button"
+															className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-accent disabled:opacity-60"
+															onClick={() => setDialog(f)}
+														>
+															<Trans>Block</Trans>
+														</button>
+													) : null}
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
 							)}
-						</section>
-						<section>
-							<h2 className="text-sm font-semibold mb-1">
-								<Trans>Signed in recently</Trans>
-							</h2>
-							<p className="text-xs text-muted-foreground mb-2">
-								<Trans>Refused unless the block gives a reason, which is audited.</Trans>
-							</p>
-							{(net?.protected?.signins ?? []).length === 0 ? (
+						</TabsContent>
+
+						<TabsContent value="talkers">
+							{talkers.length === 0 ? (
 								<Empty>
-									<Trans>No sign-ins in the last 30 days.</Trans>
+									<Trans>No talkers in the last day.</Trans>
 								</Empty>
 							) : (
 								<Table>
@@ -471,41 +290,233 @@ export default memo(() => {
 											<TableHead>
 												<Trans>Address</Trans>
 											</TableHead>
-											<TableHead className="w-40">
-												<Trans>Source</Trans>
+											<TableHead className="w-20">
+												<Trans>Country</Trans>
 											</TableHead>
-											<TableHead className="w-40">
-												<Trans>Last seen</Trans>
+											<TableHead className="w-24">
+												<Trans>ASN</Trans>
+											</TableHead>
+											<TableHead>
+												<Trans>Hosts</Trans>
+											</TableHead>
+											<TableHead className="w-28 text-right">
+												<Trans>Requests</Trans>
+											</TableHead>
+											<TableHead className="w-32">
+												<Trans>Threat</Trans>
+											</TableHead>
+											<TableHead className="w-32">
+												<Trans>Protection</Trans>
 											</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{(net?.protected?.signins ?? []).map((s) => (
-											<TableRow key={`${s.ip}-${s.source}`}>
-												<TableCell className="font-mono text-xs">{s.ip}</TableCell>
-												<TableCell className="text-muted-foreground">{s.source}</TableCell>
-												<TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">
-													{when(s.last_seen)}
+										{talkers.map((r) => (
+											<TableRow key={r.ip}>
+												<TableCell className="font-mono text-xs">{r.ip}</TableCell>
+												<TableCell className="text-muted-foreground">{r.country || "-"}</TableCell>
+												<TableCell className="tabular-nums text-muted-foreground">{r.asn || "-"}</TableCell>
+												<TableCell className="text-xs text-muted-foreground">{(r.hosts ?? []).join(", ")}</TableCell>
+												<TableCell className="text-right tabular-nums">{r.requests ?? 0}</TableCell>
+												<TableCell>
+													{r.threat === null || r.threat === undefined ? (
+														<span className="text-xs text-muted-foreground">
+															<Trans>unknown</Trans>
+														</span>
+													) : r.threat.length === 0 ? (
+														<span className="text-xs text-muted-foreground">
+															<Trans>none</Trans>
+														</span>
+													) : (
+														<Badge variant="danger">{r.threat.join(", ")}</Badge>
+													)}
+												</TableCell>
+												<TableCell>
+													{r.protection === "hard" ? (
+														<Badge variant="secondary">
+															<Trans>never block</Trans>
+														</Badge>
+													) : r.protection === "signin" ? (
+														<Badge variant="warning">
+															<Trans>signed in</Trans>
+														</Badge>
+													) : (
+														<span className="text-xs text-muted-foreground">-</span>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
 									</TableBody>
 								</Table>
 							)}
-						</section>
-					</TabsContent>
-				</Tabs>
+						</TabsContent>
+
+						<TabsContent value="services">
+							{(net?.services ?? []).length === 0 ? (
+								<Empty>
+									<Trans>No services talked to a peer in the last day.</Trans>
+								</Empty>
+							) : (
+								<Table>
+									<TableHeader className="sticky top-0 z-10 bg-table-header">
+										<TableRow>
+											<TableHead>
+												<Trans>Entity</Trans>
+											</TableHead>
+											<TableHead className="w-32 text-right">
+												<Trans>Peers in</Trans>
+											</TableHead>
+											<TableHead className="w-32 text-right">
+												<Trans>Peers out</Trans>
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{(net?.services ?? []).map((s) => (
+											<TableRow key={s.name}>
+												<TableCell className="font-medium">{s.name}</TableCell>
+												<TableCell className="text-right tabular-nums">{s.in}</TableCell>
+												<TableCell className="text-right tabular-nums">{s.out}</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							)}
+						</TabsContent>
+
+						<TabsContent value="blocks">
+							{blocks.length === 0 ? (
+								<Empty>
+									<Trans>No active blocks.</Trans>
+								</Empty>
+							) : (
+								<Table>
+									<TableHeader className="sticky top-0 z-10 bg-table-header">
+										<TableRow>
+											<TableHead>
+												<Trans>Address</Trans>
+											</TableHead>
+											<TableHead className="w-28">
+												<Trans>Target</Trans>
+											</TableHead>
+											<TableHead className="w-36">
+												<Trans>Zone</Trans>
+											</TableHead>
+											<TableHead className="w-32">
+												<Trans>Until</Trans>
+											</TableHead>
+											<TableHead>
+												<Trans>Reason</Trans>
+											</TableHead>
+											<TableHead className="w-32 text-right">
+												<Trans>Action</Trans>
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{blocks.map((b) => (
+											<TableRow key={b.id}>
+												<TableCell className="font-mono text-xs">{b.ip}</TableCell>
+												<TableCell className="text-muted-foreground">{b.target}</TableCell>
+												<TableCell className="text-muted-foreground">{b.zone || "-"}</TableCell>
+												<TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">
+													{b.permanent ? t`permanent` : when(b.until)}
+												</TableCell>
+												<TableCell className="text-sm">
+													{b.reason}
+													{note && note.key === b.id ? (
+														<span className={`block text-xs mt-1 ${note.ok ? "text-green-500" : "text-red-500"}`}>
+															{note.text}
+														</span>
+													) : null}
+												</TableCell>
+												<TableCell className="text-right">
+													<button
+														type="button"
+														className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-accent disabled:opacity-60"
+														disabled={busy !== ""}
+														onClick={async () => ack(b.id, await send(b.id, { kind: "net_unblock", block_id: b.id }))}
+													>
+														{busy === b.id ? t`Sending…` : t`Unblock`}
+													</button>
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							)}
+						</TabsContent>
+
+						<TabsContent value="never" className="space-y-6">
+							<section>
+								<h2 className="text-sm font-semibold mb-1">
+									<Trans>Hard ranges</Trans>
+								</h2>
+								<p className="text-xs text-muted-foreground mb-2">
+									<Trans>Never blocked, whatever the reason.</Trans>
+								</p>
+								{(net?.protected?.hard_ranges ?? []).length === 0 ? (
+									<Empty>
+										<Trans>No hard ranges.</Trans>
+									</Empty>
+								) : (
+									<ul className="flex flex-wrap gap-2">
+										{(net?.protected?.hard_ranges ?? []).map((r) => (
+											<li key={r} className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs">
+												{r}
+											</li>
+										))}
+									</ul>
+								)}
+							</section>
+							<section>
+								<h2 className="text-sm font-semibold mb-1">
+									<Trans>Signed in recently</Trans>
+								</h2>
+								<p className="text-xs text-muted-foreground mb-2">
+									<Trans>Refused unless the block gives a reason, which is audited.</Trans>
+								</p>
+								{(net?.protected?.signins ?? []).length === 0 ? (
+									<Empty>
+										<Trans>No sign-ins in the last 30 days.</Trans>
+									</Empty>
+								) : (
+									<Table>
+										<TableHeader className="sticky top-0 z-10 bg-table-header">
+											<TableRow>
+												<TableHead>
+													<Trans>Address</Trans>
+												</TableHead>
+												<TableHead className="w-40">
+													<Trans>Source</Trans>
+												</TableHead>
+												<TableHead className="w-40">
+													<Trans>Last seen</Trans>
+												</TableHead>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											{(net?.protected?.signins ?? []).map((s) => (
+												<TableRow key={`${s.ip}-${s.source}`}>
+													<TableCell className="font-mono text-xs">{s.ip}</TableCell>
+													<TableCell className="text-muted-foreground">{s.source}</TableCell>
+													<TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">
+														{when(s.last_seen)}
+													</TableCell>
+												</TableRow>
+											))}
+										</TableBody>
+									</Table>
+								)}
+							</section>
+						</TabsContent>
+					</Tabs>
+				</>
 			)}
 			{dialog ? (
 				<BlockDialog
 					finding={dialog}
-					mode={
-						protectionOf(dialog.src) === "hard" || !dialog.block
-							? "hard"
-							: protectionOf(dialog.src) === "signin" || dialog.stolen_account
-								? "signin"
-								: "open"
-					}
+					mode={blockMode(dialog, talkers, net?.protected ?? {})}
 					onClose={() => setDialog(null)}
 					onSubmit={async (body) => {
 						const err = await send(dialog.id, body)
@@ -548,7 +559,7 @@ function BlockDialog({
 	const [sending, setSending] = useState(false)
 	const [error, setError] = useState("")
 
-	const daysOk = /^\d+$/.test(days) && Number(days) >= 1 && Number(days) <= 365
+	const daysOk = permanent || (/^\d+$/.test(days) && Number(days) >= 1 && Number(days) <= 365)
 	const reasonOk = mode !== "signin" || reason.trim() !== ""
 	const canSubmit = mode !== "hard" && daysOk && reasonOk && !sending
 	const zone = finding.zone ? ` · ${finding.zone}` : ""
@@ -562,7 +573,7 @@ function BlockDialog({
 			ip: finding.src ?? "",
 			target: finding.block ?? "",
 			zone: finding.zone ?? "",
-			days: Number(days),
+			days: permanent ? 365 : Number(days),
 			permanent,
 			override_reason: mode === "signin" ? reason.trim() : "",
 		})
