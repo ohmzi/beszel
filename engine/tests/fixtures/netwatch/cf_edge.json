@@ -1,0 +1,52 @@
+{
+  "data": {
+    "viewer": {
+      "zones": [
+        {
+          "httpRequestsAdaptiveGroups": [
+            {
+              "count": 12,
+              "sum": {"edgeResponseBytes": 4096},
+              "dimensions": {
+                "clientIP": "203.0.113.10",
+                "clientRequestHTTPHost": "app.example.test",
+                "clientRequestPath": "/api/v1/items/42",
+                "edgeResponseStatus": 200,
+                "clientCountryName": "NL",
+                "clientAsn": "64500",
+                "datetimeHour": "2026-10-19T10:00:00Z"
+              }
+            },
+            {
+              "count": 3,
+              "sum": {"edgeResponseBytes": 0},
+              "dimensions": {
+                "clientIP": "2001:db8::10",
+                "clientRequestHTTPHost": "app.example.test",
+                "clientRequestPath": "/wp-login.php",
+                "edgeResponseStatus": 404,
+                "clientCountryName": "US",
+                "clientAsn": 64501,
+                "datetimeHour": "2026-10-19T10:00:00Z"
+              }
+            },
+            {
+              "count": 5,
+              "sum": {"edgeResponseBytes": 900},
+              "dimensions": {
+                "clientIP": "203.0.113.20",
+                "clientRequestHTTPHost": "plex.example.test",
+                "clientRequestPath": "/",
+                "edgeResponseStatus": 200,
+                "clientCountryName": "",
+                "clientAsn": null,
+                "datetimeHour": "2026-10-19T11:00:00Z"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

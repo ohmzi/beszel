@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": {
+    "tunnel_id": "tun-2",
+    "version": 1,
+    "config": {
+      "ingress": [
+        {"hostname": "wiki.second.example.test", "service": "http://127.0.0.1:3000"},
+        {"service": "http_status:404"}
+      ]
+    },
+    "source": "cloudflare"
+  }
+}

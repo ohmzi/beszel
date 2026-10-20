@@ -1,0 +1,27 @@
+{
+  "data": {
+    "viewer": {
+      "zones": [
+        {
+          "firewallEventsAdaptive": [
+            {
+              "action": "block",
+              "source": "waf",
+              "clientIP": "2001:db8::66",
+              "clientRequestHTTPHost": "app.example.test",
+              "datetime": "2026-10-19T10:15:00Z"
+            },
+            {
+              "action": "managed_challenge",
+              "source": "ratelimit",
+              "clientIP": "203.0.113.66",
+              "clientRequestHTTPHost": "plex.example.test",
+              "datetime": "2026-10-19T10:16:30Z"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

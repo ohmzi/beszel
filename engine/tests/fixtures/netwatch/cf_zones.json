@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": [
+    {"id": "zone-a", "name": "example.test"},
+    {"id": "zone-b", "name": "second.example.test"}
+  ],
+  "result_info": {"page": 1, "per_page": 50, "count": 2, "total_count": 2, "total_pages": 1}
+}

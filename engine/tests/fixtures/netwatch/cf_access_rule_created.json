@@ -1,0 +1,6 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": {"id": "rule-new", "mode": "block", "notes": "netwatch: scanner", "configuration": {"target": "ip", "value": "203.0.113.66"}}
+}

@@ -1,0 +1,6 @@
+{
+  "data": null,
+  "errors": [
+    {"message": "time range exceeds the retention of this dataset for zone zone-a", "path": ["viewer", "zones"]}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": [
+    {"id": "rule-3", "mode": "block", "notes": "netwatch: manual", "configuration": {"target": "ip", "value": "203.0.113.77"}}
+  ],
+  "result_info": {"page": 2, "per_page": 100, "count": 1, "total_count": 3, "total_pages": 2}
+}

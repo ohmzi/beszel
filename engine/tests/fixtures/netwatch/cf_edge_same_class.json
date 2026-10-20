@@ -1,0 +1,39 @@
+{
+  "data": {
+    "viewer": {
+      "zones": [
+        {
+          "httpRequestsAdaptiveGroups": [
+            {
+              "count": 4,
+              "sum": {"edgeResponseBytes": 100},
+              "dimensions": {
+                "clientIP": "203.0.113.30",
+                "clientRequestHTTPHost": "app.example.test",
+                "clientRequestPath": "/api/v1/items/1",
+                "edgeResponseStatus": 200,
+                "clientCountryName": "DE",
+                "clientAsn": "64502",
+                "datetimeHour": "2026-10-19T10:00:00Z"
+              }
+            },
+            {
+              "count": 6,
+              "sum": {"edgeResponseBytes": 200},
+              "dimensions": {
+                "clientIP": "203.0.113.30",
+                "clientRequestHTTPHost": "app.example.test",
+                "clientRequestPath": "/api/v1/items/2",
+                "edgeResponseStatus": 200,
+                "clientCountryName": "DE",
+                "clientAsn": "64502",
+                "datetimeHour": "2026-10-19T10:00:00Z"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}
