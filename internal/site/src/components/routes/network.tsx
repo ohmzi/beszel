@@ -64,7 +64,8 @@ type Network = {
 	available?: boolean
 	generated?: number
 	learning_until?: number | null
-	sources?: Record<string, string>
+	sources?: Record<string, { status: string; age_s: number | null }>
+	stale?: string[]
 	talkers?: Talker[]
 	services?: Service[]
 	findings?: Finding[]
@@ -86,9 +87,14 @@ export default memo(() => {
 	const findings = net?.findings ?? []
 	const blocks = net?.blocks ?? []
 	const host = systems.find((s) => s.info?.mt)
-	const stale = Object.entries(net?.sources ?? {})
-		.filter(([, state]) => state !== "ok" && state !== "skipped")
+	// The engine names the stale sources; an older export without the list falls back to each source's status.
+	const stale = net?.stale ?? Object.entries(net?.sources ?? {})
+		.filter(([, src]) => src.status !== "ok" && src.status !== "skipped")
 		.map(([name]) => name)
+	// A publisher that stopped leaves the file behind: the data is only as fresh as its generated stamp.
+	const ageMin = net?.generated ? Math.floor((Date.now() / 1000 - net.generated) / 60) : 0
+	const old = ageMin > 15
+	const incomplete = stale.length > 0 || old
 
 	const [tab, setTab] = useState("flags")
 	const [dialog, setDialog] = useState<Finding | null>(null)
@@ -166,6 +172,11 @@ export default memo(() => {
 							{t`Some sources are stale: ${stale.join(", ")} — data may be incomplete`}
 						</div>
 					) : null}
+					{old ? (
+						<div className="mb-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 px-4 py-3 text-sm">
+							{t`Data is ${ageMin} min old — the publisher may be stopped`}
+						</div>
+					) : null}
 					<Tabs value={tab} onValueChange={setTab}>
 						<TabsList>
 							<TabsTrigger value="flags">
@@ -188,7 +199,7 @@ export default memo(() => {
 						<TabsContent value="flags">
 							{findings.length === 0 ? (
 								<Empty>
-									{stale.length > 0 ? (
+									{incomplete ? (
 										<Trans>No open findings in the data available</Trans>
 									) : (
 										<Trans>No open findings.</Trans>

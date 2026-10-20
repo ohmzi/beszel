@@ -196,3 +196,19 @@ def test_publish_adapter_writes_network_json_with_its_own_cap(env, db):
     assert doc is publish.WROTE and trim is None
     written = json.loads((env / "network.json").read_text())
     assert written["generated"] == NOW and len(written["talkers"]) == 50
+
+
+def test_an_aged_source_is_stale_even_though_its_status_says_ok(db):
+    store.meta_set(db, "source:sockets", f"ok|{NOW - 3 * 3600}")
+    store.meta_set(db, "source:kernel", f"ok|{NOW - 60}")
+    doc = _build(db)
+    assert "sockets" in doc["stale"]
+    assert "kernel" not in doc["stale"]
+    assert doc["sources"]["sockets"] == {"status": "ok", "age_s": 3 * 3600}
+    assert doc["sources"]["kernel"] == {"status": "ok", "age_s": 60}
+
+
+def test_a_known_source_with_no_row_is_stale_and_listed_as_missing(db):
+    doc = _build(db)
+    assert "plex" in doc["stale"]
+    assert doc["sources"]["plex"] == {"status": "missing", "age_s": None}

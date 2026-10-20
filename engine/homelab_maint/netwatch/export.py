@@ -18,6 +18,7 @@ from typing import Any
 
 from .. import core
 from ..publish import clean
+from ..tasks import net_watch
 from . import entities, judge, protect, store
 from .threat import ThreatIndex
 
@@ -144,12 +145,27 @@ def _signins(db, now: float) -> list[dict]:
     return [{"ip": _text(ip, 64), "source": _text(src, 40), "last_seen": seen} for ip, src, seen in rows]
 
 
-def _sources(db) -> dict:
+def _sources(db, now: float) -> tuple[dict, list[str]]:
+    """Every source's status and age, and the names that are stale: status 'stale...', an epoch older than STALE_S, an epoch that
+    does not parse, or a known source with no row at all (the collector never wrote it). Fail closed: stale is never 'all fine'."""
     out: dict = {}
+    seen: set[str] = set()
     for key, value in db.execute("SELECT key, value FROM meta WHERE key LIKE 'source:%'").fetchall():
-        head, sep, _epoch = str(value).rpartition("|")
-        out[_text(key[len("source:"):], 40)] = _text(head if sep else value, 40)
-    return out
+        name = _text(key[len("source:"):], 40)
+        status, epoch = net_watch._parse_source(str(value))
+        age = None if epoch is None else max(0, int(now - epoch))
+        out[name] = {"status": _text(status, 40), "age_s": age}
+        seen.add(name)
+    stale = []
+    for name in sorted(out):
+        status, age = out[name]["status"], out[name]["age_s"]
+        if status.startswith("stale") or age is None or age > net_watch.STALE_S:
+            stale.append(name)
+    for name in net_watch.KNOWN_SOURCES:
+        if name not in seen:
+            out[name] = {"status": "missing", "age_s": None}
+            stale.append(name)
+    return out, sorted(set(stale))
 
 
 def _learning_until(db) -> float | None:
@@ -216,10 +232,12 @@ def build_network(status: dict, now: float, db=None, findings_path: Path | None 
         except Exception:  # noqa: BLE001
             cfg = {}
         threat = _threat()
+        sources, stale = _sources(db, now)
         doc = {
             "generated": now,
             "learning_until": _learning_until(db),
-            "sources": _sources(db),
+            "sources": sources,
+            "stale": stale,
             "directions": _directions(db, now),
             "talkers": _talkers(db, now, topo, cfg, threat),
             "services": _services(db, now),
