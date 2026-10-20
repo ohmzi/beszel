@@ -123,8 +123,12 @@ def test_zones_maps_name_to_id(tmp_path):
 
 
 def test_tunnel_hostnames_combines_tunnels_and_skips_catch_all(tmp_path):
+    def listing(req):
+        number = parse_qs(urlsplit(req.full_url).query)["page"][0]
+        return "cf_tunnels_page1.json" if number == "1" else "cf_tunnels_page2.json"
+
     routes = {
-        f"GET {API}/accounts/acc-test/cfd_tunnel": "cf_tunnels.json",
+        f"GET {API}/accounts/acc-test/cfd_tunnel": listing,
         f"GET {API}/accounts/acc-test/cfd_tunnel/tun-1/configurations": "cf_tunnel_config_1.json",
         f"GET {API}/accounts/acc-test/cfd_tunnel/tun-2/configurations": "cf_tunnel_config_2.json",
     }
@@ -134,8 +138,10 @@ def test_tunnel_hostnames_combines_tunnels_and_skips_catch_all(tmp_path):
         "plex.example.test": "http://127.0.0.1:32400",
         "wiki.second.example.test": "http://127.0.0.1:3000",
     }
-    listing = urlsplit(http.requests[0].full_url)
-    assert parse_qs(listing.query) == {"is_deleted": ["false"]}
+    listings = [r for r in http.requests if urlsplit(r.full_url).path.endswith("/cfd_tunnel")]
+    queries = [parse_qs(urlsplit(r.full_url).query) for r in listings]
+    assert [q["page"] for q in queries] == [["1"], ["2"]]
+    assert all(q["is_deleted"] == ["false"] and q["per_page"] == ["50"] for q in queries)
 
 
 def test_tunnel_hostnames_needs_an_account_id(tmp_path):
@@ -315,3 +321,55 @@ def test_list_access_rules_follows_pages(tmp_path):
     queries = [parse_qs(urlsplit(r.full_url).query) for r in http.requests]
     assert [q["page"] for q in queries] == [["1"], ["2"]]
     assert all(q["per_page"] == ["100"] for q in queries)
+
+
+# ---- malformed responses fail closed ------------------------------------------------------------------------------------
+
+def test_edge_node_missing_client_ip_is_bad_response(tmp_path):
+    payload = json.loads((FIX / "cf_edge.json").read_text())
+    del payload["data"]["viewer"]["zones"][0]["httpRequestsAdaptiveGroups"][0]["dimensions"]["clientIP"]
+    cf, _ = make(tmp_path, {"POST /client/v4/graphql": _json(payload)})
+    with pytest.raises(CFUnavailable) as info:
+        cf.edge_requests("zone-a", _epoch(T0), _epoch(T1), CLASSES)
+    assert str(info.value) == "bad-response"
+
+
+def test_edge_node_with_non_numeric_asn_is_bad_response(tmp_path):
+    payload = json.loads((FIX / "cf_edge.json").read_text())
+    payload["data"]["viewer"]["zones"][0]["httpRequestsAdaptiveGroups"][0]["dimensions"]["clientAsn"] = "abc"
+    cf, _ = make(tmp_path, {"POST /client/v4/graphql": _json(payload)})
+    with pytest.raises(CFUnavailable) as info:
+        cf.edge_requests("zone-a", _epoch(T0), _epoch(T1), CLASSES)
+    assert str(info.value) == "bad-response"
+
+
+def test_create_response_without_result_id_is_bad_response(tmp_path):
+    cf, _ = make(tmp_path, {f"POST {API}/zones/zone-a/firewall/access_rules/rules": _json(
+        {"success": True, "errors": [], "result": {}})})
+    with pytest.raises(CFUnavailable) as info:
+        cf.create_access_rule("zone-a", "203.0.113.66", "netwatch: scanner")
+    assert str(info.value) == "bad-response"
+
+
+def test_security_node_missing_field_is_bad_response(tmp_path):
+    payload = json.loads((FIX / "cf_security.json").read_text())
+    del payload["data"]["viewer"]["zones"][0]["firewallEventsAdaptive"][0]["datetime"]
+    cf, _ = make(tmp_path, {"POST /client/v4/graphql": _json(payload)})
+    with pytest.raises(CFUnavailable) as info:
+        cf.security_events("zone-a", _epoch(T0), _epoch(T1))
+    assert str(info.value) == "bad-response"
+
+
+def test_zone_without_name_is_bad_response(tmp_path):
+    cf, _ = make(tmp_path, {f"GET {API}/zones": _json({"success": True, "result": [{"id": "zone-a"}]})})
+    with pytest.raises(CFUnavailable) as info:
+        cf.zones()
+    assert str(info.value) == "bad-response"
+
+
+def test_paged_result_that_is_not_a_list_is_bad_response(tmp_path):
+    cf, _ = make(tmp_path, {f"GET {API}/zones/zone-a/firewall/access_rules/rules": _json(
+        {"success": True, "result": {"id": "rule-1"}})})
+    with pytest.raises(CFUnavailable) as info:
+        cf.list_access_rules("zone-a")
+    assert str(info.value) == "bad-response"

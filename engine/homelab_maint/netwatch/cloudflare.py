@@ -12,6 +12,7 @@ import json
 import re
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlencode
@@ -42,6 +43,23 @@ def _epoch(text: str) -> int:
 
 def _status_reason(code: int) -> str:
     return str(code) if code == 429 else f"http-{code}"
+
+
+@contextmanager
+def _parsing():
+    """Any shape error while reading a response becomes CFUnavailable("bad-response"), never a bare KeyError or TypeError."""
+    try:
+        yield
+    except (KeyError, TypeError, ValueError, AttributeError, IndexError):
+        raise CFUnavailable("bad-response") from None
+
+
+def _as_list(value) -> list:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("expected a list")
+    return value
 
 
 def _zone_query(selection: str) -> str:
@@ -135,10 +153,24 @@ class CF:
         data = payload.get("data")
         if not isinstance(data, dict):
             raise CFUnavailable("bad-response")
-        zones = (data.get("viewer") or {}).get("zones") or []
-        if not zones:
-            return []
-        return zones[0].get(dataset) or []
+        with _parsing():
+            zones = (data.get("viewer") or {}).get("zones") or []
+            if not zones:
+                return []
+            return _as_list(zones[0].get(dataset))
+
+    def _paged(self, path: str, query: dict, per_page: int) -> list:
+        """Every row of a paginated list, following result_info.total_pages."""
+        rows: list = []
+        page = 1
+        while True:
+            payload = self._request("GET", path, query={**query, "per_page": per_page, "page": page})
+            with _parsing():
+                rows.extend(_as_list(payload.get("result")))
+                total = int((payload.get("result_info") or {}).get("total_pages") or 1)
+            if page >= total:
+                return rows
+            page += 1
 
     def _account(self) -> str:
         if not self._account_id:
@@ -150,21 +182,23 @@ class CF:
     def zones(self) -> dict[str, str]:
         """Zone name to zone id."""
         payload = self._request("GET", "/zones", query={"per_page": 50})
-        return {z["name"]: z["id"] for z in payload.get("result") or []}
+        with _parsing():
+            return {z["name"]: z["id"] for z in _as_list(payload.get("result"))}
 
     def tunnel_hostnames(self) -> dict[str, str]:
         """Hostname to the local service URL it is routed to, across every live tunnel on the account."""
         account = quote(self._account(), safe="")
-        listing = self._request("GET", f"/accounts/{account}/cfd_tunnel", query={"is_deleted": "false"})
         hostnames: dict[str, str] = {}
-        for tunnel in listing.get("result") or []:
-            tid = quote(str(tunnel["id"]), safe="")
+        for tunnel in self._paged(f"/accounts/{account}/cfd_tunnel", {"is_deleted": "false"}, 50):
+            with _parsing():
+                tid = quote(str(tunnel["id"]), safe="")
             cfg = self._request("GET", f"/accounts/{account}/cfd_tunnel/{tid}/configurations")
-            ingress = ((cfg.get("result") or {}).get("config") or {}).get("ingress") or []
-            for rule in ingress:
-                host = rule.get("hostname")
-                if host:  # the catch-all rule has no hostname
-                    hostnames[host] = rule.get("service", "")
+            with _parsing():
+                ingress = _as_list(((cfg.get("result") or {}).get("config") or {}).get("ingress"))
+                for rule in ingress:
+                    host = rule.get("hostname")
+                    if host:  # the catch-all rule has no hostname
+                        hostnames[host] = rule.get("service", "")
         return hostnames
 
     def edge_requests(self, zone_id: str, start: float, end: float, path_classes: dict[str, str]) -> list[EdgeRow]:
@@ -180,43 +214,36 @@ class CF:
 
         nodes = self._graphql_nodes(EDGE_SELECTION, zone_id, start, end, "httpRequestsAdaptiveGroups")
         merged: dict[tuple, list] = {}
-        for node in nodes:
-            d = node["dimensions"]
-            key = (
-                _epoch(d["datetimeHour"]), zone_id, d["clientRequestHTTPHost"], d["clientIP"],
-                int(d["edgeResponseStatus"]), path_class(d.get("clientRequestPath")),
-            )
-            row = merged.setdefault(key, [d.get("clientCountryName") or "", int(d.get("clientAsn") or 0), 0, 0])
-            row[2] += int(node.get("count") or 0)
-            row[3] += int((node.get("sum") or {}).get("edgeResponseBytes") or 0)
-        return [
-            EdgeRow(bucket=k[0], zone=k[1], host=k[2], client_ip=k[3], country=v[0], asn=v[1], status=k[4],
-                    path_class=k[5], count=v[2], bytes=v[3])
-            for k, v in merged.items()
-        ]
+        with _parsing():
+            for node in nodes:
+                d = node["dimensions"]
+                key = (
+                    _epoch(d["datetimeHour"]), zone_id, d["clientRequestHTTPHost"], d["clientIP"],
+                    int(d["edgeResponseStatus"]), path_class(d.get("clientRequestPath")),
+                )
+                row = merged.setdefault(key, [d.get("clientCountryName") or "", int(d.get("clientAsn") or 0), 0, 0])
+                row[2] += int(node.get("count") or 0)
+                row[3] += int((node.get("sum") or {}).get("edgeResponseBytes") or 0)
+            return [
+                EdgeRow(bucket=k[0], zone=k[1], host=k[2], client_ip=k[3], country=v[0], asn=v[1], status=k[4],
+                        path_class=k[5], count=v[2], bytes=v[3])
+                for k, v in merged.items()
+            ]
 
     def security_events(self, zone_id: str, start: float, end: float) -> list[NetEvent]:
         nodes = self._graphql_nodes(SECURITY_SELECTION, zone_id, start, end, "firewallEventsAdaptive")
-        return [
-            NetEvent(
-                ts=_epoch(n["datetime"]), kind="cf_security", src=n.get("clientIP") or "",
-                dst=n.get("clientRequestHTTPHost") or "", dport=_HTTPS_PORT,
-                detail=f"{n.get('action') or ''}/{n.get('source') or ''}",
-            )
-            for n in nodes
-        ]
+        with _parsing():
+            return [
+                NetEvent(
+                    ts=_epoch(n["datetime"]), kind="cf_security", src=n["clientIP"],
+                    dst=n["clientRequestHTTPHost"], dport=_HTTPS_PORT,
+                    detail=f"{n['action']}/{n['source']}",
+                )
+                for n in nodes
+            ]
 
     def list_access_rules(self, zone_id: str) -> list[dict]:
-        path = f"/zones/{quote(zone_id, safe='')}/firewall/access_rules/rules"
-        rules: list[dict] = []
-        page = 1
-        while True:
-            payload = self._request("GET", path, query={"per_page": 100, "page": page})
-            rules.extend(payload.get("result") or [])
-            total = (payload.get("result_info") or {}).get("total_pages") or 1
-            if page >= total:
-                return rules
-            page += 1
+        return self._paged(f"/zones/{quote(zone_id, safe='')}/firewall/access_rules/rules", {}, 100)
 
     # ---- writes (IP access rules only) ---------------------------------------------------------------------------------
 
@@ -225,7 +252,11 @@ class CF:
         target = "ip6" if ipaddress.ip_address(ip).version == 6 else "ip"
         body = {"mode": "block", "configuration": {"target": target, "value": ip}, "notes": note}
         payload = self._request("POST", f"/zones/{quote(zone_id, safe='')}/firewall/access_rules/rules", body)
-        return payload["result"]["id"]
+        with _parsing():
+            rule_id = payload["result"]["id"]
+            if not isinstance(rule_id, str) or not rule_id:
+                raise ValueError("no rule id")
+            return rule_id
 
     def delete_access_rule(self, zone_id: str, rule_id: str) -> None:
         self._request(
