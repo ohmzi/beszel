@@ -1,9 +1,8 @@
 [Unit]
 Description=homelab-maint Network Watch collector (sockets, journals, Plex log and Cloudflare -> netwatch.db)
 Documentation=file:///usr/local/lib/homelab-maint/homelab_maint/netwatch/collect.py
-# Ordering only (no Wants=): starting the collector must never start, or restart, anything it merely reads. Note: dockerd is
-# socket-activated here, and entities.load_topology calls `docker ps` without first checking docker.service is active (the live
-# monitor does that check); a connect to the socket while dockerd is stopped would start it. Flagged for review.
+# Ordering only (no Wants=): starting the collector must never start, or restart, anything it merely reads. dockerd is socket-activated
+# here; entities.load_topology checks a live dockerd and `systemctl is-active docker.service` before any docker call.
 After=network.target docker.service
 
 [Service]

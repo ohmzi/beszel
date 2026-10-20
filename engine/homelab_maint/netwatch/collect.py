@@ -25,6 +25,8 @@ TICK_S = 5                 # the loop's wake-up; every source runs on its own in
 TUNNEL_S = 3600
 PRUNE_S = 3600
 MAX_STRETCH = 4            # the load back-off never multiplies an interval by more than this
+PLEX_LOG = "Plex Media Server.log"
+PLEX_CURSOR_STEP = 0.001  # the cursor sits just past the newest consumed line, so that line is never read again
 PLEX_FIRST_S = 600         # the first Plex read looks back this far, like the journal's first read
 _DEFAULTS = {
     "sockets_every_s": 30, "journal_every_s": 60, "plex_every_s": 60, "cloudflare_every_s": 300,
@@ -119,11 +121,17 @@ class Collector:
         raw = store.meta_get(self._db, "plex:since")
         since = float(raw) if raw else now - PLEX_FIRST_S
         plex_dir = Path(self._cfg.get("plex_dir", plex.PLEX_DIR_DEFAULT))
-        events = plex.exploit_attempts(plex.plex_log_lines(since, self._cfg, margin=0.0))
+        if not (plex_dir / "Logs" / PLEX_LOG).is_file():
+            return "stale:missing"            # nothing to read: not "ok", and the cursor stays where it was
+        exploit_lines = plex.plex_log_lines(since, self._cfg, margin=0.0)
         codec_lines = plex.plex_log_lines(since, self._cfg, margin=CODEC_WINDOW)
+        events = plex.exploit_attempts(exploit_lines)
         events += plex.unexplained_codecs(plex_dir / "Codecs", codec_lines, since)
         store.add_events(self._db, events)
-        store.meta_set(self._db, "plex:since", str(now))
+        # The cursor moves to just past the newest line consumed, so the next read (lines stamped at or after it) never repeats one.
+        stamps = [ts for ts in map(plex.line_ts, exploit_lines + codec_lines) if ts is not None and ts >= since]
+        if stamps:
+            store.meta_set(self._db, "plex:since", repr(max(stamps) + PLEX_CURSOR_STEP))
         return "ok"
 
     def _cloudflare(self, now: float) -> str:

@@ -2,6 +2,7 @@
 import conftest  # noqa: F401  (points HOMELAB_MAINT_* at tmp dirs before homelab_maint.core is imported)
 
 import subprocess
+import time
 
 import pytest
 
@@ -99,6 +100,7 @@ def _count(db, table):
 
 
 def test_one_tick_writes_flow_edge_and_event_rows(tmp_path):
+    _plex_log(tmp_path)           # an empty Plex log: present, nothing in it
     sh = fake_sh(journal_k=UFW + "\n", journal_ssh=SSH_FAIL + "\n")
     db, col = _collector(tmp_path, cf=FakeCF(), sh=sh)
     status = col.tick(NOW)
@@ -186,3 +188,57 @@ def test_edge_windows_cover_the_configured_span(tmp_path):
     col.tick(NOW)
     assert cf.edge_calls == [("zone1", NOW - 900, NOW)]
 
+
+
+def _plex_stamp(epoch: float) -> str:
+    return time.strftime("%b %d, %Y %H:%M:%S", time.localtime(epoch)) + ".000"
+
+
+def _plex_log(tmp_path, *epochs: float) -> None:
+    logs = tmp_path / "plex" / "Logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    lines = [f"{_plex_stamp(t)} [1] WARN - [Req#176eb82/CompanionProxy/Subscribe/poc_23919] "
+             "CompanionProxy/Subscribe unsupported protocol 'searchOne'" for t in epochs]
+    (logs / "Plex Media Server.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _exploit_count(db) -> int:
+    return _count(db, "events WHERE kind = 'plex_exploit'")
+
+
+def test_overlapping_plex_reads_store_each_exploit_once(tmp_path):
+    # A line stamped a few seconds after the first tick is read by the first tick and would be read again by a cursor set to `now`.
+    _plex_log(tmp_path, NOW - 60, NOW + 5)
+    db, col = _collector(tmp_path, cf=None, sh=fake_sh())
+    col.tick(NOW)
+    assert _exploit_count(db) == 2
+    col._due["plex"] = 0.0        # force the Plex read again over the same log
+    col.tick(NOW + 60)
+    assert _exploit_count(db) == 2
+
+
+def test_plex_cursor_advances_past_the_newest_consumed_line(tmp_path):
+    _plex_log(tmp_path, NOW - 60, NOW + 5)
+    db, col = _collector(tmp_path, cf=None, sh=fake_sh())
+    col.tick(NOW)
+    cursor = float(store.meta_get(db, "plex:since"))
+    assert NOW + 5 < cursor <= NOW + 5 + 0.01
+
+
+def test_plex_cursor_is_unchanged_when_no_line_parses(tmp_path):
+    logs = tmp_path / "plex" / "Logs"
+    logs.mkdir(parents=True)
+    (logs / "Plex Media Server.log").write_text("no timestamp here\n", encoding="utf-8")
+    db, col = _collector(tmp_path, cf=None, sh=fake_sh())
+    status = col.tick(NOW)
+    assert status["plex"] == "ok"
+    assert store.meta_get(db, "plex:since") is None
+
+
+def test_a_missing_plex_log_is_stale_and_leaves_the_cursor_alone(tmp_path):
+    db, col = _collector(tmp_path, cf=None, sh=fake_sh())
+    store.meta_set(db, "plex:since", "123.0")
+    status = col.tick(NOW)
+    assert status["plex"] == "stale:missing"
+    assert store.meta_get(db, "source:plex") == f"stale:missing|{NOW}"
+    assert store.meta_get(db, "plex:since") == "123.0"

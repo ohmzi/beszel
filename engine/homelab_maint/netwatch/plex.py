@@ -36,6 +36,11 @@ def _ts(line: str) -> float | None:
     return whole + int(m.group(2)) / 1000.0
 
 
+def line_ts(line: str) -> float | None:
+    """Epoch of a Plex log line, or None when it has no readable stamp. Public so callers can move a cursor past a line."""
+    return _ts(line)
+
+
 def exploit_attempts(lines) -> list[NetEvent]:
     """plex_exploit events for exploit-shaped requests. detail is the request id, or "unknown" when the line has none."""
     events: list[NetEvent] = []
