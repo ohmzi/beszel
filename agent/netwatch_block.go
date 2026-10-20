@@ -92,9 +92,9 @@ func buildNetBlock(r common.MaintenanceNetBlockRequest, ts int64) (map[string]an
 	if r.Days < 1 || r.Days > netBlockMaxDays {
 		return nil, fmt.Errorf("days out of range")
 	}
-	reason := asciiNote(r.OverrideReason)
-	if len(reason) > netBlockReasonMax {
-		return nil, fmt.Errorf("reason too long")
+	reason, err := checkOverrideReason(r.OverrideReason)
+	if err != nil {
+		return nil, err
 	}
 	return map[string]any{
 		"v":               1,
@@ -109,6 +109,25 @@ func buildNetBlock(r common.MaintenanceNetBlockRequest, ts int64) (map[string]an
 		"permanent":       r.Permanent,
 		"override_reason": reason,
 	}, nil
+}
+
+// checkOverrideReason validates the reason as typed and never rewrites it: control characters, DEL and
+// any non-ASCII byte are refused, as is a raw string longer than 200 bytes. Only surrounding spaces are
+// trimmed. Go's canonical bytes match Python's only for ASCII, so there is no sanitising step.
+func checkOverrideReason(raw string) (string, error) {
+	if len(raw) > netBlockReasonMax {
+		return "", fmt.Errorf("reason too long")
+	}
+	for i := 0; i < len(raw); i++ {
+		c := raw[i]
+		if c < 0x20 || c == 0x7f {
+			return "", fmt.Errorf("reason has a control character")
+		}
+		if c >= 0x80 {
+			return "", fmt.Errorf("reason is not ASCII")
+		}
+	}
+	return strings.TrimSpace(raw), nil
 }
 
 // isHex16Exact is 16 lowercase hex digits and nothing else, the same check as block.py's _HEX16.

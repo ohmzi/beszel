@@ -196,3 +196,48 @@ func TestNetBlockWritesSignedRequest(t *testing.T) {
 		}
 	}
 }
+
+// The override reason is checked as typed and never rewritten: control characters, DEL, non-ASCII and
+// anything over 200 bytes are refused. Only surrounding spaces are trimmed.
+func TestNetBlockOverrideReason(t *testing.T) {
+	refused := []struct{ name, reason string }{
+		{"tab", "owner\tok"},
+		{"newline", "owner\nok"},
+		{"carriage return", "owner\rok"},
+		{"DEL", "owner\x7fok"},
+		{"non-ASCII rune", "owner é"},
+		{"raw 201 characters", strings.Repeat("x", 201)},
+	}
+	for _, tc := range refused {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validNetBlock()
+			r.OverrideReason = tc.reason
+			if _, err := buildNetBlockRequest(r, 1); err == nil {
+				t.Fatalf("reason %q: want an error", tc.reason)
+			}
+		})
+	}
+
+	// 200 bytes with internal space runs: accepted unchanged, because there is nothing to trim.
+	long := "x" + strings.Repeat(" ", 99) + "y" + strings.Repeat(" ", 98) + "z"
+	if len(long) != 200 {
+		t.Fatalf("test string is %d bytes, want 200", len(long))
+	}
+	accepted := []struct{ name, reason, want string }{
+		{"200 bytes with space runs", long, long},
+		{"surrounding spaces trimmed", "  a  b  ", "a  b"},
+	}
+	for _, tc := range accepted {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validNetBlock()
+			r.OverrideReason = tc.reason
+			m, err := buildNetBlockRequest(r, 1)
+			if err != nil {
+				t.Fatalf("reason %q: %v", tc.reason, err)
+			}
+			if m["override_reason"] != tc.want {
+				t.Fatalf("override_reason = %q, want %q", m["override_reason"], tc.want)
+			}
+		})
+	}
+}
