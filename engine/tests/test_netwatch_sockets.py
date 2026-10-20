@@ -113,6 +113,17 @@ def test_host_loopback_on_a_non_tunnel_port_gives_no_flow():
     assert set(flows) == EXPECTED
 
 
+def test_ipv4_mapped_peer_on_a_dual_stack_listener_is_an_ipv4_lan_flow():
+    host_ss = ("LISTEN 0 4096 [::]:32400 [::]:*\n"
+               "ESTAB 0 0 [::ffff:192.168.40.20]:32400 [::ffff:192.168.40.50]:50000\n"
+               "\t cubic bytes_sent:90 bytes_acked:90 bytes_received:40\n")
+    flows, status = sample(_topo(), CFG, NOW, sh=make_sh(host_ss=host_ss))
+    assert status == "ok"
+    inbound = Flow(BUCKET, "lan", "lan:192.168.40.50", "host", 32400, "tcp", 1, 40, 90)
+    assert inbound in flows
+    assert all(not f.src.startswith("lan:::") and "::ffff" not in f.src for f in flows)
+
+
 def test_lan_outbound_from_host_is_counted_with_remote_port():
     host_ss = HOST_SS + "ESTAB 0 0 192.168.40.20:50500 192.168.40.60:8443\n\t cubic bytes_sent:300 bytes_received:400\n"
     flows, status = sample(_topo(), CFG, NOW, sh=make_sh(host_ss=host_ss))

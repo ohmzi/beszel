@@ -53,7 +53,7 @@ def _all_good() -> dict[str, bytes]:
     return {
         threat.LISTS["spamhaus_drop_v4"][0]: drop_v4.encode(),
         threat.LISTS["spamhaus_drop_v6"][0]: (json.dumps({"cidr": "2001:db8::/32"}) + "\n").encode(),
-        threat.LISTS["firehol_level1"][0]: b"# FireHOL level 1\n192.0.2.1\n198.18.0.0/15 # bench\n\n",
+        threat.LISTS["firehol_level1"][0]: b"# FireHOL level 1\n192.0.2.1\n198.51.100.0/24 # doc\n\n",
         threat.LISTS["feodo"][0]: b"# Feodo\n203.0.113.77\n",
     }
 
@@ -78,6 +78,7 @@ def test_v4_and_v6_cidr_membership(tmp_path, tdir):
     assert idx.lookup("203.0.114.1") is None
     assert idx.lookup("2001:db8::1") == "spam"
     assert idx.lookup("2001:db9::1") is None
+    assert idx.lookup("::ffff:203.0.113.9") == "spam"
     assert idx.lookup("::ffff:198.51.100.1") is None
 
 
@@ -105,11 +106,11 @@ def test_lists_are_checked_in_name_order_after_the_ioc(tmp_path, tdir):
     assert idx.lookup("203.0.113.9") == "alpha"
 
 
-def test_an_empty_or_missing_directory_matches_nothing(tmp_path):
+def test_an_empty_or_missing_directory_matches_nothing_and_every_list_is_stale(tmp_path):
     idx = ThreatIndex.load(tmp_path / "nowhere", tmp_path / "missing.toml")
     assert idx.lookup("203.0.113.9") is None
     assert idx.domains == set()
-    assert idx.stale_lists(NOW) == []
+    assert idx.stale_lists(NOW) == sorted(threat.LISTS)
 
 
 def test_refresh_writes_each_list_as_plain_cidrs(tdir):
@@ -118,7 +119,7 @@ def test_refresh_writes_each_list_as_plain_cidrs(tdir):
     assert status == {name: "ok" for name in threat.LISTS}
     assert (tdir / "spamhaus_drop_v4.txt").read_text() == "203.0.113.0/24\n198.51.100.0/24\n"
     assert (tdir / "spamhaus_drop_v6.txt").read_text() == "2001:db8::/32\n"
-    assert (tdir / "firehol_level1.txt").read_text() == "192.0.2.1/32\n198.18.0.0/15\n"
+    assert (tdir / "firehol_level1.txt").read_text() == "192.0.2.1/32\n198.51.100.0/24\n"
     assert (tdir / "feodo.txt").read_text() == "203.0.113.77/32\n"
     assert not list(tdir.glob(".*.tmp")), "the temp file is replaced, never left behind"
 
@@ -167,13 +168,37 @@ def test_a_file_older_than_three_days_is_stale(tmp_path, tdir):
     os.utime(old, (NOW - 4 * DAY, NOW - 4 * DAY))
     os.utime(fresh, (NOW - 2 * DAY, NOW - 2 * DAY))
     idx = ThreatIndex.load(tdir, tmp_path / "missing.toml")
-    assert idx.stale_lists(NOW) == ["firehol_level1"]
+    assert idx.stale_lists(NOW) == ["firehol_level1", "spamhaus_drop_v4", "spamhaus_drop_v6"]   # the two spamhaus lists were never written
 
 
 def test_a_refresh_stamps_its_files_with_the_clock_it_was_given(tdir):
     threat.refresh(fetch=FakeFetch(_all_good()), now=NOW - 4 * DAY)
     idx_stale = ThreatIndex.load(tdir, tdir / "none.toml").stale_lists(NOW)
     assert sorted(idx_stale) == sorted(threat.LISTS)
+
+
+def test_a_list_that_was_never_fetched_is_stale(tmp_path, tdir):
+    failing = {url: urllib.error.URLError("no route") for url, _ in threat.LISTS.values()}
+    status = threat.refresh(fetch=FakeFetch(failing), now=NOW)
+    assert set(status.values()) == {"kept:fetch:URLError"}
+    assert not tdir.exists() or not any(tdir.iterdir())
+    idx = ThreatIndex.load(tdir, tmp_path / "missing.toml")
+    assert set(threat.LISTS) <= set(idx.stale_lists(NOW))
+
+
+def test_a_write_failure_keeps_that_list_and_the_others_go_on(tdir, monkeypatch):
+    real_write = threat._write_atomic
+
+    def fail_feodo(path, cidrs, now):
+        if path.name == "feodo.txt":
+            raise OSError(28, "No space left on device")
+        real_write(path, cidrs, now)
+    monkeypatch.setattr(threat, "_write_atomic", fail_feodo)
+    status = threat.refresh(fetch=FakeFetch(_all_good()), now=NOW)
+    assert status["feodo"] == "kept:write:OSError"
+    assert status["spamhaus_drop_v4"] == "ok"
+    assert (tdir / "spamhaus_drop_v4.txt").exists()
+    assert not (tdir / "feodo.txt").exists()
 
 
 def test_main_refresh_prints_one_line_per_list_and_exits_zero(tdir, monkeypatch, capsys):

@@ -104,8 +104,17 @@ def refresh(fetch=urllib.request.urlopen, now=None) -> dict[str, str]:
     """Download every list. Returns list name -> "ok" or "kept:<reason>" (the old file stays in place on any failure)."""
     now = time.time() if now is None else now
     directory = threat_dir()
-    directory.mkdir(parents=True, exist_ok=True)
-    return {name: _refresh_one(name, url, fmt, fetch, directory, now) for name, (url, fmt) in LISTS.items()}
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return {name: f"kept:write:{type(e).__name__}" for name in LISTS}
+    out = {}
+    for name, (url, fmt) in LISTS.items():
+        try:
+            out[name] = _refresh_one(name, url, fmt, fetch, directory, now)
+        except OSError as e:                             # a full disk or a read-only dir keeps this list only; the others go on
+            out[name] = f"kept:write:{type(e).__name__}"
+    return out
 
 
 def _group(cidrs) -> dict[tuple[int, int], set[int]]:
@@ -149,13 +158,18 @@ class ThreatIndex:
 
     def lookup(self, ip: str) -> str | None:
         addr = ipaddress.ip_address(ip.strip())
+        if addr.version == 6 and addr.ipv4_mapped:       # ss reports IPv4 peers of dual-stack listeners as ::ffff:a.b.c.d
+            addr = addr.ipv4_mapped
         for name, groups in self._lists:
             if _contains(groups, addr):
                 return name
         return None
 
     def stale_lists(self, now: float) -> list[str]:
-        return sorted(name for name, mtime in self._mtimes.items() if now - mtime > STALE_S)
+        """Lists never downloaded (no file) or whose file is older than 3 days: a missing list is stale, never "all fine"."""
+        missing = [name for name in LISTS if name not in self._mtimes]
+        old = [name for name, mtime in self._mtimes.items() if now - mtime > STALE_S]
+        return sorted(set(missing) | set(old))
 
 
 def main(argv: list[str] | None = None) -> int:
