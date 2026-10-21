@@ -5,6 +5,7 @@ const routes = {
 	alerts: "/alerts",
 	incidents: "/incidents",
 	network: "/network",
+	web: "/web",
 	reports: "/reports",
 	report: "/reports/:id",
 	services: "/services",

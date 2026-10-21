@@ -193,6 +193,8 @@ msgid "Acknowledged issues"
 msgstr "Acknowledged issues"
 
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
 msgid "Action"
 msgstr "Action"
 
@@ -256,6 +258,14 @@ msgstr "Add System"
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "Add URL"
+
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/web.tsx
+msgid "Address"
+msgstr "Address"
 
 #: src/components/routes/settings/general.tsx
 msgid "Adjust display options for charts."
@@ -329,6 +339,10 @@ msgstr "All rules"
 msgid "All Systems"
 msgstr "All Systems"
 
+#: src/components/routes/network.tsx
+msgid "applied"
+msgstr "applied"
+
 #: src/components/routes/ack.tsx
 msgid "Applied"
 msgstr "Applied"
@@ -341,6 +355,10 @@ msgstr "Are you sure you want to delete {name}?"
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Are you sure?"
 msgstr "Are you sure?"
+
+#: src/components/routes/network.tsx
+msgid "ASN"
+msgstr "ASN"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Attention"
@@ -477,6 +495,21 @@ msgstr "Binary"
 msgid "Bits (Kbps, Mbps, Gbps)"
 msgstr "Bits (Kbps, Mbps, Gbps)"
 
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+msgid "Block"
+msgstr "Block"
+
+#. placeholder {0}: finding.src ?? ""
+#: src/components/routes/network.tsx
+msgid "Block {0}"
+msgstr "Block {0}"
+
+#: src/components/routes/network.tsx
+msgid "Blocks"
+msgstr "Blocks"
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
 msgstr "Boot state"
@@ -528,6 +561,7 @@ msgid "Can stop"
 msgstr "Can stop"
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
+#: src/components/routes/network.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -838,6 +872,10 @@ msgstr "Core"
 #~ msgid "cores"
 #~ msgstr "cores"
 
+#: src/components/routes/network.tsx
+msgid "Country"
+msgstr "Country"
+
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -891,6 +929,10 @@ msgstr "Created"
 #: src/components/routes/incidents.tsx
 msgid "crit — not acknowledgeable"
 msgstr "crit — not acknowledgeable"
+
+#: src/components/routes/network.tsx
+msgid "critical"
+msgstr "critical"
 
 #: src/components/routes/ack.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -955,9 +997,17 @@ msgstr "Daily and weekly maintenance reports, newest first."
 msgid "Daily report"
 msgstr "Daily report"
 
+#: src/components/routes/network.tsx
+msgid "Data is {ageMin} min old — the publisher may be stopped"
+msgstr "Data is {ageMin} min old — the publisher may be stopped"
+
 #: src/components/routes/ack.tsx
 msgid "days"
 msgstr "days"
+
+#: src/components/routes/network.tsx
+msgid "Days"
+msgstr "Days"
 
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
@@ -1002,6 +1052,7 @@ msgid "Detail"
 msgstr "Detail"
 
 #: src/components/routes/system/smart-table.tsx
+#: src/components/routes/web.tsx
 msgid "Device"
 msgstr "Device"
 
@@ -1162,6 +1213,10 @@ msgstr "Enter email address..."
 #: src/components/login/otp-forms.tsx
 msgid "Enter your one-time password."
 msgstr "Enter your one-time password."
+
+#: src/components/routes/network.tsx
+msgid "Entity"
+msgstr "Entity"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Ephemeral"
@@ -1337,6 +1392,14 @@ msgstr "Fingerprint"
 msgid "Firmware"
 msgstr "Firmware"
 
+#: src/components/routes/network.tsx
+msgid "first"
+msgstr "first"
+
+#: src/components/routes/network.tsx
+msgid "Flags"
+msgstr "Flags"
+
 #: src/components/alerts/alerts-sheet.tsx
 msgid "For <0>{min}</0> {min, plural, one {minute} other {minutes}}"
 msgstr "For <0>{min}</0> {min, plural, one {minute} other {minutes}}"
@@ -1430,6 +1493,10 @@ msgstr "Growth"
 msgid "Halted:"
 msgstr "Halted:"
 
+#: src/components/routes/network.tsx
+msgid "Hard ranges"
+msgstr "Hard ranges"
+
 #: src/components/routes/reports.tsx
 msgid "Headline"
 msgstr "Headline"
@@ -1460,6 +1527,10 @@ msgstr "Heartbeat sent successfully"
 msgid "Hide timestamps"
 msgstr "Hide timestamps"
 
+#: src/components/routes/web.tsx
+msgid "home.ohmz.cloud access, newest first. Server-side nginx logs only; no client-side tracker or cookie."
+msgstr "home.ohmz.cloud access, newest first. Server-side nginx logs only; no client-side tracker or cookie."
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -1473,6 +1544,10 @@ msgstr "homelab-maint verdict over time (0 healthy, 1 attention, 2 critical)"
 #: src/components/add-system.tsx
 msgid "Host / IP"
 msgstr "Host / IP"
+
+#: src/components/routes/network.tsx
+msgid "Hosts"
+msgstr "Hosts"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "HTTP Method"
@@ -1547,6 +1622,7 @@ msgstr "It may have expired or already been used. Open the dashboard to acknowle
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/migration.tsx
+#: src/components/routes/network.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr "Kind"
@@ -1560,6 +1636,7 @@ msgid "Largest by memory"
 msgstr "Largest by memory"
 
 #: src/components/routes/checks.tsx
+#: src/components/routes/network.tsx
 msgid "last"
 msgstr "last"
 
@@ -1587,6 +1664,10 @@ msgstr "Last publish"
 msgid "Last run"
 msgstr "Last run"
 
+#: src/components/routes/network.tsx
+msgid "Last seen"
+msgstr "Last seen"
+
 #: src/components/routes/incidents.tsx
 msgid "lasted"
 msgstr "lasted"
@@ -1602,6 +1683,10 @@ msgstr "Layout"
 #: src/components/routes/settings/general.tsx
 msgid "Layout width"
 msgstr "Layout width"
+
+#: src/components/routes/network.tsx
+msgid "Learning period ends"
+msgstr "Learning period ends"
 
 #: src/components/routes/migration.tsx
 msgid "Legacy units retired one at a time; the rest observed until they are cut over."
@@ -1659,10 +1744,18 @@ msgstr "Load spikes"
 msgid "Load state"
 msgstr "Load state"
 
+#: src/components/routes/web.tsx
+msgid "Loading the website log…"
+msgstr "Loading the website log…"
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Loading..."
 msgstr "Loading..."
+
+#: src/components/routes/web.tsx
+msgid "Location"
+msgstr "Location"
 
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
@@ -1847,7 +1940,9 @@ msgstr "need attention"
 msgid "Net"
 msgstr "Net"
 
+#: src/components/routes/network.tsx
 #: src/components/routes/system.tsx
+#: src/components/routes/web.tsx
 msgid "Network"
 msgstr "Network"
 
@@ -1887,6 +1982,22 @@ msgstr "Network traffic of public interfaces"
 msgid "Network unit"
 msgstr "Network unit"
 
+#: src/components/routes/network.tsx
+msgid "never block"
+msgstr "never block"
+
+#: src/components/routes/network.tsx
+msgid "Never blocked, whatever the reason."
+msgstr "Never blocked, whatever the reason."
+
+#: src/components/routes/network.tsx
+msgid "Never blocked: this address is in a protected range, so there is nothing to confirm."
+msgstr "Never blocked: this address is in a protected range, so there is nothing to confirm."
+
+#: src/components/routes/network.tsx
+msgid "Never-block"
+msgstr "Never-block"
+
 #: src/components/routes/checks.tsx
 msgid "next"
 msgstr "next"
@@ -1905,6 +2016,10 @@ msgstr "No"
 #: src/components/routes/maintenance.tsx
 msgid "No actions recorded."
 msgstr "No actions recorded."
+
+#: src/components/routes/network.tsx
+msgid "No active blocks."
+msgstr "No active blocks."
 
 #: src/components/routes/checks.tsx
 msgid "no alerts for these until they expire"
@@ -1926,6 +2041,10 @@ msgstr "No container traffic recorded yet."
 msgid "No detail data for this pool."
 msgstr "No detail data for this pool."
 
+#: src/components/routes/network.tsx
+msgid "No hard ranges."
+msgstr "No hard ranges."
+
 #: src/components/routes/spikes.tsx
 msgid "No load spikes recorded."
 msgstr "No load spikes recorded."
@@ -1934,13 +2053,33 @@ msgstr "No load spikes recorded."
 msgid "No logs found."
 msgstr "No logs found."
 
+#: src/components/routes/network.tsx
+msgid "No maintenance agent is connected, so the request cannot be sent."
+msgstr "No maintenance agent is connected, so the request cannot be sent."
+
+#: src/components/routes/network.tsx
+msgid "No open findings in the data available"
+msgstr "No open findings in the data available"
+
+#: src/components/routes/network.tsx
+msgid "No open findings."
+msgstr "No open findings."
+
 #: src/components/routes/incidents.tsx
 msgid "No open incidents."
 msgstr "No open incidents."
 
+#: src/components/routes/web.tsx
+msgid "No public requests have reached the origin yet."
+msgstr "No public requests have reached the origin yet."
+
 #: src/components/routes/reports.tsx
 msgid "No reports yet."
 msgstr "No reports yet."
+
+#: src/components/routes/network.tsx
+msgid "No requests yet."
+msgstr "No requests yet."
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1966,15 +2105,35 @@ msgstr "No rule matches."
 msgid "No S.M.A.R.T. attributes available for this device."
 msgstr "No S.M.A.R.T. attributes available for this device."
 
+#: src/components/routes/network.tsx
+msgid "No services talked to a peer in the last day."
+msgstr "No services talked to a peer in the last day."
+
+#: src/components/routes/network.tsx
+msgid "No sign-ins in the last 30 days."
+msgstr "No sign-ins in the last 30 days."
+
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "No systems found."
 msgstr "No systems found."
 
+#: src/components/routes/network.tsx
+msgid "No talkers in the last day."
+msgstr "No talkers in the last day."
+
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "No targets found."
 msgstr "No targets found."
+
+#: src/components/routes/web.tsx
+msgid "No website log yet. {error}"
+msgstr "No website log yet. {error}"
+
+#: src/components/routes/network.tsx
+msgid "none"
+msgstr "none"
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "None"
@@ -2158,6 +2317,10 @@ msgstr "Past"
 msgid "Patch"
 msgstr "Patch"
 
+#: src/components/routes/web.tsx
+msgid "Path"
+msgstr "Path"
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Pause"
@@ -2174,6 +2337,14 @@ msgstr "Paused ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Payload format"
+
+#: src/components/routes/network.tsx
+msgid "Peers in"
+msgstr "Peers in"
+
+#: src/components/routes/network.tsx
+msgid "Peers out"
+msgstr "Peers out"
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "Per-container upload and download: now, last 24 hours, last 7 days."
@@ -2196,6 +2367,11 @@ msgstr "Percentage of time spent in each state"
 msgid "Period"
 msgstr "Period"
 
+#: src/components/routes/network.tsx
+msgid "permanent"
+msgstr "permanent"
+
+#: src/components/routes/network.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "Permanent"
@@ -2263,6 +2439,10 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Ports"
 
+#: src/components/routes/network.tsx
+msgid "Possible stolen account:"
+msgstr "Possible stolen account:"
+
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
@@ -2292,6 +2472,10 @@ msgstr "Process"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Process started"
 msgstr "Process started"
+
+#: src/components/routes/network.tsx
+msgid "Protection"
+msgstr "Protection"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -2345,6 +2529,14 @@ msgstr "Read"
 msgid "Read errors"
 msgstr "Read errors"
 
+#: src/components/routes/network.tsx
+msgid "Reason"
+msgstr "Reason"
+
+#: src/components/routes/network.tsx
+msgid "Reason (required)"
+msgstr "Reason (required)"
+
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Received"
 msgstr "Received"
@@ -2352,6 +2544,10 @@ msgstr "Received"
 #: src/components/routes/maintenance.tsx
 msgid "Recent actions"
 msgstr "Recent actions"
+
+#: src/components/routes/network.tsx
+msgid "Recent requests"
+msgstr "Recent requests"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/logs-display.tsx
@@ -2365,6 +2561,15 @@ msgstr "Refresh"
 #: src/components/routes/report.tsx
 msgid "refused"
 msgstr "refused"
+
+#: src/components/routes/network.tsx
+msgid "Refused unless the block gives a reason, which is audited."
+msgstr "Refused unless the block gives a reason, which is audited."
+
+#. placeholder {0}: r.reason
+#: src/components/routes/network.tsx
+msgid "refused: {0}"
+msgstr "refused: {0}"
 
 #: src/components/pipeline-strip.tsx
 msgid "registry"
@@ -2406,6 +2611,10 @@ msgstr "Request OTP"
 #: src/components/routes/incidents.tsx
 msgid "Requested. The runner applies it within a minute."
 msgstr "Requested. The runner applies it within a minute."
+
+#: src/components/routes/network.tsx
+msgid "Requests"
+msgstr "Requests"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Required by"
@@ -2457,6 +2666,10 @@ msgstr "Response time monitoring from agents."
 msgid "Restarts"
 msgstr "Restarts"
 
+#: src/components/routes/network.tsx
+msgid "Result"
+msgstr "Result"
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Resume"
@@ -2494,6 +2707,10 @@ msgstr "Routine"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Rows per page"
 msgstr "Rows per page"
+
+#: src/components/routes/network.tsx
+msgid "Rule"
+msgstr "Rule"
 
 #: src/components/routes/registry.tsx
 #: src/components/routes/registry.tsx
@@ -2604,6 +2821,10 @@ msgstr "Security: {securityCount}"
 msgid "See <0>notification settings</0> to configure how you receive alerts."
 msgstr "See <0>notification settings</0> to configure how you receive alerts."
 
+#: src/components/routes/network.tsx
+msgid "Seen"
+msgstr "Seen"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Select {foo}"
 msgstr "Select {foo}"
@@ -2647,12 +2868,18 @@ msgstr "Send test heartbeat"
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
 msgid "Sending…"
 msgstr "Sending…"
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
 msgstr "Sent"
+
+#: src/components/routes/network.tsx
+msgid "Sent — see Recent requests for the result"
+msgstr "Sent — see Recent requests for the result"
 
 #: src/components/routes/system/smart-table.tsx
 msgid "Serial Number"
@@ -2676,6 +2903,7 @@ msgid "Service objectives are still collecting data."
 msgstr "Service objectives are still collecting data."
 
 #: src/components/live-panels.tsx
+#: src/components/routes/network.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2704,6 +2932,7 @@ msgstr "Settings saved"
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/network.tsx
 msgid "Severity"
 msgstr "Severity"
 
@@ -2725,6 +2954,14 @@ msgstr "Sign in"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Signal strength of connected Wi-Fi interfaces"
 
+#: src/components/routes/network.tsx
+msgid "signed in"
+msgstr "signed in"
+
+#: src/components/routes/network.tsx
+msgid "Signed in recently"
+msgstr "Signed in recently"
+
 #: src/components/routes/ack.tsx
 msgid "Silence for"
 msgstr "Silence for"
@@ -2742,10 +2979,23 @@ msgstr "Size"
 msgid "SMTP settings"
 msgstr "SMTP settings"
 
+#. placeholder {0}: stale.join(", ")
+#: src/components/routes/network.tsx
+msgid "Some sources are stale: {0} — data may be incomplete"
+msgstr "Some sources are stale: {0} — data may be incomplete"
+
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "Sort By"
+
+#: src/components/routes/network.tsx
+msgid "Source"
+msgstr "Source"
+
+#: src/components/routes/network.tsx
+msgid "Source → target"
+msgstr "Source → target"
 
 #: src/components/routes/report.tsx
 msgid "Space freed"
@@ -2776,6 +3026,7 @@ msgstr "State"
 #: src/components/routes/incidents.tsx
 #: src/components/routes/report.tsx
 #: src/components/routes/system/smart-table.tsx
+#: src/components/routes/web.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
@@ -2876,9 +3127,15 @@ msgctxt "Tabs system layout option"
 msgid "Tabs"
 msgstr "Tabs"
 
+#: src/components/routes/network.tsx
+msgid "Talkers"
+msgstr "Talkers"
+
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
 msgid "Target"
 msgstr "Target"
 
@@ -2944,6 +3201,10 @@ msgstr "Test notification sent"
 msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
 msgstr "The monitoring pipeline's own verdict — whether the checks are actually running."
 
+#: src/components/routes/network.tsx
+msgid "The network watch has no data yet."
+msgstr "The network watch has no data yet."
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2964,9 +3225,17 @@ msgstr "Then log into the backend and reset your user account password in the us
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 
+#: src/components/routes/network.tsx
+msgid "This address signed in successfully recently, or its account was reported stolen. A reason is required, and it is audited."
+msgstr "This address signed in successfully recently, or its account was reported stolen. A reason is required, and it is audited."
+
 #: src/components/routes/ack.tsx
 msgid "This exact alert is silenced for {days} days. The runner is applying it now, about a minute."
 msgstr "This exact alert is silenced for {days} days. The runner is applying it now, about a minute."
+
+#: src/components/routes/network.tsx
+msgid "This finding has no block target, so it cannot be blocked."
+msgstr "This finding has no block target, so it cannot be blocked."
 
 #: src/components/routes/ack.tsx
 msgid "This link is not valid"
@@ -2985,6 +3254,10 @@ msgstr "This silences this exact alert. It stays listed as acknowledged, and a w
 msgid "This will permanently delete all selected records from the database."
 msgstr "This will permanently delete all selected records from the database."
 
+#: src/components/routes/network.tsx
+msgid "Threat"
+msgstr "Threat"
+
 #: src/components/routes/system/charts/disk-charts.tsx
 msgid "Throughput of {extraFsName}"
 msgstr "Throughput of {extraFsName}"
@@ -2992,6 +3265,11 @@ msgstr "Throughput of {extraFsName}"
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 msgid "Throughput of storage pool {displayName}"
 msgstr "Throughput of storage pool {displayName}"
+
+#: src/components/routes/network.tsx
+#: src/components/routes/web.tsx
+msgid "Time"
+msgstr "Time"
 
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
@@ -3161,6 +3439,11 @@ msgstr "Type"
 msgid "Un-acknowledge"
 msgstr "Un-acknowledge"
 
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+msgid "Unblock"
+msgstr "Unblock"
+
 #: src/components/live-panels.tsx
 #: src/lib/alerts.ts
 msgid "Unhealthy"
@@ -3184,6 +3467,10 @@ msgstr "Unit preferences"
 msgid "Universal token"
 msgstr "Universal token"
 
+#: src/components/routes/network.tsx
+msgid "unknown"
+msgstr "unknown"
+
 #. Context: Battery state
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -3195,6 +3482,10 @@ msgstr "Unknown"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unlimited"
 msgstr "Unlimited"
+
+#: src/components/routes/network.tsx
+msgid "Until"
+msgstr "Until"
 
 #. Context: System is up
 #: src/components/routes/system/info-bar.tsx
@@ -3335,6 +3626,10 @@ msgstr "Want to help improve our translations? Check <0>Crowdin</0> for details.
 msgid "Wants"
 msgstr "Wants"
 
+#: src/components/routes/network.tsx
+msgid "warning"
+msgstr "warning"
+
 #: src/components/routes/ack.tsx
 msgid "Warning"
 msgstr "Warning"
@@ -3347,9 +3642,17 @@ msgstr "Warning (%)"
 msgid "Warning thresholds"
 msgstr "Warning thresholds"
 
+#: src/components/routes/web.tsx
+#~ msgid "Watching:"
+#~ msgstr "Watching:"
+
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Push notifications"
+
+#: src/components/routes/web.tsx
+msgid "Website"
+msgstr "Website"
 
 #: src/components/routes/report.tsx
 msgid "Weekly report"
@@ -3375,6 +3678,10 @@ msgstr "What mattered"
 msgid "What the engine did, what runs when, and what it told you."
 msgstr "What the engine did, what runs when, and what it told you."
 
+#: src/components/routes/network.tsx
+msgid "What the network watch saw, the top talkers and the blocks in force."
+msgstr "What the network watch saw, the top talkers and the blocks in force."
+
 #: src/components/routes/registry.tsx
 msgid "What the script does"
 msgstr "What the script does"
@@ -3398,8 +3705,13 @@ msgstr "When using POST, each heartbeat includes a JSON payload with system stat
 #~ msgstr "Who"
 
 #: src/components/routes/health.tsx
+#: src/components/routes/network.tsx
 msgid "Why"
 msgstr "Why"
+
+#: src/components/routes/network.tsx
+msgid "Why this address should be blocked"
+msgstr "Why this address should be blocked"
 
 #: src/components/routes/system/charts/wifi-chart.tsx
 msgid "Wi-Fi signal"
@@ -3452,3 +3764,7 @@ msgstr "Yes"
 #: src/components/routes/settings/layout.tsx
 msgid "Your user settings have been updated."
 msgstr "Your user settings have been updated."
+
+#: src/components/routes/network.tsx
+msgid "Zone"
+msgstr "Zone"

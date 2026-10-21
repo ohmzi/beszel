@@ -34,6 +34,7 @@ Markdown scrubbed line by line with traceback blocks dropped):
   reports/index.json  see below
   self.json           tasks.self_health.export()     health of the monitoring pipeline itself (SPEC6 S6): runner -> publish -> website, tick, live, registry
   network.json        netwatch.export.build_network() Network Watch: directions, talkers, services, open findings, blocks, sign-ins (512 KB cap)
+  web.json            netwatch.weblog.build_web()   home.ohmz.cloud access log: recent public requests, DB-IP city/ASN, device/browser/OS, target-company matches
   rules.json          registry.write_public()        what the script does: every rule of the registry, last evaluated / triggered (SPEC6 S5; 700 KB cap of its own)
   rules-history.json  the `history` of rules.json    the registry's recent changes as a file of its own: {schema, generated_at, registry_hash, history: [newest first]}
   manifest.json       registry.write_public()        schema + generated_at of every public file, runner version, registry hash: written LAST
@@ -1442,6 +1443,14 @@ def build_network_json(run: _Run):
     return WROTE, None
 
 
+def build_web_json(run: _Run):
+    """web.json (home.ohmz.cloud access log, netwatch/weblog.py). Recent public requests, enriched with DB-IP city/ASN."""
+    from .netwatch import weblog
+    doc = weblog.build_web(run.now)
+    _write_atomic(run.pub / "web.json", _dump(doc))
+    return WROTE, None
+
+
 BUILDERS: list[tuple[str, Callable]] = [
     ("overview.json", build_overview), ("checks.json", build_checks), ("actions.json", build_actions),
     ("storage.json", build_storage), ("metrics.json", build_metrics), ("schedule.json", build_schedule),
@@ -1450,6 +1459,7 @@ BUILDERS: list[tuple[str, Callable]] = [
     ("pressure.json", build_pressure), ("jobs.json", build_jobs), ("monitors.json", build_monitors),
     ("notifications.json", build_notifications), ("migration.json", build_migration), ("self.json", build_self),
     ("network.json", build_network_json),
+    ("web.json", build_web_json),
     ("reports/index.json", build_reports),
 ]
 

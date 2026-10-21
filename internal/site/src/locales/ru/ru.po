@@ -198,6 +198,8 @@ msgid "Acknowledged issues"
 msgstr ""
 
 #: src/components/routes/maintenance.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
 msgid "Action"
 msgstr ""
 
@@ -261,6 +263,14 @@ msgstr "Добавить систему"
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "Добавить URL"
+
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/web.tsx
+msgid "Address"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Adjust display options for charts."
@@ -334,6 +344,10 @@ msgstr ""
 msgid "All Systems"
 msgstr "Все системы"
 
+#: src/components/routes/network.tsx
+msgid "applied"
+msgstr ""
+
 #: src/components/routes/ack.tsx
 msgid "Applied"
 msgstr ""
@@ -346,6 +360,10 @@ msgstr "Вы уверены, что хотите удалить {name}?"
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Are you sure?"
 msgstr "Вы уверены?"
+
+#: src/components/routes/network.tsx
+msgid "ASN"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Attention"
@@ -482,6 +500,21 @@ msgstr "Двоичный"
 msgid "Bits (Kbps, Mbps, Gbps)"
 msgstr "Биты (Кбит/с, Мбит/с, Гбит/с)"
 
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+msgid "Block"
+msgstr ""
+
+#. placeholder {0}: finding.src ?? ""
+#: src/components/routes/network.tsx
+msgid "Block {0}"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Blocks"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
 msgstr "Состояние загрузки"
@@ -533,6 +566,7 @@ msgid "Can stop"
 msgstr "Может остановить"
 
 #: src/components/network-monitors-table/network-monitors-table.tsx
+#: src/components/routes/network.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -843,6 +877,10 @@ msgstr "Ядро"
 #~ msgid "cores"
 #~ msgstr ""
 
+#: src/components/routes/network.tsx
+msgid "Country"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -895,6 +933,10 @@ msgstr "Создано"
 
 #: src/components/routes/incidents.tsx
 msgid "crit — not acknowledgeable"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "critical"
 msgstr ""
 
 #: src/components/routes/ack.tsx
@@ -960,8 +1002,16 @@ msgstr ""
 msgid "Daily report"
 msgstr ""
 
+#: src/components/routes/network.tsx
+msgid "Data is {ageMin} min old — the publisher may be stopped"
+msgstr ""
+
 #: src/components/routes/ack.tsx
 msgid "days"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Days"
 msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
@@ -1007,6 +1057,7 @@ msgid "Detail"
 msgstr "Подробности"
 
 #: src/components/routes/system/smart-table.tsx
+#: src/components/routes/web.tsx
 msgid "Device"
 msgstr "Устройство"
 
@@ -1167,6 +1218,10 @@ msgstr "Введите адрес электронной почты..."
 #: src/components/login/otp-forms.tsx
 msgid "Enter your one-time password."
 msgstr "Введите ваш одноразовый пароль."
+
+#: src/components/routes/network.tsx
+msgid "Entity"
+msgstr ""
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Ephemeral"
@@ -1342,6 +1397,14 @@ msgstr "Отпечаток"
 msgid "Firmware"
 msgstr "Прошивка"
 
+#: src/components/routes/network.tsx
+msgid "first"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Flags"
+msgstr ""
+
 #: src/components/alerts/alerts-sheet.tsx
 msgid "For <0>{min}</0> {min, plural, one {minute} other {minutes}}"
 msgstr "На <0>{min}</0> {min, plural, one {минуту} other {минут}}"
@@ -1435,6 +1498,10 @@ msgstr ""
 msgid "Halted:"
 msgstr ""
 
+#: src/components/routes/network.tsx
+msgid "Hard ranges"
+msgstr ""
+
 #: src/components/routes/reports.tsx
 msgid "Headline"
 msgstr ""
@@ -1465,6 +1532,10 @@ msgstr "Heartbeat успешно отправлен"
 msgid "Hide timestamps"
 msgstr "Скрыть метки времени"
 
+#: src/components/routes/web.tsx
+msgid "home.ohmz.cloud access, newest first. Server-side nginx logs only; no client-side tracker or cookie."
+msgstr ""
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -1478,6 +1549,10 @@ msgstr ""
 #: src/components/add-system.tsx
 msgid "Host / IP"
 msgstr "Хост / IP"
+
+#: src/components/routes/network.tsx
+msgid "Hosts"
+msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "HTTP Method"
@@ -1552,6 +1627,7 @@ msgstr ""
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/migration.tsx
+#: src/components/routes/network.tsx
 #: src/components/routes/reports.tsx
 msgid "Kind"
 msgstr ""
@@ -1565,6 +1641,7 @@ msgid "Largest by memory"
 msgstr ""
 
 #: src/components/routes/checks.tsx
+#: src/components/routes/network.tsx
 msgid "last"
 msgstr ""
 
@@ -1592,6 +1669,10 @@ msgstr ""
 msgid "Last run"
 msgstr ""
 
+#: src/components/routes/network.tsx
+msgid "Last seen"
+msgstr ""
+
 #: src/components/routes/incidents.tsx
 msgid "lasted"
 msgstr ""
@@ -1607,6 +1688,10 @@ msgstr "Макет"
 #: src/components/routes/settings/general.tsx
 msgid "Layout width"
 msgstr "Ширина макета"
+
+#: src/components/routes/network.tsx
+msgid "Learning period ends"
+msgstr ""
 
 #: src/components/routes/migration.tsx
 msgid "Legacy units retired one at a time; the rest observed until they are cut over."
@@ -1664,10 +1749,18 @@ msgstr ""
 msgid "Load state"
 msgstr "Состояние загрузки"
 
+#: src/components/routes/web.tsx
+msgid "Loading the website log…"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Loading..."
 msgstr "Загрузка..."
+
+#: src/components/routes/web.tsx
+msgid "Location"
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
@@ -1852,7 +1945,9 @@ msgstr ""
 msgid "Net"
 msgstr "Сеть"
 
+#: src/components/routes/network.tsx
 #: src/components/routes/system.tsx
+#: src/components/routes/web.tsx
 msgid "Network"
 msgstr "Сеть"
 
@@ -1892,6 +1987,22 @@ msgstr "Сетевой трафик публичных интерфейсов"
 msgid "Network unit"
 msgstr "Единицы измерения скорости сети"
 
+#: src/components/routes/network.tsx
+msgid "never block"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Never blocked, whatever the reason."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Never blocked: this address is in a protected range, so there is nothing to confirm."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Never-block"
+msgstr ""
+
 #: src/components/routes/checks.tsx
 msgid "next"
 msgstr ""
@@ -1909,6 +2020,10 @@ msgstr "Нет"
 
 #: src/components/routes/maintenance.tsx
 msgid "No actions recorded."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "No active blocks."
 msgstr ""
 
 #: src/components/routes/checks.tsx
@@ -1931,6 +2046,10 @@ msgstr ""
 msgid "No detail data for this pool."
 msgstr "Подробные данные для этого пула отсутствуют."
 
+#: src/components/routes/network.tsx
+msgid "No hard ranges."
+msgstr ""
+
 #: src/components/routes/spikes.tsx
 msgid "No load spikes recorded."
 msgstr ""
@@ -1939,12 +2058,32 @@ msgstr ""
 msgid "No logs found."
 msgstr "Журналы не найдены."
 
+#: src/components/routes/network.tsx
+msgid "No maintenance agent is connected, so the request cannot be sent."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "No open findings in the data available"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "No open findings."
+msgstr ""
+
 #: src/components/routes/incidents.tsx
 msgid "No open incidents."
 msgstr ""
 
+#: src/components/routes/web.tsx
+msgid "No public requests have reached the origin yet."
+msgstr ""
+
 #: src/components/routes/reports.tsx
 msgid "No reports yet."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "No requests yet."
 msgstr ""
 
 #: src/components/command-palette.tsx
@@ -1971,15 +2110,35 @@ msgstr ""
 msgid "No S.M.A.R.T. attributes available for this device."
 msgstr "Для этого устройства нет доступных атрибутов S.M.A.R.T."
 
+#: src/components/routes/network.tsx
+msgid "No services talked to a peer in the last day."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "No sign-ins in the last 30 days."
+msgstr ""
+
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "No systems found."
 msgstr "Системы не найдены."
 
+#: src/components/routes/network.tsx
+msgid "No talkers in the last day."
+msgstr ""
+
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "No targets found."
 msgstr "Цели не найдены."
+
+#: src/components/routes/web.tsx
+msgid "No website log yet. {error}"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "none"
+msgstr ""
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "None"
@@ -2163,6 +2322,10 @@ msgstr "Прошлое"
 msgid "Patch"
 msgstr "Патч"
 
+#: src/components/routes/web.tsx
+msgid "Path"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Pause"
@@ -2179,6 +2342,14 @@ msgstr "Пауза ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Формат полезной нагрузки"
+
+#: src/components/routes/network.tsx
+msgid "Peers in"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Peers out"
+msgstr ""
 
 #: src/components/routes/system/charts/container-network.tsx
 msgid "Per-container upload and download: now, last 24 hours, last 7 days."
@@ -2201,6 +2372,11 @@ msgstr "Процент времени, проведенного в каждом 
 msgid "Period"
 msgstr ""
 
+#: src/components/routes/network.tsx
+msgid "permanent"
+msgstr ""
+
+#: src/components/routes/network.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "Постоянный"
@@ -2268,6 +2444,10 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Порты"
 
+#: src/components/routes/network.tsx
+msgid "Possible stolen account:"
+msgstr ""
+
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
@@ -2297,6 +2477,10 @@ msgstr ""
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Process started"
 msgstr "Процесс запущен"
+
+#: src/components/routes/network.tsx
+msgid "Protection"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -2350,12 +2534,24 @@ msgstr "Чтение"
 msgid "Read errors"
 msgstr "Ошибки чтения"
 
+#: src/components/routes/network.tsx
+msgid "Reason"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Reason (required)"
+msgstr ""
+
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Received"
 msgstr "Получено"
 
 #: src/components/routes/maintenance.tsx
 msgid "Recent actions"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Recent requests"
 msgstr ""
 
 #: src/components/containers-table/containers-table.tsx
@@ -2369,6 +2565,15 @@ msgstr "Обновить"
 
 #: src/components/routes/report.tsx
 msgid "refused"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Refused unless the block gives a reason, which is audited."
+msgstr ""
+
+#. placeholder {0}: r.reason
+#: src/components/routes/network.tsx
+msgid "refused: {0}"
 msgstr ""
 
 #: src/components/pipeline-strip.tsx
@@ -2410,6 +2615,10 @@ msgstr "Запросить OTP"
 
 #: src/components/routes/incidents.tsx
 msgid "Requested. The runner applies it within a minute."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Requests"
 msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
@@ -2462,6 +2671,10 @@ msgstr "Мониторинг времени отклика с агентов."
 msgid "Restarts"
 msgstr "Перезапуски"
 
+#: src/components/routes/network.tsx
+msgid "Result"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Resume"
@@ -2499,6 +2712,10 @@ msgstr ""
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Rows per page"
 msgstr "Строк на странице"
+
+#: src/components/routes/network.tsx
+msgid "Rule"
+msgstr ""
 
 #: src/components/routes/registry.tsx
 #: src/components/routes/registry.tsx
@@ -2609,6 +2826,10 @@ msgstr "Безопасность: {securityCount}"
 msgid "See <0>notification settings</0> to configure how you receive alerts."
 msgstr "Смотрите <0>настройки уведомлений</0>, чтобы настроить, как вы получаете оповещения."
 
+#: src/components/routes/network.tsx
+msgid "Seen"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Select {foo}"
 msgstr "Выбрать {foo}"
@@ -2652,12 +2873,18 @@ msgstr "Отправить тестовый heartbeat"
 
 #: src/components/routes/incidents.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
 msgid "Sending…"
 msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
 msgstr "Отправлено"
+
+#: src/components/routes/network.tsx
+msgid "Sent — see Recent requests for the result"
+msgstr ""
 
 #: src/components/routes/system/smart-table.tsx
 msgid "Serial Number"
@@ -2681,6 +2908,7 @@ msgid "Service objectives are still collecting data."
 msgstr ""
 
 #: src/components/live-panels.tsx
+#: src/components/routes/network.tsx
 #: src/components/routes/services.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Services"
@@ -2709,6 +2937,7 @@ msgstr "Настройки сохранены"
 
 #: src/components/routes/alerts.tsx
 #: src/components/routes/incidents.tsx
+#: src/components/routes/network.tsx
 msgid "Severity"
 msgstr ""
 
@@ -2730,6 +2959,14 @@ msgstr "Войти"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Уровень сигнала подключенных интерфейсов Wi-Fi"
 
+#: src/components/routes/network.tsx
+msgid "signed in"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Signed in recently"
+msgstr ""
+
 #: src/components/routes/ack.tsx
 msgid "Silence for"
 msgstr ""
@@ -2747,10 +2984,23 @@ msgstr ""
 msgid "SMTP settings"
 msgstr "Настройки SMTP"
 
+#. placeholder {0}: stale.join(", ")
+#: src/components/routes/network.tsx
+msgid "Some sources are stale: {0} — data may be incomplete"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "Сортировать по"
+
+#: src/components/routes/network.tsx
+msgid "Source"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Source → target"
+msgstr ""
 
 #: src/components/routes/report.tsx
 msgid "Space freed"
@@ -2781,6 +3031,7 @@ msgstr "Состояние"
 #: src/components/routes/incidents.tsx
 #: src/components/routes/report.tsx
 #: src/components/routes/system/smart-table.tsx
+#: src/components/routes/web.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
@@ -2881,9 +3132,15 @@ msgctxt "Tabs system layout option"
 msgid "Tabs"
 msgstr "Вкладки"
 
+#: src/components/routes/network.tsx
+msgid "Talkers"
+msgstr ""
+
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
 msgid "Target"
 msgstr "Цель"
 
@@ -2949,6 +3206,10 @@ msgstr "Тестовое уведомление отправлено"
 msgid "The monitoring pipeline's own verdict — whether the checks are actually running."
 msgstr ""
 
+#: src/components/routes/network.tsx
+msgid "The network watch has no data yet."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "Общий статус: <0>ok</0>, когда все системы работают, <1>предупреждение</1>, когда сработали оповещения, и <2>ошибка</2>, когда какая-либо система отключена."
@@ -2969,8 +3230,16 @@ msgstr "Затем войдите в бэкенд и сбросьте парол
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "Это действие не может быть отменено. Оно навсегда удалит все текущие записи для {name} из базы данных."
 
+#: src/components/routes/network.tsx
+msgid "This address signed in successfully recently, or its account was reported stolen. A reason is required, and it is audited."
+msgstr ""
+
 #: src/components/routes/ack.tsx
 msgid "This exact alert is silenced for {days} days. The runner is applying it now, about a minute."
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "This finding has no block target, so it cannot be blocked."
 msgstr ""
 
 #: src/components/routes/ack.tsx
@@ -2990,6 +3259,10 @@ msgstr ""
 msgid "This will permanently delete all selected records from the database."
 msgstr "Это навсегда удалит все выбранные записи из базы данных."
 
+#: src/components/routes/network.tsx
+msgid "Threat"
+msgstr ""
+
 #: src/components/routes/system/charts/disk-charts.tsx
 msgid "Throughput of {extraFsName}"
 msgstr "Пропускная способность {extraFsName}"
@@ -2997,6 +3270,11 @@ msgstr "Пропускная способность {extraFsName}"
 #: src/components/routes/system/charts/storage-pool-charts.tsx
 msgid "Throughput of storage pool {displayName}"
 msgstr "Пропускная способность пула хранения {displayName}"
+
+#: src/components/routes/network.tsx
+#: src/components/routes/web.tsx
+msgid "Time"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Time format"
@@ -3166,6 +3444,11 @@ msgstr "Тип"
 msgid "Un-acknowledge"
 msgstr ""
 
+#: src/components/routes/network.tsx
+#: src/components/routes/network.tsx
+msgid "Unblock"
+msgstr ""
+
 #: src/components/live-panels.tsx
 #: src/lib/alerts.ts
 msgid "Unhealthy"
@@ -3189,6 +3472,10 @@ msgstr "Параметры единиц измерения"
 msgid "Universal token"
 msgstr "Универсальный токен"
 
+#: src/components/routes/network.tsx
+msgid "unknown"
+msgstr ""
+
 #. Context: Battery state
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -3200,6 +3487,10 @@ msgstr "Неизвестно"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unlimited"
 msgstr "Неограниченно"
+
+#: src/components/routes/network.tsx
+msgid "Until"
+msgstr ""
 
 #. Context: System is up
 #: src/components/routes/system/info-bar.tsx
@@ -3340,6 +3631,10 @@ msgstr "Хотите помочь нам улучшить наши перево�
 msgid "Wants"
 msgstr "Требует"
 
+#: src/components/routes/network.tsx
+msgid "warning"
+msgstr ""
+
 #: src/components/routes/ack.tsx
 msgid "Warning"
 msgstr ""
@@ -3352,9 +3647,17 @@ msgstr "Предупреждений (%)"
 msgid "Warning thresholds"
 msgstr "Пороги предупреждений"
 
+#: src/components/routes/web.tsx
+#~ msgid "Watching:"
+#~ msgstr ""
+
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Push уведомления"
+
+#: src/components/routes/web.tsx
+msgid "Website"
+msgstr ""
 
 #: src/components/routes/report.tsx
 msgid "Weekly report"
@@ -3380,6 +3683,10 @@ msgstr ""
 msgid "What the engine did, what runs when, and what it told you."
 msgstr ""
 
+#: src/components/routes/network.tsx
+msgid "What the network watch saw, the top talkers and the blocks in force."
+msgstr ""
+
 #: src/components/routes/registry.tsx
 msgid "What the script does"
 msgstr ""
@@ -3403,7 +3710,12 @@ msgstr "При использовании POST каждый heartbeat содер
 #~ msgstr ""
 
 #: src/components/routes/health.tsx
+#: src/components/routes/network.tsx
 msgid "Why"
+msgstr ""
+
+#: src/components/routes/network.tsx
+msgid "Why this address should be blocked"
 msgstr ""
 
 #: src/components/routes/system/charts/wifi-chart.tsx
@@ -3457,3 +3769,7 @@ msgstr "Да"
 #: src/components/routes/settings/layout.tsx
 msgid "Your user settings have been updated."
 msgstr "Ваши настройки пользователя были обновлены."
+
+#: src/components/routes/network.tsx
+msgid "Zone"
+msgstr ""
