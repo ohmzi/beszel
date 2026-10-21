@@ -1,5 +1,5 @@
 // home.ohmz.cloud access log (Ohmz fork). The engine publishes web.json from the origin nginx log, enriched with DB-IP
-// Lite city/ASN, a coarse User-Agent parse and the target-company watchlist. Server-side only: no client tracker, no
+// Lite city/ASN, a coarse User-Agent parse and the network organization. Server-side only: no client tracker, no
 // cookie, no fingerprint. A network organization is the IP owner, not a person; e-mail scanners can appear here too.
 import { Trans } from "@lingui/react/macro"
 import { memo, useEffect } from "react"
@@ -22,14 +22,12 @@ type Row = {
 	referer?: string
 	status?: number
 	bytes?: number
-	target?: string | null
 }
 
 type WebFile = {
 	available?: boolean
 	generated?: number
 	rows?: Row[]
-	targets?: string[]
 	window?: { from?: number | null; to?: number | null }
 	sources?: Record<string, { status?: string; error?: string | null }>
 	note?: string

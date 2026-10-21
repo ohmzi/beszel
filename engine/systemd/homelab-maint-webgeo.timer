@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh DB-IP Lite city/ASN monthly
+
+[Timer]
+OnCalendar=monthly
+Persistent=true
+RandomizedDelaySec=30min
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target

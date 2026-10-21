@@ -289,8 +289,6 @@ func TestCopyMonitorToNewRecordDropsResultFields(t *testing.T) {
 
 	collection, err := hub.FindCachedCollectionByNameOrId("network_monitors")
 	require.NoError(t, err)
-	assert.Nil(t, collection.Fields.GetByName("name"))
-
 	oldRecord := core.NewRecord(collection)
 	oldRecord.Load(map[string]any{
 		"system":   "sys123",

@@ -1,0 +1,14 @@
+[Unit]
+Description=homelab-maint DB-IP city/ASN refresh for the Website page
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Environment=PYTHONPATH=/usr/local/lib/homelab-maint
+ExecStart=/usr/bin/python3 -m homelab_maint.netwatch.webgeo update
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=45min
+SyslogIdentifier=homelab-maint

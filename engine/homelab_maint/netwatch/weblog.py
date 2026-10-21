@@ -2,8 +2,8 @@
 
 The origin is an nginx container behind the host's Cloudflare Tunnel. Its access log is the combined format, captured by
 Docker's json-file driver; this module reads the recent tail with `docker logs`, parses the public requests, resolves the
-city and network organization through DB-IP Lite (`webgeo`), parses the User-Agent for device/browser/OS, and matches the
-network organization against the owner's target-company list.
+city and network organization through DB-IP Lite (`webgeo`), and parses the User-Agent for device/browser/OS. Every visitor
+row carries the network organization, so any known company network is visible.
 
 It is a **server-side** view. There is no client-side tracker, no cookie and no fingerprint: the page behind the hub login
 shows what nginx already recorded, and the User-Agent is the only device signal. A network organization is the owner of the
@@ -114,33 +114,6 @@ def parse_ua(ua: str) -> tuple[str, str, str]:
     return device, browser, os_
 
 
-def load_targets() -> list[dict]:
-    try:
-        doc = core.load_toml(core.CONF_DIR / "web-targets.toml") or {}
-    except Exception:  # noqa: BLE001 - a missing/broken list means no matches, never a failed export
-        return []
-    rows = doc.get("target") if isinstance(doc, dict) else None
-    out = []
-    for row in rows or []:
-        if not isinstance(row, dict) or not row.get("name"):
-            continue
-        match = row.get("match") or []
-        if isinstance(match, str):
-            match = [match]
-        out.append({"name": str(row["name"]), "match": [str(m).casefold() for m in match if str(m).strip()]})
-    return out
-
-
-def match_target(org: str, targets: list[dict]) -> str | None:
-    low = (org or "").casefold()
-    if not low:
-        return None
-    for target in targets:
-        if any(pattern in low for pattern in target["match"]):
-            return target["name"]
-    return None
-
-
 def read_logs(container: str = CONTAINER) -> tuple[list[str], str | None]:
     """The recent Docker log tail for the origin. Returns (lines, error)."""
     if os.environ.get("HOMELAB_MAINT_NO_SYSLOG"):
@@ -155,8 +128,8 @@ def read_logs(container: str = CONTAINER) -> tuple[list[str], str | None]:
 
 
 def build_web(now: float | None = None, logs: list[str] | None = None,
-              geo=None, targets: list[dict] | None = None) -> dict:
-    """The web.json document. `logs`/`geo`/`targets` are injectable for tests."""
+              geo=None) -> dict:
+    """The web.json document. `logs`/`geo` are injectable for tests."""
     now = time.time() if now is None else float(now)
     source_error = None
     if logs is None:
@@ -179,8 +152,6 @@ def build_web(now: float | None = None, logs: list[str] | None = None,
     if own_geo:
         geo = webgeo.GeoLookup()
     geo_ok = getattr(geo, "conn", None) is not None
-    if targets is None:
-        targets = load_targets()
 
     from ..publish import clean  # local: publish imports this module only from a builder
 
@@ -204,7 +175,6 @@ def build_web(now: float | None = None, logs: list[str] | None = None,
             "referer": clean(row["referer"], REF_MAX),
             "status": row["status"],
             "bytes": row["bytes"],
-            "target": match_target(org, targets),
         })
     if own_geo:
         geo.close()
@@ -213,7 +183,6 @@ def build_web(now: float | None = None, logs: list[str] | None = None,
         "generated": now,
         "available": bool(out),
         "rows": out,
-        "targets": [t["name"] for t in targets],
         "window": {"from": out[-1]["ts"] if out else None, "to": out[0]["ts"] if out else None},
         "sources": {
             "nginx": {"status": "ok" if out else ("error" if source_error else "empty"), "error": source_error},

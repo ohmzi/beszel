@@ -1,4 +1,4 @@
-"""Tests for the home.ohmz.cloud access-log export: parsing, filtering, UA parsing and target matching."""
+"""Tests for the home.ohmz.cloud access-log export: parsing, filtering, UA parsing and network enrichment."""
 import conftest  # noqa: F401  (points HOMELAB_MAINT_* at tmp dirs before homelab_maint.core is imported)
 
 from homelab_maint.netwatch import weblog
@@ -36,14 +36,6 @@ def test_parse_ua():
     assert weblog.parse_ua("") == ("", "", "")
 
 
-def test_match_target():
-    targets = [{"name": "Salesforce", "match": ["salesforce"]}, {"name": "Ford", "match": ["ford motor"]}]
-    assert weblog.match_target("Salesforce.com, Inc.", targets) == "Salesforce"
-    assert weblog.match_target("Ford Motor Company", targets) == "Ford"
-    assert weblog.match_target("Cloudflare, Inc.", targets) is None
-    assert weblog.match_target("", targets) is None
-
-
 class FakeGeo:
     conn = object()
 
@@ -58,27 +50,21 @@ class FakeGeo:
         pass
 
 
-def test_build_web_filters_probes_and_matches_target():
-    doc = weblog.build_web(
-        now=NOW,
-        logs=[PROBE, LINE, LINE2],
-        geo=FakeGeo(),
-        targets=[{"name": "Salesforce", "match": ["salesforce"]}],
-    )
+def test_build_web_filters_probes_and_enriches():
+    doc = weblog.build_web(now=NOW, logs=[PROBE, LINE, LINE2], geo=FakeGeo())
     assert doc["available"] is True
     assert len(doc["rows"]) == 2
     assert doc["rows"][0]["ip"] == "1.1.1.1"
     assert doc["rows"][0]["browser"] == "Chrome"
     assert doc["rows"][0]["city"] == "San Francisco"
-    assert doc["rows"][0]["target"] is None
-    assert doc["rows"][1]["target"] == "Salesforce"
+    assert doc["rows"][0]["org"] == "Cloudflare, Inc."
+    assert doc["rows"][1]["org"] == "Salesforce.com, Inc."
     assert doc["rows"][1]["country"] == "US"
-    assert doc["targets"] == ["Salesforce"]
     assert doc["sources"]["geo"]["status"] == "ok"
 
 
 def test_build_web_empty_is_unavailable():
-    doc = weblog.build_web(now=NOW, logs=[PROBE], geo=FakeGeo(), targets=[])
+    doc = weblog.build_web(now=NOW, logs=[PROBE], geo=FakeGeo())
     assert doc["available"] is False
     assert doc["rows"] == []
     assert doc["sources"]["nginx"]["status"] == "empty"
