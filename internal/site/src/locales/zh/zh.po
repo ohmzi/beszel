@@ -882,9 +882,14 @@ msgid "Country"
 msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/charts/load-chart.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "CPU"
+msgstr ""
+
+#: src/components/routes/system/charts/load-chart.tsx
+msgid "CPU and GPU utilization"
 msgstr ""
 
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1470,6 +1475,7 @@ msgid "Global"
 msgstr "全域"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/charts/load-chart.tsx
 msgid "GPU"
 msgstr ""
 
@@ -1717,6 +1723,10 @@ msgstr "限制"
 
 #: src/components/live-panels.tsx
 msgid "Live monitor"
+msgstr ""
+
+#: src/components/routes/system/charts/load-chart.tsx
+msgid "Load"
 msgstr ""
 
 #: src/components/routes/system/charts/load-average-chart.tsx
