@@ -74,6 +74,20 @@ WEAK = re.compile(
 #     starting before its state file exists; it proceeds regardless.
 #   * fsverity "operation not supported" -- the host filesystem lacks fsverity;
 #     buildx reports it and carries on.
+#   * postgres "cannot connect to invalid database \"sure_test_N\"" -- the Sure
+#     test suite creates and drops throwaway databases on devcontainer-db-1 in
+#     parallel, and clients still connecting to one that has just gone log this
+#     FATAL. Scoped to the `sure_test_` prefix: an invalid REAL database name is
+#     still a finding.
+#   * Jackett "IndexerException ... Connection refused" -- an external indexer
+#     is unreachable; Jackett itself is healthy and reports it per query. The
+#     two .NET inner-exception lines that follow the same failure are covered
+#     too (they carry no "IndexerException" word of their own).
+#   * SABnzbd "No such file or directory ... /_UNPACK_..." -- a failed download
+#     is renamed to _FAILED_ while the unpacker still holds the old path; the
+#     container carries on. Scoped to the _UNPACK_ path.
+#   * nginx "open() ... apple-touch-icon... failed" -- a browser requests an
+#     icon the site does not ship; a normal 404, not a missing file it needs.
 BENIGN = re.compile(
     r"(level=(info|debug|trace))"
     r"|(\b(INFO|DEBUG|TRACE)\b)"
@@ -87,7 +101,12 @@ BENIGN = re.compile(
     r"|(role \".*\" does not exist)"
     r"|(database \".*\" does not exist)"
     r"|(Can't open global server state file)"
-    r"|(fsverity)",
+    r"|(fsverity)"
+    r"|(cannot connect to invalid database \"sure_test_)"
+    r"|(Jackett\.Common\.IndexerException)"
+    r"|(---> System\.Net\.(Http\.HttpRequestException|Sockets\.SocketException))"
+    r"|(No such file or directory: '[^']*/_UNPACK_)"
+    r"|(apple-touch-icon)",
     re.IGNORECASE,
 )
 
