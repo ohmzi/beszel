@@ -884,29 +884,38 @@ def c_alerts(cx: Cx) -> dict:
     ttl, cap = retry["outbox_ttl_s"], int(retry["outbox_max"])
     warn_s = o.num("outbox_warn_s", 60, 86400)
     box = [e for e in st.get("outbox") or [] if isinstance(e, dict)] if isinstance(st.get("outbox"), list) else []
+    # Deferred delivery also parks WARNINGS in the outbox while the daily budget is spent. Only a critical page says the transport
+    # is failing; a queued warning is best-effort and is re-sent by its own reminder (kept for the message, not the verdict).
+    crit = [e for e in box if ((e.get("snap") or {}).get("sev", "crit") == "crit")]
+    queued = [e for e in box if e not in crit]
     ages = []
-    for e in box:                                           # notify's own reading: a first attempt stamped in the future is brand new, a missing one is old
+    for e in crit:                                          # notify's own reading: a first attempt stamped in the future is brand new, a missing one is old
         t = _num(e.get("ts"))
         ages.append(max(now - t, 0.0) if t is not None else warn_s + 1)
     oldest = max(ages, default=0.0)
+    q_ages = [max(now - _num(e.get("ts")), 0.0) if _num(e.get("ts")) is not None else warn_s + 1 for e in queued]
+    q_txt = f"{len(queued)} warning(s) queued by the daily budget" + (f" (oldest {_dur(max(q_ages))})" if q_ages else "")
     bk = st.get("breaker") if isinstance(st.get("breaker"), dict) else {}
     until, fails = _num(bk.get("until")) or 0.0, int(_num(bk.get("n")) or 0)
     open_ = now < until <= now + BREAKER_MAX_S
-    cx.m.update(outbox_n=len(box), outbox_oldest_s=int(oldest), breaker_open=open_)
-    n_txt = f"{len(box)} critical page(s) could not be delivered, the oldest for {_dur(oldest)}"
-    if box and (oldest >= ttl / 2 or len(box) >= cap):
+    cx.m.update(outbox_n=len(box), outbox_crit_n=len(crit), outbox_oldest_s=int(oldest), breaker_open=open_)
+    n_txt = f"{len(crit)} critical page(s) could not be delivered, the oldest for {_dur(oldest)}"
+    suffix = f"; {q_txt}" if queued else ""
+    if crit and (oldest >= ttl / 2 or len(box) >= cap):
         why_ = f"the outbox is full ({len(box)}): pages are being dropped" if len(box) >= cap else f"a critical page has waited {_dur(oldest)} for delivery"
         return _row("down", f"{n_txt}: nobody can be paged", f"alerts are not reaching you: {why_}", hint, oldest, ttl / 2)
     last = (_ascii(bk.get("why"), 60) if bk.get("why") else "no reason logged")
-    if box and oldest >= warn_s:
-        return _row("degraded", f"{n_txt}" + (f"; transport circuit open ({fails} failures, last: {last})" if open_ else ""),
-                    f"{len(box)} critical page(s) undelivered for {_dur(oldest)}: the alert transport is failing", hint, oldest, warn_s)
+    if crit and oldest >= warn_s:
+        return _row("degraded", f"{n_txt}" + (f"; transport circuit open ({fails} failures, last: {last})" if open_ else "") + suffix,
+                    f"{len(crit)} critical page(s) undelivered for {_dur(oldest)}: the alert transport is failing", hint, oldest, warn_s)
     if open_:
         return _row("degraded", f"the alert transport circuit is open for {_dur(until - now)} more ({fails} failure(s), last: {last})",
                     "the alert transport is failing: alerts are being held", hint)
     if fails >= o.num("breaker_fail_n", 1, 1000) and 0 <= now - until < 7200:
         return _row("degraded", f"{fails} alert transport failures in a row, none delivered since (last: {last})", "the alert transport keeps failing", hint)
-    return _row("ok", f"{len(box)} critical page(s) waiting for a retry, the oldest {_dur(oldest)}" if box else "no undelivered critical page, transport circuit closed")
+    if crit:
+        return _row("ok", f"{len(crit)} critical page(s) waiting for a retry, the oldest {_dur(oldest)}" + suffix)
+    return _row("ok", f"no undelivered critical page, transport circuit closed" + (f"; {q_txt}" if queued else ""))
 
 
 # --------------------------------------------------------------------------- row: website
