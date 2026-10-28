@@ -2211,6 +2211,7 @@ def _default_notify(ev: dict) -> None:
 
 # =================================================================== audit: is anything scheduled that the inventory does not know?
 _TOKEN_RX = re.compile(r"[A-Za-z0-9@._-]+")
+_KEEP_PATH_RX = re.compile(r"/[A-Za-z0-9@._/-]+")
 CRON_DIRS = ("/etc/cron.d", "/etc/cron.hourly", "/etc/cron.daily", "/etc/cron.weekly", "/etc/cron.monthly")
 
 
@@ -2243,6 +2244,10 @@ def audit(host: Host | None = None, inv: Inventory | None = None, users: tuple[s
         for a in it.actions:
             if a["do"] == "cron_comment":
                 selectors.setdefault(a["user"], []).append((a.get("tag"), a.get("match")))
+    # A KEPT/OBSERVED item names the script it knows about (a keep item cannot carry a retire action). A cron line that runs
+    # that exact path is accounted for: the inventory knows it exists and why it stays. Whole paths, not loose words.
+    kept_paths = {m.rstrip(".,;") for it in inv.items if it.mode in ("observe", "keep")
+                  for m in _KEEP_PATH_RX.findall(it.location)}
     for user in ("root", *users):
         try:
             text = host.crontab_read(user)
@@ -2251,7 +2256,8 @@ def audit(host: Host | None = None, inv: Inventory | None = None, users: tuple[s
             continue
         seen = {i for tag, match in selectors.get(user, []) for i in cron_find(text, tag, match)}
         for i, ln in enumerate(text.split("\n")):
-            if _cron_active(ln) and not re.match(r"\s*[A-Za-z_][A-Za-z0-9_]*\s*=", ln) and i not in seen:     # NAME=value lines are not jobs
+            if _cron_active(ln) and not re.match(r"\s*[A-Za-z_][A-Za-z0-9_]*\s*=", ln) and i not in seen \
+                    and not any(p in ln for p in kept_paths):     # NAME=value lines are not jobs
                 out["cron"].append({"user": user, "line": ln.strip()[:120]})
     for d in CRON_DIRS:
         try:

@@ -1848,6 +1848,21 @@ def test_audit_reports_a_new_timer_cron_line_or_cron_file_nobody_accounted_for(t
     assert a["files"] == ["/etc/cron.daily/brand-new"]
 
 
+def test_audit_a_kept_cron_line_is_accounted_by_the_item_that_names_its_script(tmp_path):
+    """A cron line belonging to a KEPT script (app plumbing the umbrella does not own) is accounted for by the keep item
+    that names the script's path; a different path in the same crontab is still unaccounted."""
+    items = [*AUDIT_ITEMS, {"name": "sure-backup", "kind": "cron", "mode": "keep", "wave": 3, "unmonitored": "kept",
+                            "location": "ohmz crontab: 17 3 * * * /home/ohmz/StudioProjects/sure/deploy/backup.sh"}]
+    ah = AuditHost(tmp_path, timers=["apt-daily.timer", "fstrim.timer"], user_timers=["snap.thing.notifier.timer"],
+                   cron={"root": "", "ohmz": "17 3 * * * /home/ohmz/StudioProjects/sure/deploy/backup.sh >> log 2>&1\n"})
+    a = legacy.audit(ah.host, parse_inventory({"item": items}), users=("ohmz",))
+    assert a["ok"] is True, a
+    ah = AuditHost(tmp_path, timers=["apt-daily.timer", "fstrim.timer"], user_timers=["snap.thing.notifier.timer"],
+                   cron={"root": "", "ohmz": "17 3 * * * /home/ohmz/StudioProjects/other/deploy/backup.sh\n"})
+    a = legacy.audit(ah.host, parse_inventory({"item": items}), users=("ohmz",))
+    assert [c["line"] for c in a["cron"]] == ["17 3 * * * /home/ohmz/StudioProjects/other/deploy/backup.sh"]
+
+
 def test_audit_matches_whole_names_not_substrings(tmp_path):
     a = audit_of(tmp_path, timers=["daily.timer", "apt.timer", "sneaky-apt-daily.timer"])
     assert [t["unit"] for t in a["timers"]] == ["daily.timer", "apt.timer", "sneaky-apt-daily.timer"]
