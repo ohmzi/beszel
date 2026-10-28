@@ -2017,8 +2017,22 @@ def _zstd_ok(path: Path) -> bool | None:
     return None if v in ("missing", "timeout") else v == "ok"
 
 
-def _dump_rows(dump_dir: Path, now: float, max_age_d: float, max_mib: float) -> tuple[list[dict], list[str]]:
-    """Newest dump per prefix (immich-2026-09-26.sql.zst -> immich): present, recent, non-empty, and (small ones) zstd -t."""
+def _container_absent(name: str) -> bool:
+    """True only when docker positively says the container does not exist ("No such object"). A docker that is missing, erroring
+    or cannot answer is NOT proof of retirement: the stale dump stays a finding (fail closed)."""
+    r = sh(["docker", "inspect", name], timeout=15)
+    if r.returncode == 0:
+        return False
+    return "no such object" in ((r.stdout or "") + (r.stderr or "")).lower()
+
+
+def _dump_rows(dump_dir: Path, now: float, max_age_d: float, max_mib: float,
+               sources: dict[str, str] | None = None) -> tuple[list[dict], list[str]]:
+    """Newest dump per prefix (immich-2026-09-26.sql.zst -> immich): present, recent, non-empty, and (small ones) zstd -t.
+
+    `sources` maps a dump prefix to the database container it comes from. A dump older than max_age_d whose source container does
+    not exist at all is reported as retired, not as a broken backup: the service is gone, so the newest file is history. A source
+    that still exists but is stopped (or a docker that cannot answer) does not excuse the stale dump."""
     newest: dict[str, tuple[float, Path, int]] = {}
     try:
         for p in dump_dir.iterdir():
@@ -2036,6 +2050,8 @@ def _dump_rows(dump_dir: Path, now: float, max_age_d: float, max_mib: float) -> 
         row = {"item": f"dump {k}", "age_d": round(age, 1), "size": human(size), "check": "size"}
         if size < 1024:
             bad.append(f"{k} dump empty")
+        elif age > max_age_d and (sources or {}).get(k) and _container_absent(sources[k]):
+            row["check"] = "retired (source absent)"
         elif age > max_age_d:
             bad.append(f"{k} dump {age:.0f} d old")
         elif size <= max_mib * 1024 * 1024:
@@ -2050,7 +2066,7 @@ def _dump_rows(dump_dir: Path, now: float, max_age_d: float, max_mib: float) -> 
     return rows, bad
 
 
-@register_task("routine_backup_verify", klass="C0", tier="weekly", title="Backup verification", timeout=600)
+@register_task("routine_backup_verify", klass="C0", tier="weekly", title="Backup verification", timeout=1200)
 def backup_verify(ctx: Ctx) -> Result:
     """Beyond 'did it run': each backup status says ok with no errors, is recent, its target is mounted with free space, the
     newest database dumps exist and (small ones) pass zstd -t, the restore tooling sits next to the backup."""
@@ -2096,8 +2112,10 @@ def backup_verify(ctx: Ctx) -> Result:
         rows.append({"item": f"backup {job}", "age_d": round(age_h / 24, 1) if age_h is not None else -1,
                      "size": _safe(d.get("files_summary", ""), 40), "check": "ok" if not problems else _safe("; ".join(problems), 80)})
         bad += [f"{job}: {p}" for p in problems]
+    sources = o("dump_sources", {}) or {}
     for dd in _strs(o("dump_dirs", ["/mnt/backup/system/dbdumps"])):
-        r2, b2 = _dump_rows(Path(dd), ctx.now, _num(o("dump_max_age_days", 10), 10) or 10, _num(o("integrity_max_mib", 64), 64) or 64)
+        r2, b2 = _dump_rows(Path(dd), ctx.now, _num(o("dump_max_age_days", 10), 10) or 10,
+                            _num(o("integrity_max_mib", 64), 64) or 64, sources)
         rows += r2
         bad += b2
     ok_file = o("stack_last_ok", "/media/SandiskSSD/ai-stack-backups/LAST_OK")
@@ -2111,9 +2129,9 @@ def backup_verify(ctx: Ctx) -> Result:
             bad.append("stack-backup LAST_OK missing")
     if not files and not rows:
         return _res("info", "backup verification: no backup status files found", {"backups": 0})
-    n_ok = sum(1 for r in rows if r["check"] in ("ok", "size", "zstd -t ok"))
+    n_ok = sum(1 for r in rows if r["check"] in ("ok", "size", "zstd -t ok", "retired (source absent)"))
     return _res("warn" if bad else "ok", ("backup verification FAILED: " + "; ".join(bad)) if bad else f"backups verified: {len(rows)} item(s) checked, all ok",
-                {"checked": len(rows), "ok": n_ok, "problems": len(bad)}, sorted(rows, key=lambda r: r["check"] in ("ok", "size", "zstd -t ok")), alert=bool(bad))
+                {"checked": len(rows), "ok": n_ok, "problems": len(bad)}, sorted(rows, key=lambda r: r["check"] in ("ok", "size", "zstd -t ok", "retired (source absent)")), alert=bool(bad))
 
 
 # --------------------------------------------------------------------------- monthly: restore drill checklist

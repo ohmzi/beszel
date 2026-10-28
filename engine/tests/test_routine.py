@@ -1427,6 +1427,34 @@ def test_backup_verify_all_good_and_each_failure(w, tmp_path):
     assert routine.backup_verify(c()).summary == "backup verification: no backup status files found"
 
 
+def _retired_dump(w, tmp_path, *, inspect_out, inspect_rc):
+    tgt = make_backups(w, tmp_path)
+    f = tgt / "dbdumps" / "paperless-2026-08-01.sql.zst"
+    f.write_bytes(b"x" * 2000)
+    os.utime(f, (NOW_BK - 30 * 86400, NOW_BK - 30 * 86400))
+    w.sh.when(["docker", "inspect", "paperless-db"], inspect_out, rc=inspect_rc)
+    w.maint(MAINT + f'[tasks.routine_backup_verify]\nstatus_glob = "{tmp_path}/logs/*-status.json"\ndump_dirs = ["{tgt}/dbdumps"]\n'
+                    f'stack_last_ok = "{tmp_path}/LAST_OK"\ndump_sources = {{ paperless = "paperless-db" }}\n')
+    return routine.backup_verify(Ctx(core.load_config(), "routine_backup_verify", False, NOW_BK))
+
+
+def test_backup_verify_retired_dump_source_is_not_a_failure(w, tmp_path):
+    """A dump whose source container no longer exists (the service was retired) is reported, not paged: the stale file is history,
+    not a broken backup."""
+    r = _retired_dump(w, tmp_path, inspect_out="Error: No such object: paperless-db", inspect_rc=1)
+    assert r.status == "ok" and not r.alert
+    row = next(i for i in r.items if i["item"] == "dump paperless")
+    assert row["check"] == "retired (source absent)"
+
+
+def test_backup_verify_stale_dump_with_a_live_source_still_fails(w, tmp_path):
+    """Only a source that does not exist excuses a stale dump: a stopped or unreadable source must still warn."""
+    r = _retired_dump(w, tmp_path, inspect_out="exited\n", inspect_rc=0)
+    assert r.status == "warn" and r.alert and "paperless dump 30 d old" in r.summary
+    r = _retired_dump(w, tmp_path, inspect_out="<command failed: docker not found>", inspect_rc=1)
+    assert r.status == "warn" and "paperless dump 30 d old" in r.summary
+
+
 def test_backup_verify_zstd_timeout_is_not_corruption(w, tmp_path):
     """A stalled backup disk (zstd -t killed by the timeout, rc 124) must read "unverified", never "CORRUPT"; one retry may rescue it;
     after a double timeout the remaining dumps are not probed (the task keeps its time budget)."""
