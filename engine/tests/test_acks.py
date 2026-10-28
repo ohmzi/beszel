@@ -1627,8 +1627,8 @@ class TestCli:
         key = ready()
         write_status({"t": ent("warn", "warn: x")})
         tok = acks.issue_token(fp_of("t", "warn: x"), "t", "T", "x", "warn", NOW)
-        submit(email_req(tok, ts=time.time()), key)
-        assert acks.run_once(time.time(), refresh=False)["applied"] == 1
+        submit(email_req(tok, ts=NOW), key)
+        assert acks.run_once(NOW, refresh=False)["applied"] == 1
         out = capsys.readouterr().out
         assert tok not in out
 
