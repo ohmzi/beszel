@@ -2426,10 +2426,18 @@ def doctor(cfg: dict | None = None) -> list[tuple[str, bool, str]]:
                  f"{len(st.get('pending') or [])} text(s) retried every {int(_num(nc['retry'].get('sms_gap_s'), 300) // 60)} min "
                  "(the email went, the SMS leg failed)"))
     box = [e for e in st.get("outbox") or [] if isinstance(e, dict) and e.get("kind") not in NOTICE_KINDS]     # (a queued expiry notice is no page)
-    oldest = min(max((_oage(now, e.get("ts")) for e in box), default=0), 10 ** 9)
-    rows.append(("no critical page waiting in the outbox", not box,
-                 f"{len(box)} page(s) could not be delivered (oldest first tried {T.dur(oldest)} ago), replayed with back-off for up to "
-                 f"{int(_num(nc['retry'].get('outbox_ttl_s'), 43200) // 3600)} h: {'; '.join(str(e.get('why') or '?')[:50] for e in box[:3])}"))
+    # The deferring notifier (cmd_run) queues WARNINGS as well while the daily budget is spent. Only a critical page means
+    # delivery is broken; a queued warning is best-effort and says nothing about the transport.
+    crit = [e for e in box if str((e.get("snap") or {}).get("sev") or "crit") == "crit"]
+    other = [e for e in box if e not in crit]
+    oldest = min(max((_oage(now, e.get("ts")) for e in crit), default=0), 10 ** 9)
+    rows.append(("no critical page waiting in the outbox", not crit,
+                 f"{len(crit)} page(s) could not be delivered (oldest first tried {T.dur(oldest)} ago), replayed with back-off for up to "
+                 f"{int(_num(nc['retry'].get('outbox_ttl_s'), 43200) // 3600)} h: {'; '.join(str(e.get('why') or '?')[:50] for e in crit[:3])}"))
+    if other:
+        q_oldest = min(max((_oage(now, e.get("ts")) for e in other), default=0), 10 ** 9)
+        rows.append((f"{len(other)} warning(s) queued for delivery", True,
+                     f"best-effort, held by policy or budget (oldest {T.dur(q_oldest)}); they are replayed, not lost"))
     ac = ack_cfg(nc)
     rows.append(("acknowledgements available (button + suppression)", not ac["enabled"] or acks_loader() is not None,
                  "homelab_maint/acks.py is missing or does not import: alerts are sent as before, with no Acknowledge button"))

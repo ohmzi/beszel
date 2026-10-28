@@ -1452,6 +1452,22 @@ def test_alerts_outbox_age_thresholds(w, age, state):
     assert (w.assess()["level"], ) == ({"ok": "ok", "degraded": "degraded", "down": "down"}[state], )
 
 
+def test_alerts_queued_warnings_are_not_critical_pages(w):
+    """Deferred delivery puts warnings in the outbox too. A warning held by the daily budget says nothing about the transport,
+    so it must not turn into 'nobody can be paged'."""
+    w.notify_state(outbox=[box_entry(7 * H, snap={"title": "SECRET TITLE xyz", "kind": "alert", "sev": "warn"})])
+    r = row(w.assess(), "alerts")
+    assert r["state"] == "ok" and "critical page(s)" not in r["detail"] and "warning(s) queued" in r["detail"]
+    assert w.assess()["metrics"]["outbox_n"] == 1 and w.assess()["metrics"]["outbox_crit_n"] == 0
+
+
+def test_alerts_one_critical_page_still_degrades_with_warnings_queued(w):
+    w.notify_state(outbox=[box_entry(4 * H, snap={"title": "SECRET TITLE xyz", "kind": "alert", "sev": "crit"}),
+                           box_entry(7 * H, snap={"title": "SECRET TITLE xyz", "kind": "alert", "sev": "warn"})])
+    r = row(w.assess(), "alerts")
+    assert r["state"] == "degraded" and "1 critical page(s)" in r["detail"] and "1 warning(s) queued" in r["detail"]
+
+
 def test_alerts_outbox_thresholds_follow_notify_toml(w):
     (w.conf / "notify.toml").write_text("[retry]\noutbox_ttl_s = 3600\noutbox_max = 3\n")
     w.notify_state(outbox=[box_entry(1900)])                                                          # 31 min > ttl/2

@@ -3620,6 +3620,19 @@ def test_the_two_outbox_classes_are_capped_independently_and_a_notice_replay_nev
     assert [m.subject for m in fk.calls][:2] == ["[homelab] CRIT Page 1", "[homelab] CRIT Page 2"] or all("Page" in m.subject for m in fk.calls[:2])
 
 
+def test_doctor_a_deferred_warning_is_not_a_critical_page(monkeypatch):
+    """cmd_run's deferring notifier queues warnings too. A warning held by the daily budget must not make doctor report a
+    failed transport; it is reported, but it is not a page."""
+    st = {"v": 1, "sent": [], "dedupe": {}, "esc": {}, "outbox": [
+        {"kind": "alert", "key": "k", "snap": {"kind": "alert", "sev": "warn", "title": "w"},
+         "ts": NOON - 3600, "why": "budget"}]}
+    (core.STATE_DIR / "notify-state.json").write_text(json.dumps(st))
+    rows = {label: (ok, hint) for label, ok, hint in notify.doctor(cfgx())}
+    assert rows["no critical page waiting in the outbox"][0] is True
+    label = next(label for label in rows if "warning(s) queued" in label)
+    assert "1 warning(s) queued" in label and rows[label][0] is True
+
+
 def test_doctor_and_export_do_not_call_a_queued_notice_a_critical_page(acks):
     notify.send_expired(expiry_items(1), cfgx(), NOON, transport=down())
     rows = {label: (ok, hint) for label, ok, hint in notify.doctor(cfgx())}
