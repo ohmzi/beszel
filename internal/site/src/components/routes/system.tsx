@@ -20,7 +20,7 @@ import {
 	LazyZfsTable,
 } from "./system/lazy-tables"
 import { LoadAverageChart } from "./system/charts/load-average-chart"
-import { MaintenanceChart } from "./system/charts/maintenance-chart"
+import { SystemLoadChart } from "./system/charts/load-chart"
 
 import { ContainerIcon, CpuIcon, HardDriveIcon, NetworkIcon } from "lucide-react"
 import { GpuIcon } from "../ui/icons"
@@ -131,7 +131,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 
 					<LoadAverageChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} />
 
-						<MaintenanceChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} />
+						<SystemLoadChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} />
 
 					<TemperatureChart {...coreProps} />
 
@@ -195,7 +195,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 						<CpuChart {...coreProps} />
 						<LoadAverageChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} />
 
-						<MaintenanceChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} />
+						<SystemLoadChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} />
 						<MemoryChart {...coreProps} />
 						<SwapChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} systemStats={systemStats} />
 						<TemperatureChart {...coreProps} setPageBottomExtraMargin={setPageBottomExtraMargin} />
