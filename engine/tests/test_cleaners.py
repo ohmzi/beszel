@@ -34,10 +34,12 @@ class FakeSh:
     def __init__(self, *rows):
         self.rows = list(rows)
         self.calls: list[str] = []
+        self.envs: list[dict] = []
 
     def __call__(self, cmd, timeout=60, **kw):
         key = cmd if isinstance(cmd, str) else " ".join(cmd)
         self.calls.append(key)
+        self.envs.append(dict(kw.get("env") or {}))
         for prefix, resp in self.rows:
             if key.startswith(prefix):
                 rc, out, err = resp(key) if callable(resp) else resp
@@ -594,6 +596,46 @@ def test_docker_cache_byte_cap_skips_oversized_prune(tmp_path, monkeypatch):
     sh = cache_sh(monkeypatch, {"default": "22GB"})
     res = cl.docker_cache(mk("docker_cache", apply=True, high_gib=15, low_gib=8, max_gib_per_run=5))
     assert sh.mutating() == [] and res.metrics["oversize"] == 1
+
+
+def test_docker_cache_discovers_builders_from_another_docker_config(tmp_path, monkeypatch):
+    """The daily service runs as root; root cannot see the owner's buildx builders. Each configured DOCKER_CONFIG is scanned, and
+    its builders are measured and pruned with that same config."""
+    owner = tmp_path / "owner-docker"
+    (owner / "buildx").mkdir(parents=True)
+    root_ls = json.dumps({"Name": "default", "Nodes": [{"Status": "running"}]})
+    owner_ls = json.dumps({"Name": "immaculaterr-builder", "Nodes": [{"Status": "running"}]})
+    seq = iter([root_ls, owner_ls])
+
+    def ls(cmd):
+        return ok(next(seq))
+
+    def du(cmd):
+        return ok(du_text("50GB" if "immaculaterr-builder" in cmd else "5GB"))
+
+    sh = use_sh(monkeypatch, ("docker buildx ls", ls), ("docker buildx du", du),
+                ("docker buildx prune", lambda c: (0, "", "")))
+    res = cl.docker_cache(mk("docker_cache", apply=True, high_gib=15, low_gib=8, max_gib_per_run=100,
+                             builder_configs=[str(owner)]))
+    assert res.status == "ok" and [a["target"] for a in audit_rows(tmp_path)] == ["builder:immaculaterr-builder"]
+    i = next(i for i, c in enumerate(sh.calls) if c.startswith("docker buildx prune"))
+    assert sh.calls[i] == f"docker buildx prune --builder immaculaterr-builder -f --max-used-space {8 * GIB}"
+    assert sh.envs[i]["DOCKER_CONFIG"] == str(owner)
+
+
+def test_docker_cache_age_filter_reaches_the_prune_command(tmp_path, monkeypatch):
+    sh = cache_sh(monkeypatch, {"default": "30GB"})
+    cl.docker_cache(mk("docker_cache", apply=True, high_gib=15, low_gib=8, max_age_hours=168))
+    assert sh.mutating() == [f"docker buildx prune --builder default -f --filter until=168h --max-used-space {8 * GIB}"]
+
+
+def test_docker_cache_ignores_a_missing_builder_config_dir(tmp_path, monkeypatch):
+    sh = cache_sh(monkeypatch, {"default": "30GB"})
+    res = cl.docker_cache(mk("docker_cache", high_gib=15, low_gib=8,
+                             builder_configs=["/nonexistent/docker", 7]))
+    assert res.status == "info"                                   # report mode still lists the default builder
+    assert sum(1 for c in sh.calls if c.startswith("docker buildx ls")) == 1
+    assert all("DOCKER_CONFIG" not in e for e in sh.envs)
 
 
 # =========================================================================== docker_images

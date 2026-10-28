@@ -1492,14 +1492,21 @@ def docker_prune_parity(ctx: Ctx) -> Result:
             "entries unused > 7 d below the cap are kept; " + (f"add {CACHE_AGE_OPTION}" if supported else "docker_cache has no age option yet"))
     # 4. builder visibility (the script ran with DOCKER_CONFIG=<owner>/.docker; as root docker_cache sees only root's).
     #    docker_cache only prunes RUNNING builders, so that is the set compared.
-    owner = _owner_builders(str(ctx.opt("legacy_docker_config", LEGACY_DOCKER_PRUNE["docker_config"])))
+    owner_cfg = str(ctx.opt("legacy_docker_config", LEGACY_DOCKER_PRUNE["docker_config"]))
+    owner = _owner_builders(owner_cfg)
     seen = _buildx_names(running_only=True)
+    reachable = owner_cfg in {str(c) for c in (cache.get("builder_configs") or []) if isinstance(c, str)}
     if owner is None or seen is None:
         add("builder discovery", "DOCKER_CONFIG=owner dir", "unknown", "gap", "cannot read the owner's buildx store or docker")
     else:
         missing = sorted(set(owner) - set(seen))
-        add("builder discovery", f"owner builders {', '.join(owner) or '-'}", f"runner prunes running: {', '.join(seen) or '-'}",
-            "gap" if missing else "same", f"not pruned by docker_cache: {', '.join(missing)}" if missing else "")
+        if missing and reachable:
+            add("builder discovery", f"owner builders {', '.join(owner) or '-'}",
+                f"docker_cache builder_configs includes {owner_cfg}", "same",
+                "reachable by docker_cache; not by a bare buildx ls")
+        else:
+            add("builder discovery", f"owner builders {', '.join(owner) or '-'}", f"runner prunes running: {', '.join(seen) or '-'}",
+                "gap" if missing else "same", f"not pruned by docker_cache: {', '.join(missing)}" if missing else "")
     # 5. volumes and schedule
     vp = leg.get("volume_prune")
     add("volumes", "never pruned" if vp is False else ("PRUNES VOLUMES" if vp else "unknown"), "never pruned",

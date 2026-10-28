@@ -2958,13 +2958,16 @@ def test_exposure_real_stack_recovery_after_the_owner_acts(tmp_path, monkeypatch
 
 # --------------------------------------------------------------------------- docker_prune_parity: the build-cache age option and builders
 def test_parity_age_option_the_task_ignores_is_a_gap(tmp_path, monkeypatch):
-    """REGRESSION: `max_age_hours` present in the config made the verdict `same`, but cleaners.docker_cache did not implement
-    it: gaps went to 0 and the cutover gate went through while the age filter was silently ignored."""
+    """REGRESSION: `max_age_hours` present in the config made the verdict `same`, but a cleaners.docker_cache that does not
+    implement it made gaps go to 0 and the cutover gate go through while the age filter was silently ignored. The real task
+    now implements the option, so `age=False` simulates a task that does not."""
     builders = ("default", "immaculaterr-builder")
+    assert nv._cache_age_supported() is True                        # the real cleaners module implements the option
+    monkeypatch.setattr(nv, "_cache_age_supported", lambda: False)  # simulate a task that does not
     res, _ = parity_run(tmp_path, monkeypatch, cache={"mode": "apply", "max_age_hours": 168}, images={"mode": "apply"},
                         cont={"mode": "apply"}, builders=builders, age=False)
     row = next(i for i in res.items if i["behaviour"] == "build cache age filter")
-    assert nv._cache_age_supported() is False                       # the real cleaners module: no such option today
+    assert nv._cache_age_supported() is False
     assert row["verdict"] == "gap" and "ignores it" in row["native"] and "not implemented" in row["note"]
     assert res.metrics["gaps"] == 1 and res.metrics["cutover_ready"] is False and res.status == "warn"
     res, _ = parity_run(tmp_path, monkeypatch, builders=builders, age=False)
@@ -3004,6 +3007,15 @@ def test_cache_age_support_follows_the_real_function_or_a_capability_table(monke
     monkeypatch.setattr(inspect, "getsource", lambda f: (_ for _ in ()).throw(OSError("no source")))
     monkeypatch.delattr(cleaners, "CAPABILITIES")
     assert nv._cache_age_supported() is False                                                      # unknown = no
+
+
+def test_parity_builder_discovery_accepts_a_configured_owner_docker_config(tmp_path, monkeypatch):
+    """docker_cache reaches the owner's builders via builder_configs; the parity gate must count that as covered."""
+    res, _ = parity_run(tmp_path, monkeypatch, cache={"mode": "apply", "max_age_hours": 168,
+                                                      "builder_configs": [str(tmp_path / "dockercfg")]},
+                        builders=("default",))
+    assert verdicts(res)["builder discovery"] == "same"
+    assert res.metrics["gaps"] == 0
 
 
 def test_parity_builder_discovery_counts_only_running_builders(tmp_path, monkeypatch):

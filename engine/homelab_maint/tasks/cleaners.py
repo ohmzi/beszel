@@ -131,9 +131,9 @@ def _busy(name: str) -> tuple[bool, str]:
         return True, f"gate error: {type(exc).__name__}"
 
 
-def _run_ok(cmd: list[str], timeout: int) -> str:
+def _run_ok(cmd: list[str], timeout: int, env: dict | None = None) -> str:
     """Run a mutating command; raise with a short reason unless it exits 0 (ctx.act audits the failure)."""
-    r = sh(cmd, timeout=timeout)
+    r = sh(cmd, timeout=timeout, env=env)
     if r.returncode != 0:
         raise RuntimeError(f"{cmd[0]} {cmd[1] if len(cmd) > 1 else ''} rc={r.returncode}: "
                            f"{(r.stderr or r.stdout).strip()[-100:]}")
@@ -293,9 +293,27 @@ def _skipped(why: str, **metrics: Any) -> Result:
 
 
 # =========================================================================== docker_cache
-def _builders() -> list[str] | None:
+def _docker_env(config: str | None) -> dict | None:
+    """DOCKER_CONFIG for a builder that belongs to another user's docker config, None for the process's own."""
+    return {"DOCKER_CONFIG": config} if config else None
+
+
+def _builder_configs(ctx: Ctx) -> list[str | None]:
+    """The docker configs to scan, the process's own first. `builder_configs` lists absolute DOCKER_CONFIG dirs (the daily service
+    runs as root and cannot see the owner's buildx builders). An entry that is not an existing directory is ignored."""
+    out: list[str | None] = [None]
+    raw = ctx.opt("builder_configs", []) or []
+    if not isinstance(raw, list):
+        return out
+    for c in raw:
+        if isinstance(c, str) and os.path.isdir(c) and c not in out:
+            out.append(c)
+    return out
+
+
+def _builders(config: str | None = None) -> list[str] | None:
     """Names of RUNNING buildx builders (`docker buildx ls --format json`), None if docker cannot say."""
-    r = sh(["docker", "buildx", "ls", "--format", "json"], timeout=30)
+    r = sh(["docker", "buildx", "ls", "--format", "json"], timeout=30, env=_docker_env(config))
     if r.returncode != 0:
         return None
     out = []
@@ -307,9 +325,9 @@ def _builders() -> list[str] | None:
     return out
 
 
-def _builder_size(name: str) -> int | None:
+def _builder_size(name: str, config: str | None = None) -> int | None:
     """Total build-cache bytes of a builder from the `Total:` footer of `docker buildx du`."""
-    r = sh(["docker", "buildx", "du", "--builder", name], timeout=120)
+    r = sh(["docker", "buildx", "du", "--builder", name], timeout=120, env=_docker_env(config))
     if r.returncode != 0:
         return None
     for ln in reversed(r.stdout.splitlines()):
@@ -320,21 +338,32 @@ def _builder_size(name: str) -> int | None:
 
 @task("docker_cache", klass="C1", tier="daily", title="Docker build cache", timeout=1800)
 def docker_cache(ctx: Ctx) -> Result:
-    """Prune each builder's cache LRU-style down to `low_gib` once it exceeds `high_gib`. Never volumes."""
+    """Prune each builder's cache LRU-style down to `low_gib` once it exceeds `high_gib`. Never volumes.
+    `builder_configs` reaches builders owned by other docker configs; `max_age_hours` adds the legacy age filter."""
     high, low = _num(ctx.opt("high_gib", 15), 0.001), _num(ctx.opt("low_gib", 8), 0)
-    if high is None or low is None or low >= high:
-        return _skipped("bad high_gib/low_gib config: nothing done")
+    unused = _num(ctx.opt("max_age_hours", 0), 0, 8760)
+    if high is None or low is None or low >= high or unused is None:
+        return _skipped("bad high_gib/low_gib/max_age_hours config: nothing done")
     busy, why = _busy("docker_build")
     if busy:
         return _skipped(f"docker build active, cache prune deferred ({why})")
-    names = _builders()
-    if names is None:
-        return _skipped("docker buildx unavailable: nothing done")
+    configs = _builder_configs(ctx)
+    discovered: dict[str, str | None] = {}
+    for cfg in configs:
+        names = _builders(cfg)
+        if names is None:
+            if cfg is None:
+                return _skipped("docker buildx unavailable: nothing done")
+            continue                        # an unreadable extra config is skipped, never a reason to stop
+        for n in names:
+            discovered.setdefault(n, cfg)   # the same builder listed by two configs is measured/pruned once
+    if not discovered:
+        return _skipped("no running buildx builder found: nothing done")
     high_b, low_b = int(high * GIB), int(low * GIB)
     sizes: dict[str, int] = {}
     unknown = 0
-    for n in names:
-        s = _builder_size(n)
+    for n, cfg in discovered.items():
+        s = _builder_size(n, cfg)
         if s is None:
             unknown += 1                       # unmeasurable => untouched
         else:
@@ -343,10 +372,15 @@ def docker_cache(ctx: Ctx) -> Result:
     for name, size in sorted(sizes.items(), key=lambda kv: (-kv[1], kv[0])):
         if size <= high_b:
             continue
+        cfg = discovered[name]
 
-        def prune(name=name, size=size) -> None:
-            _run_ok(["docker", "buildx", "prune", "--builder", name, "-f", "--max-used-space", str(low_b)], 900)
-            after = _builder_size(name)
+        def prune(name=name, size=size, cfg=cfg) -> None:
+            cmd = ["docker", "buildx", "prune", "--builder", name, "-f"]
+            if unused:
+                cmd += ["--filter", f"until={int(unused)}h"]
+            cmd += ["--max-used-space", str(low_b)]
+            _run_ok(cmd, 900, env=_docker_env(cfg))
+            after = _builder_size(name, cfg)
             if after is not None:
                 actual[name] = max(size - after, 0)
 
@@ -354,7 +388,7 @@ def docker_cache(ctx: Ctx) -> Result:
         acts.run("buildx-prune", f"builder:{name}", size - low_b, prune, label=f"{name} {human(size)}")
     total = sum(sizes.values())
     res = acts.result("builders", {"cache_h": human(total), "high_h": human(high_b), "low_h": human(low_b),
-                                   "builders": len(names), "unmeasured": unknown,
+                                   "builders": len(discovered), "configs": len(configs), "unmeasured": unknown,
                                    "actual_freed_h": human(sum(actual.values()))})
     if not acts.rows:
         res.summary = _ascii(f"build cache {human(total)} across {len(sizes)} builders, under {human(high_b)}")
