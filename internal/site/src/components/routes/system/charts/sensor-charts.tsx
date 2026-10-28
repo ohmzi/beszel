@@ -102,7 +102,8 @@ export function BatteryChart({
 // Group them by what they actually measure so the chart shows a handful of meaningful lines.
 // The group's value is the hottest member — that is the one that matters.
 const TEMP_GROUPS: { label: string; re: RegExp }[] = [
-	{ label: "CPU", re: /^(coretemp|k10temp|zenpower|peci_agent|cpu_thermal)/i },
+	// The board's PECI channel is named nct6798_peci_agent_0, so `peci_agent` cannot be anchored at the start.
+	{ label: "CPU", re: /(^coretemp|^k10temp|^zenpower|peci_agent|^cpu_thermal)/i },
 	{ label: "GPU", re: /(geforce|nvidia|rtx|radeon|^amd |arc a|apple gpu)/i },
 	{ label: "NVMe", re: /^nvme/i },
 	{ label: "HDD", re: /^(drivetemp|sd[a-z]$)/i },
