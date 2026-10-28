@@ -43,6 +43,9 @@ func (h *Hub) startServer(se *core.ServeEvent) error {
 		if !isAppRoute(e.Request.URL.Path, basePath) {
 			status = http.StatusNotFound
 		}
+		// The HTML names content-hashed bundles, so it must be revalidated on every load:
+		// a cached index keeps a long-open tab on an old build after a deploy.
+		e.Response.Header().Set("Cache-Control", "no-cache")
 		return e.HTML(status, html)
 	})
 	return nil
