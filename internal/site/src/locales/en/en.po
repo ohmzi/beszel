@@ -3093,8 +3093,12 @@ msgid "System"
 msgstr "System"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
-msgid "System fan speeds (RPM)"
-msgstr "System fan speeds (RPM)"
+msgid "System fan speeds (RPM; GPU fan duty on the right axis)"
+msgstr "System fan speeds (RPM; GPU fan duty on the right axis)"
+
+#: src/components/routes/system/charts/sensor-charts.tsx
+#~ msgid "System fan speeds (RPM)"
+#~ msgstr "System fan speeds (RPM)"
 
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "System load averages over time"
