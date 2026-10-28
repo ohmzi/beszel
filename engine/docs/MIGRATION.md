@@ -537,7 +537,7 @@ Day 0 is a healthy install with `notify-test` delivered. A day is the soonest th
 
 #### `umbrella-services` (keep): The umbrella's own services: homelab-maint-www (:9111), homelab-maint-live, the tick timer, the self-health timer
 
-- Legacy: unit `homelab-maint-www.service (127.0.0.1:9111, installed), homelab-maint-live.service, homelab-maint-tick.timer and homelab-maint-selfhealth.timer (shipped by install.sh)`, always on; the tick every minute
+- Legacy: unit `homelab-maint-www.service (127.0.0.1:9111, installed), homelab-maint-live.service, homelab-maint-tick.timer and homelab-maint-selfhealth.timer (shipped by install.sh), homelab-maint-webgeo.timer (monthly DB-IP city/ASN refresh for the Website page, shipped by install.sh)`, always on; the tick every minute
 - Replaced by: `umbrella-www`, `svc-hm-www`, `umbrella-status` (probe)
 - Parity (all must be green): probe(s) `umbrella-www`, `svc-hm-www`, `umbrella-status` 8 consecutive green runs over 48 h
 - Cutover only records the adoption (no host change); the replacement keeps watching it.

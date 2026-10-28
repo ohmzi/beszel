@@ -326,6 +326,7 @@ EXPECTED_UNITS = {
     "homelab-maint-selfhealth.service", "homelab-maint-selfhealth.timer",   # the 1-minute pipeline self-check (public/self.json)
     "homelab-maint-live.service",                                       # the 5 s live monitor
     "homelab-maint-netwatch.service",                                   # the Network Watch collector (netwatch/collect.py)
+    "homelab-maint-webgeo.service", "homelab-maint-webgeo.timer",       # monthly DB-IP city/ASN refresh for the Website page
     "homelab-maint-www.service",
 }
 
