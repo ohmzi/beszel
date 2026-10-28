@@ -252,6 +252,24 @@ export function TemperatureChart({
 	)
 }
 
+// The agent names a fan "<chip>_<label-or-fan-idx>". This board (ASUS TUF B760M-PLUS WIFI,
+// nct6798) exposes no fan*_label files, so map the headers to the case's physical fans
+// instead of showing raw keys. The mapping was measured on 2026-10-27; see the fan-zone
+// notes in the maintenance engine. "Unused" entries are dropped from the chart.
+const FAN_LABELS: Record<string, string> = {
+	nct6798_fan1: "Rear exhaust",
+	nct6798_fan2: "Radiator",
+	nct6798_fan4: "Front top",
+	nct6798_fan5: "Front bottom",
+	nct6798_fan6: "AIO pump",
+	nct6798_fan3: "Unused",
+	nct6798_fan7: "Unused",
+}
+
+function fanLabel(key: string): string {
+	return FAN_LABELS[key] ?? key
+}
+
 export function FanChart({ chartData, grid, dataEmpty }: { chartData: ChartData; grid: boolean; dataEmpty: boolean }) {
 	const showFanChart = chartData.systemStats.at(-1)?.stats.f
 
@@ -281,7 +299,9 @@ export function FanChart({ chartData, grid, dataEmpty }: { chartData: ChartData;
 				sums[key] = (sums[key] ?? 0) + f[key]
 			}
 		}
-		const sorted = Object.keys(sums).sort((a, b) => sums[b] - sums[a])
+		const sorted = Object.keys(sums)
+			.sort((a, b) => sums[b] - sums[a])
+			.filter((key) => fanLabel(key) !== "Unused")
 		const colorMap = {} as Record<string, string>
 		const dataKeys = {} as Record<string, (d: SystemStatsRecord) => number | undefined>
 		for (let i = 0; i < sorted.length; i++) {
@@ -300,10 +320,11 @@ export function FanChart({ chartData, grid, dataEmpty }: { chartData: ChartData;
 						.split(" ")
 						.filter((term) => term.length > 0)
 				: []
-			const filtered = filterTerms.length > 0 && !filterTerms.some((term) => key.toLowerCase().includes(term))
+			const label = fanLabel(key)
+			const filtered = filterTerms.length > 0 && !filterTerms.some((term) => label.toLowerCase().includes(term) || key.toLowerCase().includes(term))
 			const strokeOpacity = filtered ? 0.1 : 1
 			return {
-				label: key,
+				label,
 				dataKey: dataKeys[key],
 				color: colorMap[key],
 				strokeOpacity,

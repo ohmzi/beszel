@@ -480,8 +480,8 @@ services_every_s = 30
 disk_every_s = 30
 http_timeout_s = 5            # per service probe
 slow_ms = 2000                # a service that answers slower than this reads "degraded"
-cpu_fans = [1, 4]             # nct6798 fan headers, same grouping as sensor-exporter
-case_fans = [2, 3, 5]
+cpu_fans = [2]                 # nct6798: the AIO radiator's three fans sit on CPU_FAN
+case_fans = [1, 4, 5]          # rear exhaust (pwm1) plus the front intakes (pwm4, pwm5)
 # mounts = ["/", "/media/SandiskSSD"]     # default: [tasks.disk_forecast].watch
 
 # One [[live.services]] table per service. name = label on the website. container = docker container name (state + health).

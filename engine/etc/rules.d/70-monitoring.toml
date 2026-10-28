@@ -28,7 +28,7 @@ title = "Live monitor: 5 second heartbeat and probe cadences"
 kind = "probe"
 principle = "detect by saturation, not size"
 why = "The website's Live tab needs second-level data without loading the host. Cheap /proc reads run every 5 seconds; anything that forks or can hang runs in its own thread on a slower cadence."
-does = "homelab-maint-live samples every interval_s = 5 s and rewrites public/live.json (52 KB budget, 720 history points = 60 min). Probe threads: GPU (nvidia-smi) every 10 s, hwmon temperatures every 15 s, fan speeds every 60 s (the fan chip is the dearest read), Docker over its socket every 10 s (only while dockerd is demonstrably up, so asking never starts it), services every 30 s, disk usage every 30 s. A service answering slower than slow_ms = 2000 reads degraded; http_timeout_s = 5 per service. cpu_fans = [1, 4] and case_fans = [2, 3, 5] name the nct6798 fan headers. Read once at start: restart the unit after editing. It only reads the host."
+does = "homelab-maint-live samples every interval_s = 5 s and rewrites public/live.json (52 KB budget, 720 history points = 60 min). Probe threads: GPU (nvidia-smi) every 10 s, hwmon temperatures every 15 s, fan speeds every 60 s (the fan chip is the dearest read), Docker over its socket every 10 s (only while dockerd is demonstrably up, so asking never starts it), services every 30 s, disk usage every 30 s. A service answering slower than slow_ms = 2000 reads degraded; http_timeout_s = 5 per service. cpu_fans = [2] (the radiator on CPU_FAN) and case_fans = [1, 4, 5] (rear exhaust plus front intakes) name the nct6798 fan headers. Read once at start: restart the unit after editing. It only reads the host."
 file = "maint.toml"
 target = "live"
 since = "2026-10-03"
@@ -48,8 +48,8 @@ services_every_s = 30
 disk_every_s = 30
 http_timeout_s = 5
 slow_ms = 2000
-cpu_fans = [1, 4]
-case_fans = [2, 3, 5]
+cpu_fans = [2]                 # nct6798: the AIO radiator's three fans sit on CPU_FAN
+case_fans = [1, 4, 5]          # rear exhaust (pwm1) plus the front intakes (pwm4, pwm5)
 
 [[rule]]
 id = "netwatch.settings"

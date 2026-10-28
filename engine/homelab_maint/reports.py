@@ -1377,7 +1377,7 @@ def temperature_section(ring: dict | None, per: Period) -> dict:
            "hours_covered": hours, "hours_expected": h1 - h0 + 1}
     bits = []
     if avg("cpu_fan_rpm") is not None:
-        bits.append(f"CPU fan {avg('cpu_fan_rpm'):.0f} rpm avg (max {mx.get('cpu_fan_rpm', 0):.0f})")
+        bits.append(f"radiator fan {avg('cpu_fan_rpm'):.0f} rpm avg (max {mx.get('cpu_fan_rpm', 0):.0f})")
     if avg("case_fan_rpm") is not None:
         bits.append(f"case fans {avg('case_fan_rpm'):.0f} rpm avg")
     if "gpu_fan_pct" in mx:

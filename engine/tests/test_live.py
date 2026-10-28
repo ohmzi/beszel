@@ -779,20 +779,21 @@ def test_fans_are_read_on_their_own_slower_cadence(env, monkeypatch):
     clk = Clock(1000.0)
     read = live.make_sensors_reader(live.Cfg(fans_every=60.0), clock=clk)
     a = read()
-    assert a["cpu_fan_rpm"] == 1650 and a["case_fan_rpm"] == 500 and a["cpu_temp"] == 70.0
-    write(env.hw / "hwmon3" / "fan1_input", "3000\n")
-    write(env.hw / "hwmon3" / "fan4_input", "3000\n")
+    assert a["cpu_fan_rpm"] == 400 and a["case_fan_rpm"] == 1300 and a["cpu_temp"] == 70.0
+    write(env.hw / "hwmon3" / "fan2_input", "2000\n")     # radiator (CPU_FAN)
+    write(env.hw / "hwmon3" / "fan1_input", "3000\n")     # rear exhaust
+    write(env.hw / "hwmon3" / "fan4_input", "3000\n")     # front intake
     write(env.hw / "hwmon2" / "temp1_input", "80000\n")
     opened = []
     real = live._read
     monkeypatch.setattr(live, "_read", lambda p: opened.append(str(p)) or real(p))
     clk.t += 15
     b = read()
-    assert b["cpu_temp"] == 80.0 and b["cpu_fan_rpm"] == 1650 and b["case_fan_rpm"] == 500      # temperature is fresh, fans are the cached ones
+    assert b["cpu_temp"] == 80.0 and b["cpu_fan_rpm"] == 400 and b["case_fan_rpm"] == 1300      # temperature is fresh, fans are the cached ones
     assert not [p for p in opened if Path(p).name.startswith("fan")]
     clk.t += 46                                                                                  # 61 s after the last fan read
     c = read()
-    assert c["cpu_fan_rpm"] == 3000 and c["case_fan_rpm"] == 500 and [p for p in opened if Path(p).name.startswith("fan")]
+    assert c["cpu_fan_rpm"] == 2000 and c["case_fan_rpm"] == 2200 and [p for p in opened if Path(p).name.startswith("fan")]
 
 
 def test_hwmon_fans_all_stopped_is_zero_but_no_fan_chip_is_unknown(env):
@@ -1047,8 +1048,8 @@ services_every_s = 30
 disk_every_s = 30
 http_timeout_s = 5            # per service probe
 slow_ms = 2000                # a service that answers slower than this reads "degraded"
-cpu_fans = [1, 4]             # nct6798 fan headers, same grouping as sensor-exporter
-case_fans = [2, 3, 5]
+cpu_fans = [2]                # nct6798: the AIO radiator's fans sit on CPU_FAN
+case_fans = [1, 4, 5]         # rear exhaust plus the front intakes
 # mounts = ["/", "/media/SandiskSSD"]     # default: [tasks.disk_forecast].watch
 
 # One [[live.services]] table per service. name = label on the website. container = docker container name (state + health).
@@ -1118,7 +1119,7 @@ def test_defaults_describe_this_host():
     assert all(s["addr"] and s["addr"][0] == "127.0.0.1" and not s["bad_url"] for s in c.services)
     assert c.interval == 5.0 and (c.gpu_every, c.sensors_every, c.docker_every, c.services_every) == (10.0, 15.0, 10.0, 30.0)
     assert c.fans_every == 60.0
-    assert c.mounts == ["/"] and c.cpu_fans == (1, 4) and c.case_fans == (2, 3, 5)
+    assert c.mounts == ["/"] and c.cpu_fans == (2,) and c.case_fans == (1, 4, 5)
 
 
 def test_toml_snippet_for_maint_toml_matches_the_defaults_exactly():

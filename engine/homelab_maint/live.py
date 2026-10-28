@@ -315,8 +315,11 @@ class Cfg:
     http_timeout: float = 5.0
     docker_timeout: float = 3.0
     slow_ms: int = 2000
-    cpu_fans: tuple = (1, 4)          # nct6798 headers, same grouping as sensor-exporter
-    case_fans: tuple = (2, 3, 5)
+    # nct6798 headers, same zones as sensor-exporter (measured 2026-10-27 after the AIO swap):
+    # the radiator's three fans sit on CPU_FAN, the case fans on pwm1 (rear) plus pwm4+pwm5
+    # (front). cpu_fan_rpm is therefore the radiator group, not an air cooler.
+    cpu_fans: tuple = (2,)
+    case_fans: tuple = (1, 4, 5)
     mounts: list = field(default_factory=lambda: ["/"])
     services: list = field(default_factory=list)
 

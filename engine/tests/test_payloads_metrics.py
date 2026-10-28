@@ -181,13 +181,13 @@ def test_dst_spring_forward_is_unique_too():
 def test_thermal_tiles_current_averages_and_max():
     e = fx("full_ring")
     t = tiles(pm.thermal(e, NOW))
-    assert list(t) == ["CPU", "GPU", "RAM", "CPU fan", "Case fan", "GPU fan"]
+    assert list(t) == ["CPU", "GPU", "RAM", "Radiator", "Case fans", "GPU fan"]
     cpu = t["CPU"]
     assert cpu["v"] == f"{e['current']['cpu_temp']:.0f}" and cpu["u"] == "°C"
     assert cpu["a"] == " / ".join(f"{e[b]['cpu_temp'] if b != 'hour_avg' else e['hour_avg']['cpu_temp']:.0f}"
                                    for b in ("hour_avg", "avg_24h", "avg_7d"))
     assert cpu["x"] == f"max {e['max_7d']['cpu_temp']:.0f}"
-    assert t["CPU fan"]["u"] == "" and t["CPU fan"]["x"] == ""          # rpm is in the group title, the sparkline needs the room
+    assert t["Radiator"]["u"] == "" and t["Radiator"]["x"] == ""          # rpm is in the group title, the sparkline needs the room
 
 
 def test_load_tiles_percent_formatting():
@@ -211,7 +211,7 @@ def test_status_ladder_hot_fixture():
     assert (t["CPU"]["c"], t["CPU"]["b"]) == ("orange", "hot")           # 94 C: >= 92
     assert (t["GPU"]["c"], t["GPU"]["b"]) == ("orange", "hot")           # 80 C: >= 78
     assert (t["RAM"]["c"], t["RAM"]["b"]) == ("yellow", "warm")          # 58 C: >= 55
-    assert (t["CPU fan"]["c"], t["CPU fan"]["b"]) == ("orange", "stop")  # a stopped CPU fan is flagged
+    assert (t["Radiator"]["c"], t["Radiator"]["b"]) == ("orange", "stop")  # a stopped radiator fan is flagged
     assert p["c"] == "orange" and p["head"].endswith("hot") and not p["stale"]
 
 
@@ -239,13 +239,13 @@ def test_gpu_fan_falls_back_to_percent_when_the_card_reports_no_rpm():
 def test_fan_sparklines_are_scaled_per_fan_and_keep_gaps():
     e = fx("full_ring")
     e["series"]["cpu_fan_rpm"][20] = None
-    s = tiles(pm.thermal(e, NOW))["CPU fan"]["s"]
+    s = tiles(pm.thermal(e, NOW))["Radiator"]["s"]
     assert len(s) == 168 and s[20] is None
     vals = [v for v in s if v is not None]
     assert min(vals) == 0 and 0 <= max(vals) <= 100 and max(vals) >= 90
     # a perfectly steady fan is a flat line, not noise blown up to full height
     e["series"]["case_fan_rpm"] = [600.0] * 168
-    assert set(tiles(pm.thermal(e, NOW))["Case fan"]["s"]) == {0}
+    assert set(tiles(pm.thermal(e, NOW))["Case fans"]["s"]) == {0}
     # a fan that never ran is a flat line at 0, not a crash
     e["series"]["gpu_fan_rpm"] = [0.0] * 168
     assert set(tiles(pm.thermal(e, NOW))["GPU fan"]["s"]) == {0}

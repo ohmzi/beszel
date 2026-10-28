@@ -303,12 +303,12 @@ def thermal(export: dict | None, now: float | None = None) -> dict:
         t_tiles.append(tile)
         t_cur.append((lk, cur, tile))
     f_tiles = []
-    for metric, lab, color in (("cpu_fan_rpm", "CPU fan", BLUE), ("case_fan_rpm", "Case fan", AQUA), ("gpu_fan_rpm", "GPU fan", ORANGE)):
+    for metric, lab, color in (("cpu_fan_rpm", "Radiator", BLUE), ("case_fan_rpm", "Case fans", AQUA), ("gpu_fan_rpm", "GPU fan", ORANGE)):
         tile, cur = _tile(e, metric, lab, "r", color, spark=True)   # unit rpm is in the group title: more room for the sparkline
         if metric == "gpu_fan_rpm" and cur is None and _scalar(e, "current", "gpu_fan_pct") is not None:
             # no rpm sensor on this card/driver: the percent is the only fan reading, show that on the tile
             tile, cur = _tile(e, "gpu_fan_pct", lab, "r", color, unit="%", spark=True)
-        if metric == "cpu_fan_rpm" and cur == 0:       # a stopped CPU fan is the one fan fault worth a colour
+        if metric == "cpu_fan_rpm" and cur == 0:       # a stopped radiator fan is the one fan fault worth a colour
             tile.update(c="orange", b="stop")
         f_tiles.append(tile)
 

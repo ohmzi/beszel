@@ -887,7 +887,7 @@ def test_temperature_section_covers_only_the_hours_in_the_ring(doc):
     assert t["gpu_avg"] == 41.0 and t["gpu_max"] == 46.0 and t["ram_avg"] == 38.0 and t["nvme_avg"] == 47.0
     assert 52 <= t["cpu_avg"] <= 58 and t["cpu_max"] > t["cpu_avg"]
     assert 100 < t["hours_covered"] < t["hours_expected"] == 168
-    assert "CPU fan 1180 rpm avg" in t["fan_note"] and "case fans 800 rpm avg" in t["fan_note"] and "GPU fan up to 25%" in t["fan_note"]
+    assert "radiator fan 1180 rpm avg" in t["fan_note"] and "case fans 800 rpm avg" in t["fan_note"] and "GPU fan up to 25%" in t["fan_note"]
     assert any("Temperatures cover" in n for n in doc["notes"])
     assert not any(h.startswith("Temperatures") for h in doc["highlights"])            # a crowded week: 8 lines, thermals are in their own section
 
