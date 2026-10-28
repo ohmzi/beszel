@@ -204,6 +204,19 @@ def test_line_not_meant_is_a_container_hitting_a_host_port(db, threat):
     assert "(never blocked: 172.18.0.0/16)" in f.why
 
 
+def test_line_not_meant_ignores_a_named_container(db, threat):
+    """A torrent client's peer connections hit the host's own address on random ports and are refused. The owner names such a
+    container in line_not_meant_ignore; every other container is still a finding."""
+    topo = entities.Topology(
+        containers={"Transmission": entities.ContainerInfo("Transmission", 1, ["172.18.0.5"], "")},
+        subnets=TOPO.subnets, compose={}, listening=set(), host_ips=TOPO.host_ips)
+    _event(db, NOW - 60, "fw_block", "172.18.0.5", "192.168.40.2", 47100)
+    cfg = {"signin": {"hosts": ["app.example.test"]}, "line_not_meant_ignore": ["Transmission"]}
+    assert _rule(_judge(db, threat, topo=topo, cfg=cfg), "line_not_meant") == []
+    [f] = _rule(_judge(db, threat, topo=topo), "line_not_meant")
+    assert f.src == "172.18.0.5" and f.target == "host:47100"
+
+
 # ---- new_peer -------------------------------------------------------------------------------------------------------------
 
 def test_new_peer_silent_during_learning(db, threat):

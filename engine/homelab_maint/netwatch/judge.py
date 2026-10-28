@@ -207,11 +207,17 @@ def _auth(db, lo: float, now: float, found: dict) -> None:
 
 
 def _line_not_meant(db, topo: Topology, cfg: dict, lo: float, now: float, found: dict) -> None:
+    """A container reaching a host port it was refused on. `line_not_meant_ignore` names containers whose own protocol does
+    this by design (a torrent client's peers): their refused peer traffic is not a pinhole violation."""
+    ignore = {n for n in (cfg.get("line_not_meant_ignore") or []) if isinstance(n, str)}
     for ts, src, dst, dport in db.execute(
         "SELECT ts, src, dst, dport FROM events WHERE kind = 'fw_block' AND ts >= ? AND ts <= ? ORDER BY ts", (lo, now)
     ).fetchall():
         ip = _ip(src)
-        if ip is None or classify(ip, topo, cfg).kind != "container" or not _is_host_ip(dst, topo):
+        if ip is None or not _is_host_ip(dst, topo):
+            continue
+        peer = classify(ip, topo, cfg)
+        if peer.kind != "container" or peer.name in ignore:
             continue
         _add(found, "line_not_meant", "warn", ip, f"host:{dport}",
              f"container {ip} was refused on host port {dport} (pinhole violation)", ts, ts, 1)
