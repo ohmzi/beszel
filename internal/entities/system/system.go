@@ -119,6 +119,7 @@ type GPUData struct {
 	Count       float64            `json:"-"`
 	Engines     map[string]float64 `json:"e,omitempty" cbor:"5,keyasint,omitempty"`
 	PowerPkg    float64            `json:"pp,omitempty" cbor:"6,keyasint,omitempty"`
+	Fan         float64            `json:"fs,omitempty" cbor:"7,keyasint,omitempty"` // fan duty (%)
 }
 
 type FsStats struct {

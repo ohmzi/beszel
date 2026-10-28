@@ -256,6 +256,10 @@ func (gm *GPUManager) parseNvidiaData(output []byte) bool {
 		totalMemory, _ := strconv.ParseFloat(fields[4], 64)
 		usage, _ := strconv.ParseFloat(fields[5], 64)
 		power, _ := strconv.ParseFloat(fields[6], 64)
+		var fan float64
+		if len(fields) > 7 {
+			fan, _ = strconv.ParseFloat(fields[7], 64) // "%" or "[N/A]" on cards without a fan
+		}
 		// add gpu if not exists
 		if _, ok := gm.GpuDataMap[id]; !ok {
 			name := strings.TrimPrefix(fields[1], "NVIDIA ")
@@ -268,6 +272,7 @@ func (gm *GPUManager) parseNvidiaData(output []byte) bool {
 		gpu.MemoryTotal = totalMemory / mebibytesInAMegabyte
 		gpu.Usage += usage
 		gpu.Power += power
+		gpu.Fan = fan
 		gpu.Count++
 	}
 	return valid
@@ -511,7 +516,7 @@ func (gm *GPUManager) startNvidiaSmiCollector(intervalSeconds string) {
 		bufSize: 10 * 1024,
 		cmdArgs: []string{
 			"-l", intervalSeconds,
-			"--query-gpu=index,name,temperature.gpu,memory.used,memory.total,utilization.gpu,power.draw",
+			"--query-gpu=index,name,temperature.gpu,memory.used,memory.total,utilization.gpu,power.draw,fan.speed",
 			"--format=csv,noheader,nounits",
 		},
 		parse: gm.parseNvidiaData,

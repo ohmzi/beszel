@@ -267,6 +267,8 @@ export interface GPUData {
 	p?: number
 	/** power package (w) */
 	pp?: number
+	/** fan duty (%) */
+	fs?: number
 	/** engines */
 	e?: Record<string, number>
 }

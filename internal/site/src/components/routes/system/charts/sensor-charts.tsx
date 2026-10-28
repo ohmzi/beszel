@@ -6,6 +6,7 @@ import { cn, decimalString, formatTemperature, toFixedFloat } from "@/lib/utils"
 import type { ChartData, SystemRecord, SystemStatsRecord } from "@/types"
 import { ChartCard, FilterBar } from "../chart-card"
 import LineChartDefault from "@/components/charts/line-chart"
+import type { DataPoint } from "@/components/charts/line-chart"
 import { useStore } from "@nanostores/react"
 import { useRef, useMemo, useState, useEffect } from "react"
 
@@ -97,6 +98,26 @@ export function BatteryChart({
 	)
 }
 
+// Temperature sensors arrive one key per sensor: every P-core, every disk, every aux channel.
+// Group them by what they actually measure so the chart shows a handful of meaningful lines.
+// The group's value is the hottest member — that is the one that matters.
+const TEMP_GROUPS: { label: string; re: RegExp }[] = [
+	{ label: "CPU", re: /^(coretemp|k10temp|zenpower|peci_agent|cpu_thermal)/i },
+	{ label: "GPU", re: /(geforce|nvidia|rtx|radeon|^amd |arc a|apple gpu)/i },
+	{ label: "NVMe", re: /^nvme/i },
+	{ label: "HDD", re: /^(drivetemp|sd[a-z]$)/i },
+	{ label: "RAM", re: /^(spd5|jc42|dimmtemp)/i },
+	{ label: "Board", re: /(systin|^acpitz$)/i },
+]
+// Bogus or irrelevant channels: Super-I/O aux inputs, PECI calibration, Wi-Fi.
+const TEMP_IGNORE = /(calibration|auxtin|cputin|iwlwifi)/i
+
+function tempGroup(key: string): string | null {
+	if (TEMP_IGNORE.test(key)) return null
+	for (const g of TEMP_GROUPS) if (g.re.test(key)) return g.label
+	return null
+}
+
 export function TemperatureChart({
 	chartData,
 	grid,
@@ -129,21 +150,30 @@ export function TemperatureChart({
 	// Only recompute colors and dataKey functions when sensor names change
 	const { colorMap, dataKeys, sortedKeys } = useMemo(() => {
 		const stats = statsRef.current
-		const tempSums = {} as Record<string, number>
+		const sums = {} as Record<string, number>
 		for (const data of stats) {
 			const t = data.stats?.t
 			if (!t) continue
 			for (const key of Object.keys(t)) {
-				tempSums[key] = (tempSums[key] ?? 0) + t[key]
+				const group = tempGroup(key)
+				if (group) sums[group] = (sums[group] ?? 0) + t[key]
 			}
 		}
-		const sorted = Object.keys(tempSums).sort((a, b) => tempSums[b] - tempSums[a])
+		const sorted = Object.keys(sums).sort((a, b) => sums[b] - sums[a])
 		const colorMap = {} as Record<string, string>
 		const dataKeys = {} as Record<string, (d: SystemStatsRecord) => number | undefined>
 		for (let i = 0; i < sorted.length; i++) {
-			const key = sorted[i]
-			colorMap[key] = `hsl(${((i * 360) / sorted.length) % 360}, 60%, 55%)`
-			dataKeys[key] = (d: SystemStatsRecord) => d.stats?.t?.[key]
+			const label = sorted[i]
+			colorMap[label] = `hsl(${((i * 360) / sorted.length) % 360}, 60%, 55%)`
+			dataKeys[label] = (d: SystemStatsRecord) => {
+				const t = d.stats?.t
+				if (!t) return undefined
+				let max: number | undefined
+				for (const key of Object.keys(t)) {
+					if (tempGroup(key) === label && (max === undefined || t[key] > max)) max = t[key]
+				}
+				return max
+			}
 		}
 		return { colorMap, dataKeys, sortedKeys: sorted }
 	}, [sensorNamesKey])
@@ -333,11 +363,38 @@ export function FanChart({ chartData, grid, dataEmpty }: { chartData: ChartData;
 		})
 	}, [sortedKeys, filter, dataKeys, colorMap])
 
+	// GPU fans report a duty percentage, not RPM: their driver exposes no tachometer. Plot the
+	// hottest GPU fan on the right-hand % axis so the RPM scale stays honest.
+	const gpuFanPoint = useMemo((): DataPoint | null => {
+		const gpus = chartData.systemStats.at(-1)?.stats?.g
+		if (!gpus || !Object.values(gpus).some((g) => g?.fs !== undefined)) return null
+		const terms = filter ? filter.toLowerCase().split(" ").filter((term) => term.length > 0) : []
+		const filtered = terms.length > 0 && !terms.some((term) => "gpu fan".includes(term))
+		return {
+			label: "GPU fan",
+			dataKey: (d: SystemStatsRecord) => {
+				const map = d.stats?.g
+				if (!map) return undefined
+				let max: number | undefined
+				for (const g of Object.values(map)) {
+					if (g?.fs !== undefined && (max === undefined || g.fs > max)) max = g.fs
+				}
+				return max
+			},
+			color: "#f59e0b",
+			strokeOpacity: filtered ? 0.1 : 1,
+			activeDot: !filtered,
+			yAxisId: "right",
+			strokeDasharray: "4 3",
+		}
+	}, [chartData.systemStats, filter])
+
 	if (!showFanChart) {
 		return null
 	}
 
-	const legend = dataPoints.length < 12
+	const allPoints = gpuFanPoint ? [...dataPoints, gpuFanPoint] : dataPoints
+	const legend = allPoints.length < 12
 
 	return (
 		<div className={cn("odd:last-of-type:col-span-full", { "col-span-full": !grid })}>
@@ -345,7 +402,7 @@ export function FanChart({ chartData, grid, dataEmpty }: { chartData: ChartData;
 				empty={dataEmpty}
 				grid={grid}
 				title={t`Fans`}
-				description={t`System fan speeds (RPM)`}
+				description={t`System fan speeds (RPM; GPU fan duty on the right axis)`}
 				cornerEl={<FilterBar store={$fanFilter} />}
 				legend={legend}
 			>
@@ -353,10 +410,12 @@ export function FanChart({ chartData, grid, dataEmpty }: { chartData: ChartData;
 					chartData={chartData}
 					itemSorter={(a, b) => b.value - a.value}
 					domain={["auto", "auto"]}
+					domain2={[0, 100]}
 					legend={legend}
 					tickFormatter={(val) => `${toFixedFloat(val, 0)}`}
-					contentFormatter={(item) => `${decimalString(item.value, 0)} RPM`}
-					dataPoints={dataPoints}
+					tickFormatter2={(val) => `${toFixedFloat(val, 0)}%`}
+					contentFormatter={(item) => item?.name === "GPU fan" ? `${decimalString(item.value, 0)}%` : `${decimalString(item.value, 0)} RPM`}
+					dataPoints={allPoints}
 					filter={filter}
 				></LineChartDefault>
 			</ChartCard>

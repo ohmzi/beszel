@@ -60,6 +60,7 @@ var (
 	nvmlDeviceGetMemoryInfo       func(device nvmlDevice, memory uintptr) nvmlReturn
 	nvmlDeviceGetUtilizationRates func(device nvmlDevice, utilization *nvmlUtilization) nvmlReturn
 	nvmlDeviceGetTemperature      func(device nvmlDevice, sensorType int, temp *uint32) nvmlReturn
+	nvmlDeviceGetFanSpeed         func(device nvmlDevice, speed *uint32) nvmlReturn
 	nvmlDeviceGetPowerUsage       func(device nvmlDevice, power *uint32) nvmlReturn
 	nvmlDeviceGetPciInfo          func(device nvmlDevice, pci *nvmlPciInfo) nvmlReturn
 	nvmlErrorString               func(result nvmlReturn) string
@@ -97,6 +98,10 @@ func (c *nvmlCollector) init() error {
 	}
 	purego.RegisterLibFunc(&nvmlDeviceGetUtilizationRates, lib, "nvmlDeviceGetUtilizationRates")
 	purego.RegisterLibFunc(&nvmlDeviceGetTemperature, lib, "nvmlDeviceGetTemperature")
+	// Optional: absent on some older drivers and on GPUs with no controllable fan.
+	if hasSymbol(lib, "nvmlDeviceGetFanSpeed") {
+		purego.RegisterLibFunc(&nvmlDeviceGetFanSpeed, lib, "nvmlDeviceGetFanSpeed")
+	}
 	purego.RegisterLibFunc(&nvmlDeviceGetPowerUsage, lib, "nvmlDeviceGetPowerUsage")
 	purego.RegisterLibFunc(&nvmlDeviceGetPciInfo, lib, "nvmlDeviceGetPciInfo")
 	purego.RegisterLibFunc(&nvmlErrorString, lib, "nvmlErrorString")
@@ -181,6 +186,14 @@ func (c *nvmlCollector) collect() {
 		// Temperature
 		var temp uint32
 		nvmlDeviceGetTemperature(device, 0, &temp) // 0 is NVML_TEMPERATURE_GPU
+
+		// Fan duty (%). NVIDIA fans expose a percentage, not a tachometer reading.
+		if nvmlDeviceGetFanSpeed != nil {
+			var fan uint32
+			if ret := nvmlDeviceGetFanSpeed(device, &fan); ret == nvmlReturn(nvmlSuccess) {
+				gpu.Fan = float64(fan)
+			}
+		}
 
 		// Memory: only poll if GPU is active to avoid leaving D3cold state (#1522)
 		if utilization.Gpu > 0 {
