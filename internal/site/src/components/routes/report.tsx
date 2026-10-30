@@ -199,7 +199,7 @@ export default memo(({ id }: { id: string }) => {
 						{a.alerts_failed ? ` · ${a.alerts_failed} failed` : ""}
 					</p>
 					{byTask.length ? (
-						<Table>
+						<Table stack>
 							<TableHeader>
 								<TableRow>
 									<TableHead>
@@ -261,7 +261,7 @@ export default memo(({ id }: { id: string }) => {
 					<H2>
 						<Trans>Capacity outlook</Trans>
 					</H2>
-					<Table>
+					<Table stack>
 						<TableHeader>
 							<TableRow>
 								<TableHead>

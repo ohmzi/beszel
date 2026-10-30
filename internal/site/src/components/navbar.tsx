@@ -1,4 +1,5 @@
 import { Trans } from "@lingui/react/macro"
+import { useStore } from "@nanostores/react"
 import { getPagePath } from "@nanostores/router"
 import {
 	ActivityIcon,
@@ -28,7 +29,7 @@ import {
 	UsersIcon,
 	WrenchIcon,
 } from "lucide-react"
-import { lazy, Suspense, useState } from "react"
+import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { buttonVariants } from "@/components/ui/button"
 import {
 	DropdownMenu,
@@ -115,28 +116,54 @@ const SECTIONS = [
 	},
 ] as const
 
-function SectionButtons({ className }: { className?: string }) {
+// On phones the strip shows each icon with its label, since there is no hover tooltip there.
+function SectionButtons({ className, labeled }: { className?: string; labeled?: boolean }) {
+	const current = useStore($router)?.route
+	const stripRef = useRef<HTMLDivElement>(null)
+
+	// keep the open section in view when the strip scrolls sideways
+	useEffect(() => {
+		const active = stripRef.current?.querySelector<HTMLElement>('[aria-current="page"]')
+		active?.scrollIntoView({ block: "nearest", inline: "center" })
+	}, [current])
+
 	return (
-		<div className={cn("flex items-center gap-0.5 overflow-x-auto scrollbar-hide", className)}>
-			{SECTIONS.map((s, i) =>
-				"divider" in s ? (
-					<span key={`d${i}`} className="mx-1 h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+		<div ref={stripRef} className={cn("flex items-center gap-0.5 overflow-x-auto scrollbar-hide", className)}>
+			{SECTIONS.map((s, i) => {
+				if ("divider" in s) {
+					return <span key={`d${i}`} className="mx-1 h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+				}
+				const active = current === s.route
+				const link = (
+					<Link
+						key={s.route}
+						href={getPagePath($router, s.route)}
+						aria-label={s.label}
+						aria-current={active ? "page" : undefined}
+						className={cn(
+							"shrink-0",
+							labeled
+								? cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-9 gap-1.5 px-2.5 text-[0.8rem] font-normal")
+								: buttonVariants({ variant: "ghost", size: "icon" }),
+							active
+								? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary"
+								: "text-muted-foreground hover:text-foreground"
+						)}
+						onMouseEnter={runOnce(s.load)}
+					>
+						<s.icon className="h-[1.1rem] w-[1.1rem] shrink-0" strokeWidth={active ? 2 : 1.5} />
+						{labeled && <span>{s.label}</span>}
+					</Link>
+				)
+				return labeled ? (
+					link
 				) : (
 					<Tooltip key={s.route}>
-						<TooltipTrigger asChild>
-							<Link
-								href={getPagePath($router, s.route)}
-								aria-label={s.label}
-								className={cn("shrink-0", buttonVariants({ variant: "ghost", size: "icon" }))}
-								onMouseEnter={runOnce(s.load)}
-							>
-								<s.icon className="h-[1.1rem] w-[1.1rem]" strokeWidth={1.5} />
-							</Link>
-						</TooltipTrigger>
+						<TooltipTrigger asChild>{link}</TooltipTrigger>
 						<TooltipContent>{s.label}</TooltipContent>
 					</Tooltip>
 				)
-			)}
+			})}
 		</div>
 	)
 }
@@ -168,12 +195,12 @@ export default function Navbar() {
 				</Link>
 
 				{/* mobile menu */}
-				<div className="ms-auto flex items-center text-xl md:hidden">
+				<div className="ms-auto flex items-center text-xl xl:hidden">
 					<ModeToggle />
 					<DropdownMenu>
 						<DropdownMenuTrigger
 							onMouseEnter={() => import("@/components/routes/settings/general")}
-							className="ms-3"
+							className={cn("ms-1", buttonVariants({ variant: "ghost", size: "icon" }))}
 							aria-label="Open Menu"
 						>
 							<MenuIcon />
@@ -224,7 +251,7 @@ export default function Navbar() {
 				{/* desktop nav */}
 				{/** biome-ignore lint/a11y/noStaticElementInteractions: ignore */}
 				<div
-					className="hidden md:flex items-center ms-auto min-w-0"
+					className="hidden xl:flex items-center ms-auto min-w-0"
 					onMouseEnter={() => import("@/components/routes/settings/general")}
 				>
 					<SectionButtons className="min-w-0" />
@@ -269,9 +296,12 @@ export default function Navbar() {
 					</DropdownMenu>
 				</div>
 			</div>
-			<div className="md:hidden">
-				<SectionButtons className="px-1" />
-			</div>
+			<nav aria-label="Sections" className="xl:hidden -mt-2 mb-3">
+				<SectionButtons
+					labeled
+					className="-mx-1 px-1 [mask-image:linear-gradient(to_right,black_88%,transparent)] md:flex-wrap md:gap-y-1 md:[mask-image:none]"
+				/>
+			</nav>
 		</>
 	)
 }

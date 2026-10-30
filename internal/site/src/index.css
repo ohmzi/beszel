@@ -221,3 +221,67 @@
 .recharts-yAxis {
 	@apply tabular-nums;
 }
+
+/* <Table stack>: on phones each row becomes a small card. The first two cells (status + title)
+   share the top line; the rest stack beneath it, each labelled with its column name. */
+@media (max-width: 639px) {
+	.table-stack thead {
+		display: none;
+	}
+	.table-stack,
+	.table-stack tbody {
+		display: block;
+		width: 100%;
+	}
+	.table-stack tbody tr {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		column-gap: 0.625rem;
+		row-gap: 0.3rem;
+		padding: 0.75rem 0.25rem;
+	}
+	.table-stack tbody td {
+		display: block;
+		padding: 0;
+		height: auto;
+		width: auto;
+		max-width: 100%;
+		text-align: start;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+	.table-stack tbody td:empty {
+		display: none;
+	}
+	.table-stack tbody td:nth-child(2) {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+	.table-stack tbody td:nth-child(n + 3) {
+		flex: 1 1 100%;
+		font-size: 0.8125rem;
+	}
+	/* hanging indent: the label sits in the gutter so wrapped values stay aligned */
+	.table-stack tbody td:nth-child(n + 3)[data-label] {
+		position: relative;
+		padding-inline-start: 6rem;
+	}
+	.table-stack tbody td:nth-child(n + 3)[data-label]::before {
+		content: attr(data-label);
+		position: absolute;
+		inset-inline-start: 0;
+		top: 0.1rem;
+		width: 5.5rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 0.6875rem;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--muted-foreground);
+	}
+	.table-stack tbody td[colspan] {
+		flex: 1 1 100%;
+	}
+}

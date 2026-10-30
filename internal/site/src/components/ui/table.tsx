@@ -2,13 +2,49 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-	({ className, ...props }, ref) => (
+type TableProps = React.HTMLAttributes<HTMLTableElement> & {
+	/** On phones, lay each row out as a stacked card instead of squeezing the columns (see .table-stack). */
+	stack?: boolean
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(({ className, stack, ...props }, ref) => {
+	const own = React.useRef<HTMLTableElement | null>(null)
+	const setRef = React.useCallback(
+		(el: HTMLTableElement | null) => {
+			own.current = el
+			if (typeof ref === "function") ref(el)
+			else if (ref) ref.current = el
+		},
+		[ref]
+	)
+
+	// Stacked rows lose the header, so each cell carries its column name for the ::before label.
+	// Runs after every render because rows come and go with the data.
+	React.useLayoutEffect(() => {
+		const table = own.current
+		if (!stack || !table) return
+		const labels = Array.from(table.querySelectorAll("thead tr:last-child th"), (th) => th.textContent?.trim() ?? "")
+		for (const row of table.querySelectorAll<HTMLTableRowElement>("tbody tr")) {
+			let col = 0
+			for (const cell of row.cells) {
+				const label = cell.colSpan === 1 ? labels[col] : ""
+				if (label) cell.dataset.label = label
+				else delete cell.dataset.label
+				col += cell.colSpan
+			}
+		}
+	})
+
+	return (
 		<div className="relative w-full overflow-auto">
-			<table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+			<table
+				ref={setRef}
+				className={cn("w-full caption-bottom text-sm", stack && "table-stack", className)}
+				{...props}
+			/>
 		</div>
 	)
-)
+})
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(

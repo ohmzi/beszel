@@ -95,7 +95,7 @@ export default memo(() => {
 					</div>
 
 					<div className="overflow-x-auto rounded-lg border border-border bg-card">
-						<Table>
+						<Table stack>
 							<TableHeader className="sticky top-0 z-10 bg-table-header">
 								<TableRow>
 									<TableHead className="w-40">

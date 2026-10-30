@@ -138,7 +138,7 @@ export default function InfoBar({
 			<div className="grid xl:flex xl:gap-4 px-4 sm:px-6 pt-3 sm:pt-4 pb-5">
 				<div className="min-w-0">
 					<h1 className="text-2xl sm:text-[1.6rem] font-semibold mb-1.5">{system.name}</h1>
-					<div className="flex xl:flex-wrap items-center py-4 xl:p-0 -mt-3 xl:mt-1 gap-3 text-sm text-nowrap opacity-90 max-xl:overflow-x-auto scrollbar-hide -mx-4 px-4 xl:mx-0">
+					<div className="flex flex-wrap items-center pt-1 pb-4 xl:p-0 xl:mt-1 gap-x-3 gap-y-2 text-sm text-nowrap opacity-90">
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<div className="capitalize flex gap-2 items-center">
@@ -186,7 +186,7 @@ export default function InfoBar({
 							)
 							return (
 								<div key={value} className="contents">
-									<Separator orientation="vertical" className="h-4 bg-primary/30" />
+									<Separator orientation="vertical" className="h-4 bg-primary/30 max-sm:hidden" />
 									{label ? (
 										<Tooltip delayDuration={100}>
 											<TooltipTrigger asChild>{content}</TooltipTrigger>

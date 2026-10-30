@@ -55,7 +55,7 @@ export default memo(() => {
 					<Trans>No load spikes recorded.</Trans>
 				</div>
 			) : (
-				<Table>
+				<Table stack>
 					<TableHeader className="sticky top-0 z-10 bg-table-header">
 						<TableRow>
 							<TableHead className="w-28">

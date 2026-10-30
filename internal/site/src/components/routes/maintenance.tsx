@@ -144,7 +144,7 @@ export default memo(() => {
 					<Trans>No actions recorded.</Trans>
 				</div>
 			) : (
-				<Table>
+				<Table stack>
 					<TableHeader className="bg-table-header">
 						<TableRow>
 							<TableHead className="w-28">
@@ -240,7 +240,7 @@ export default memo(() => {
 					<H2>
 						<Trans>Timers</Trans>
 					</H2>
-					<Table>
+					<Table stack>
 						<TableHeader>
 							<TableRow>
 								<TableHead>
@@ -285,7 +285,7 @@ export default memo(() => {
 							<Trans>Scheduler:</Trans> {jobs.tick.summary}
 						</p>
 					) : null}
-					<Table>
+					<Table stack>
 						<TableHeader>
 							<TableRow>
 								<TableHead>
@@ -416,7 +416,7 @@ export default memo(() => {
 						</div>
 					) : null}
 					{(pressure?.classes?.length ?? 0) > 0 ? (
-						<Table>
+						<Table stack>
 							<TableHeader>
 								<TableRow>
 									<TableHead className="w-20">

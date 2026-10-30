@@ -16,10 +16,11 @@ type Item = {
 	blocked_by?: string[]
 }
 
-const tile = (label: string, value: string) => (
-	<div className="rounded-lg border border-border bg-card p-3">
+const tile = (label: string, value: string, sub?: string) => (
+	<div className="min-w-0 rounded-lg border border-border bg-card p-3">
 		<div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
 		<div className="text-xl font-semibold tabular-nums">{value}</div>
+		{sub ? <div className="truncate text-xs text-muted-foreground">{sub}</div> : null}
 	</div>
 )
 
@@ -28,7 +29,9 @@ export default memo(() => {
 		total?: number
 		retirable?: number
 		retired?: number
-		remaining?: number
+		// the engine publishes the names still to cut over; older files carried a bare count
+		remaining?: number | string[]
+		next?: string
 		complete?: boolean
 		paused?: boolean
 		items?: Item[]
@@ -47,10 +50,14 @@ export default memo(() => {
 			<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
 				{tile("Legacy units", String(m?.total ?? 0))}
 				{tile("Retired", String(m?.retired ?? 0))}
-				{tile("Remaining", String(m?.remaining ?? 0))}
+				{tile(
+					"Remaining",
+					String(Array.isArray(m?.remaining) ? m.remaining.length : (m?.remaining ?? 0)),
+					m?.next ? `next: ${m.next}` : undefined
+				)}
 				{tile("Retirable now", String(m?.retirable ?? 0))}
 			</div>
-			<Table>
+			<Table stack>
 				<TableHeader className="sticky top-0 z-10 bg-table-header">
 					<TableRow>
 						<TableHead>

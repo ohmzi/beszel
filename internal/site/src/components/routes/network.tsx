@@ -181,7 +181,7 @@ export default memo(() => {
 						</div>
 					) : null}
 					<Tabs value={tab} onValueChange={setTab}>
-						<TabsList>
+						<TabsList className="max-w-full justify-start overflow-x-auto scrollbar-hide">
 							<TabsTrigger value="flags">
 								<Trans>Flags</Trans>
 							</TabsTrigger>
@@ -209,7 +209,7 @@ export default memo(() => {
 									)}
 								</Empty>
 							) : (
-								<Table>
+								<Table stack>
 									<TableHeader className="sticky top-0 z-10 bg-table-header">
 										<TableRow>
 											<TableHead className="w-28">
@@ -298,7 +298,7 @@ export default memo(() => {
 									<Trans>No talkers in the last day.</Trans>
 								</Empty>
 							) : (
-								<Table>
+								<Table stack>
 									<TableHeader className="sticky top-0 z-10 bg-table-header">
 										<TableRow>
 											<TableHead>
@@ -371,7 +371,7 @@ export default memo(() => {
 									<Trans>No services talked to a peer in the last day.</Trans>
 								</Empty>
 							) : (
-								<Table>
+								<Table stack>
 									<TableHeader className="sticky top-0 z-10 bg-table-header">
 										<TableRow>
 											<TableHead>
@@ -404,7 +404,7 @@ export default memo(() => {
 									<Trans>No active blocks.</Trans>
 								</Empty>
 							) : (
-								<Table>
+								<Table stack>
 									<TableHeader className="sticky top-0 z-10 bg-table-header">
 										<TableRow>
 											<TableHead>
@@ -467,7 +467,7 @@ export default memo(() => {
 									<Trans>No requests yet.</Trans>
 								</Empty>
 							) : (
-								<Table>
+								<Table stack>
 									<TableHeader className="sticky top-0 z-10 bg-table-header">
 										<TableRow>
 											<TableHead className="w-44">
@@ -536,7 +536,7 @@ export default memo(() => {
 										<Trans>No sign-ins in the last 30 days.</Trans>
 									</Empty>
 								) : (
-									<Table>
+									<Table stack>
 										<TableHeader className="sticky top-0 z-10 bg-table-header">
 											<TableRow>
 												<TableHead>

@@ -152,7 +152,7 @@ export default memo(() => {
 					<p className="text-sm text-muted-foreground mb-3">
 						{rows.length} <Trans>checks</Trans> · {bad} <Trans>need attention</Trans>
 					</p>
-					<Table>
+					<Table stack>
 						<TableHeader className="sticky top-0 z-10 bg-table-header">
 							<TableRow>
 								<TableHead className="w-28">

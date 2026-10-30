@@ -33,8 +33,8 @@ export const LivePanels = memo(() => {
 	return (
 		<>
 			<div className="grid gap-3 md:grid-cols-2 mb-6 mt-6">
-				<div className="rounded-lg border border-border bg-card p-4">
-					<div className="flex items-center gap-2 mb-2">
+				<div className="min-w-0 rounded-lg border border-border bg-card p-4">
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-2">
 						<span className={`block size-2.5 rounded-full ${dotFor(lvTone(lvl))}`} />
 						<span className="text-sm font-semibold">
 							<Trans>Pressure</Trans> · {lvl} {d.pressure?.level_name ? `(${d.pressure.level_name})` : ""}
@@ -46,7 +46,7 @@ export const LivePanels = memo(() => {
 						) : null}
 					</div>
 					{d.pressure?.why ? <p className="text-sm text-muted-foreground mb-3">{d.pressure.why}</p> : null}
-					<div className="grid grid-cols-3 gap-3 text-sm">
+					<div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-3 text-sm">
 						{[
 							["Memory stall", psi.mem_some60, psi.mem_full60],
 							["I/O stall", psi.io_some60, psi.io_full60],
@@ -62,8 +62,8 @@ export const LivePanels = memo(() => {
 					</div>
 				</div>
 
-				<div className="rounded-lg border border-border bg-card p-4">
-					<div className="flex items-center gap-2 mb-2">
+				<div className="min-w-0 rounded-lg border border-border bg-card p-4">
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-2">
 						<span className="text-sm font-semibold">
 							<Trans>Swap held by</Trans>
 						</span>
@@ -74,9 +74,9 @@ export const LivePanels = memo(() => {
 					<ul className="text-sm">
 						{(swap.holders ?? []).slice(0, 6).map((x, i) => (
 							<li key={i} className="flex items-center gap-2 py-0.5 border-t border-border/40">
-								<span className="text-xs text-muted-foreground w-16">{x.kind ?? ""}</span>
-								<span className="truncate">{x.who}</span>
-								<span className="ms-auto tabular-nums">{bytes(x.swap_b)}</span>
+								<span className="text-xs text-muted-foreground w-16 shrink-0">{x.kind ?? ""}</span>
+								<span className="min-w-0 truncate">{x.who}</span>
+								<span className="ms-auto shrink-0 tabular-nums">{bytes(x.swap_b)}</span>
 							</li>
 						))}
 						{!swap.holders?.length ? <li className="text-muted-foreground py-0.5">No swap holders.</li> : null}

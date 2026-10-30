@@ -81,7 +81,7 @@ export default memo(() => {
 					<Trans>No alerts reported yet.</Trans>
 				</div>
 			) : (
-				<Table>
+				<Table stack>
 					<TableHeader className="sticky top-0 z-10 bg-table-header">
 						<TableRow>
 							<TableHead className="w-28">

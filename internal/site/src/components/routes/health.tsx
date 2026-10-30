@@ -49,7 +49,7 @@ export default memo(() => {
 				</div>
 			) : null}
 
-			<Table>
+			<Table stack>
 				<TableHeader className="sticky top-0 z-10 bg-table-header">
 					<TableRow>
 						<TableHead className="w-24">

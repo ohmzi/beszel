@@ -171,7 +171,7 @@ function EnabledState({
 
 function NotEnabledState({ isLoading }: { isLoading?: boolean }) {
 	return (
-		<div className={cn("grid gap-4", isLoading && "animate-pulse")}>
+		<div className={cn("grid gap-4 min-w-0", isLoading && "animate-pulse")}>
 			<div>
 				<p className="text-sm text-muted-foreground leading-relaxed mb-3">
 					<Trans>Set the following environment variables on your Beszel hub to enable heartbeat monitoring:</Trans>
@@ -208,11 +208,11 @@ function ConfigItem({ label, value, mono }: { label: string; value: string; mono
 
 function EnvVarItem({ name, description, example }: { name: string; description: string; example: string }) {
 	return (
-		<div className="bg-muted/50 rounded-md px-3 py-2.5 grid gap-1.5">
+		<div className="bg-muted/50 rounded-md px-3 py-2.5 grid gap-1.5 min-w-0">
 			<code className="text-sm font-mono text-primary font-medium leading-tight">{name}</code>
 			<p className="text-sm text-muted-foreground">{description}</p>
 			<p className="text-xs text-muted-foreground">
-				<Trans>Example:</Trans> <code className="font-mono">{example}</code>
+				<Trans>Example:</Trans> <code className="font-mono break-all">{example}</code>
 			</p>
 		</div>
 	)
